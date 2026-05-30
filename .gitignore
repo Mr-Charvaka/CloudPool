@@ -17,6 +17,11 @@ data/
 *.env
 application-local.yml
 
+# Exclude package/tsconfig configs from global *.json ignore
+!package.json
+!tsconfig.json
+!package-lock.json
+
 # IDE
 .idea/
 .vscode/
@@ -30,3 +35,15 @@ dist/
 
 # Local Storage
 backend/spring-boot/storage/
+
+# SDK Build Artifacts and Dependencies
+node_modules/
+sdks/nodejs/node_modules/
+sdks/nodejs/dist/
+sdks/rust/target/
+
+# Local Notes and Guides
+CloudPool_Code_Review.md
+CloudPool_Security_Fixes_Guide.md
+idea.tex
+*.tex
