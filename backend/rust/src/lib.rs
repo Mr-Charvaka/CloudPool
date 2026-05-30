@@ -4,12 +4,14 @@ pub mod vector_service;
 pub mod cache;
 pub mod error;
 pub mod models;
+pub mod crypto;
+pub mod config;
 
 pub use error::{CloudpoolError, Result};
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 use jni::JNIEnv;
-use jni::objects::{JClass, JString};
+use jni::objects::JClass;
 use jni::sys::{jbyteArray, jstring};
 use file_service::FileService;
 
