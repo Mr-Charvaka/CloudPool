@@ -15,7 +15,10 @@
 ![Weaviate](https://img.shields.io/badge/Weaviate-Vector_Search-blueviolet.svg)
 
 </div>
-
+```
+> **Note:** CloudPool is maintained by a group of Individual developers. We appreciate your patience as we review issues, discussions, and pull requests.
+> Contributors are welcome to join our **[Discord Community](https://discord.gg/gzcnkE7yN)** for support, discussions, and project updates.
+```
 ---
 
 # Overview
