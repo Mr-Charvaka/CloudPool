@@ -16,9 +16,9 @@
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/gzcnkE7yN)
 
 </div>
-```
+
 **Note:** CloudPool is maintained by a group of Individual developers. We appreciate your patience as we review issues, discussions, and pull requests.
-```
+
 ---
 
 # Overview
