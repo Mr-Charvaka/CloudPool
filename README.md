@@ -13,12 +13,11 @@
 ![GraphQL](https://img.shields.io/badge/GraphQL-API-E10098.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supported-336791.svg)
 ![Weaviate](https://img.shields.io/badge/Weaviate-Vector_Search-blueviolet.svg)
-[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/gzcnkE7yN)
 
 </div>
 
 **Note:** CloudPool is maintained by a group of Individual developers. We appreciate your patience as we review issues, discussions, and pull requests.
-
+[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/gzcnkE7yN)
 ---
 
 # Overview
