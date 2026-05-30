@@ -80,7 +80,8 @@ public class StorageService {
                     Files.createDirectories(uploadPath);
                 }
 
-                name = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+                String sanitized = fileUploadValidator.sanitizeFilename(originalFilename);
+                name = UUID.randomUUID().toString() + "_" + sanitized;
                 Path targetLocation = uploadPath.resolve(name);
                 Files.copy(file.getInputStream(), targetLocation);
                 driveLocation = targetLocation.toString();

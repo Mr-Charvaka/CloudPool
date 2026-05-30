@@ -1,6 +1,5 @@
 package com.cloudpool.util;
  
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -8,8 +7,11 @@ import org.springframework.stereotype.Component;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.util.Base64;
  
 @Component
@@ -17,8 +19,13 @@ import java.util.Base64;
 public class EncryptionUtil {
  
     private static final String ALGORITHM = "AES";
+    private static final String TRANSFORMATION = "AES/GCM/NoPadding";
     private static final int KEY_SIZE = 256;
+    private static final int IV_LENGTH_BYTES = 12;
+    private static final int TAG_LENGTH_BIT = 128;
+    
     private final SecretKey secretKey;
+    private final SecureRandom secureRandom = new SecureRandom();
  
     public EncryptionUtil(@Value("${cloudpool.encryption.master-key:d1f88c8078c1db294e82b71be5e8f6e80b2a75ffca79b9e6e6a1a8c3d6e5a6b0c2e3f4g5h6j7k8l9m0n1p2q3r4s5t6u7v8w9x0y1z2a3b4c5d6e7f8g9}") String masterKeyBase64) {
         try {
@@ -44,14 +51,19 @@ public class EncryptionUtil {
             }
  
             this.secretKey = new SecretKeySpec(decodedKey, 0, 32, ALGORITHM);
-            log.info("✅ Encryption key initialized successfully");
+            
+            if (cleanKey.equals("d1f88c8078c1db294e82b71be5e8f6e80b2a75ffca79b9e6e6a1a8c3d6e5a6b0c2e3f4g5h6j7k8l9m0n1p2q3r4s5t6u7v8w9x0y1z2a3b4c5d6e7f8g9")) {
+                log.warn("⚠️ WARNING: Using default encryption master key. Please configure cloudpool.encryption.master-key with a unique, secure key in production.");
+            } else {
+                log.info("✅ Encryption key initialized successfully");
+            }
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize encryption master key config", e);
         }
     }
  
     /**
-     * Encrypt plaintext
+     * Encrypt plaintext using AES-GCM
      */
     public String encrypt(String plaintext) {
         if (plaintext == null || plaintext.isBlank()) {
@@ -59,10 +71,22 @@ public class EncryptionUtil {
         }
         
         try {
-            Cipher cipher = Cipher.getInstance(ALGORITHM);
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
-            byte[] encryptedBytes = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().encodeToString(encryptedBytes);
+            byte[] iv = new byte[IV_LENGTH_BYTES];
+            secureRandom.nextBytes(iv);
+            
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            GCMParameterSpec parameterSpec = new GCMParameterSpec(TAG_LENGTH_BIT, iv);
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey, parameterSpec);
+            
+            byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+            
+            // Combine IV and ciphertext: [12 bytes IV][ciphertext]
+            byte[] encryptedBuffer = ByteBuffer.allocate(iv.length + ciphertext.length)
+                    .put(iv)
+                    .put(ciphertext)
+                    .array();
+            
+            return Base64.getEncoder().encodeToString(encryptedBuffer);
         } catch (Exception e) {
             log.error("Encryption failed: {}", e.getMessage());
             throw new RuntimeException("Failed to encrypt data", e);
@@ -70,7 +94,7 @@ public class EncryptionUtil {
     }
  
     /**
-     * Decrypt ciphertext
+     * Decrypt ciphertext supporting both new AES-GCM format and legacy AES-ECB fallback
      */
     public String decrypt(String ciphertext) {
         if (ciphertext == null || ciphertext.isBlank()) {
@@ -78,17 +102,44 @@ public class EncryptionUtil {
         }
         
         try {
-            Cipher cipher = Cipher.getInstance(ALGORITHM);
-            cipher.init(Cipher.DECRYPT_MODE, secretKey);
-            byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(ciphertext));
+            byte[] decoded = Base64.getDecoder().decode(ciphertext);
+            // GCM ciphertext payload must at least contain 12-byte IV + 16-byte GCM tag
+            if (decoded.length < IV_LENGTH_BYTES + 16) {
+                return decryptLegacy(ciphertext);
+            }
+            
+            ByteBuffer byteBuffer = ByteBuffer.wrap(decoded);
+            byte[] iv = new byte[IV_LENGTH_BYTES];
+            byteBuffer.get(iv);
+            
+            byte[] ciphertextBytes = new byte[byteBuffer.remaining()];
+            byteBuffer.get(ciphertextBytes);
+            
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            GCMParameterSpec parameterSpec = new GCMParameterSpec(TAG_LENGTH_BIT, iv);
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, parameterSpec);
+            
+            byte[] decryptedBytes = cipher.doFinal(ciphertextBytes);
             return new String(decryptedBytes, StandardCharsets.UTF_8);
-        } catch (IllegalArgumentException e) {
-            log.error("Invalid base64 in ciphertext");
-            throw new RuntimeException("Invalid encrypted data format", e);
         } catch (Exception e) {
-            log.error("Decryption failed: {}", e.getMessage());
-            throw new RuntimeException("Failed to decrypt data", e);
+            log.warn("GCM decryption failed, attempting legacy ECB decryption fallback: {}", e.getMessage());
+            try {
+                return decryptLegacy(ciphertext);
+            } catch (Exception ex) {
+                log.error("Decryption failed: {}", ex.getMessage());
+                throw new RuntimeException("Failed to decrypt data", ex);
+            }
         }
+    }
+ 
+    /**
+     * Fallback decryption using legacy AES/ECB/PKCS5Padding
+     */
+    private String decryptLegacy(String ciphertext) throws Exception {
+        Cipher cipher = Cipher.getInstance(ALGORITHM);
+        cipher.init(Cipher.DECRYPT_MODE, secretKey);
+        byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(ciphertext));
+        return new String(decryptedBytes, StandardCharsets.UTF_8);
     }
  
     /**
