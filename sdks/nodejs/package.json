@@ -1,0 +1,23 @@
+{
+  "name": "@cloudpool/sdk",
+  "version": "0.1.0",
+  "description": "Official Node.js and TypeScript client SDK for CloudPool",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cloudpool",
+    "sdk",
+    "client",
+    "vector",
+    "database"
+  ],
+  "author": "CloudPool Contributors",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
