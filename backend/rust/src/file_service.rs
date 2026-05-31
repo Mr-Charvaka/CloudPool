@@ -8,9 +8,32 @@ pub struct FileService;
 impl FileService {
     /// Calculate checksum of file
     pub fn calculate_checksum(data: &[u8]) -> Result<String> {
-        let mut hasher = Sha256::new();
-        hasher.update(data);
-        let result = hasher.finalize();
+        use rayon::prelude::*;
+        
+        let chunk_size = 4 * 1024 * 1024; // 4MB chunks
+        
+        if data.len() <= chunk_size {
+            let mut hasher = Sha256::new();
+            hasher.update(data);
+            let result = hasher.finalize();
+            return Ok(format!("{:x}", result));
+        }
+
+        let chunk_hashes: Vec<Vec<u8>> = data
+            .par_chunks(chunk_size)
+            .map(|chunk| {
+                let mut hasher = Sha256::new();
+                hasher.update(chunk);
+                hasher.finalize().to_vec()
+            })
+            .collect();
+
+        let mut final_hasher = Sha256::new();
+        for hash in chunk_hashes {
+            final_hasher.update(&hash);
+        }
+        
+        let result = final_hasher.finalize();
         Ok(format!("{:x}", result))
     }
 
