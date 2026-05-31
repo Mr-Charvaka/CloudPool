@@ -28,6 +28,7 @@ jni = "0.21"
 # Performance
 rayon = "1.7"
 parking_lot = "0.12"
+csv = "1.4.0"
 
 [lib]
 name = "cloudpool_rust"
