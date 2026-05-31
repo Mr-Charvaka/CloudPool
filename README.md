@@ -19,7 +19,7 @@
 
 <div align="center">
 
-## 🌩️ Building CloudPool Together
+## 🌩️ Building CloudPool Together 🌩️
 
 CloudPool is an open-source Developer Infrastructure Orchestration Platform.
 
