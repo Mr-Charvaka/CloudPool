@@ -1,3 +1,5 @@
+#![feature(portable_simd)]
+
 pub mod file_service;
 pub mod data_service;
 pub mod vector_service;

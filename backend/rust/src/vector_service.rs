@@ -6,26 +6,48 @@ pub struct VectorService;
 impl VectorService {
     /// Calculate cosine similarity between two vectors
     pub fn cosine_similarity(vec1: &[f32], vec2: &[f32]) -> Result<f32> {
+        use std::simd::f32x8;
+        use std::simd::num::SimdFloat;
+
         if vec1.len() != vec2.len() {
             return Err(CloudpoolError::InvalidInput(
                 "Vectors must have the same dimension".to_string()
             ));
         }
 
-        let dot_product: f32 = vec1
-            .iter()
-            .zip(vec2.iter())
-            .map(|(a, b)| a * b)
-            .sum();
+        let mut dot_product = f32x8::splat(0.0);
+        let mut sum_sq1 = f32x8::splat(0.0);
+        let mut sum_sq2 = f32x8::splat(0.0);
 
-        let magnitude1 = (vec1.iter().map(|x| x * x).sum::<f32>()).sqrt();
-        let magnitude2 = (vec2.iter().map(|x| x * x).sum::<f32>()).sqrt();
+        let (chunks1, rem1) = vec1.as_chunks::<8>();
+        let (chunks2, rem2) = vec2.as_chunks::<8>();
+
+        for (c1, c2) in chunks1.iter().zip(chunks2.iter()) {
+            let v1 = f32x8::from_array(*c1);
+            let v2 = f32x8::from_array(*c2);
+            dot_product += v1 * v2;
+            sum_sq1 += v1 * v1;
+            sum_sq2 += v2 * v2;
+        }
+
+        let mut dot = dot_product.reduce_sum();
+        let mut m1 = sum_sq1.reduce_sum();
+        let mut m2 = sum_sq2.reduce_sum();
+
+        for (a, b) in rem1.iter().zip(rem2.iter()) {
+            dot += a * b;
+            m1 += a * a;
+            m2 += b * b;
+        }
+
+        let magnitude1 = m1.sqrt();
+        let magnitude2 = m2.sqrt();
 
         if magnitude1 == 0.0 || magnitude2 == 0.0 {
             return Ok(0.0);
         }
 
-        Ok(dot_product / (magnitude1 * magnitude2))
+        Ok(dot / (magnitude1 * magnitude2))
     }
 
     /// Calculate Euclidean distance between two vectors
