@@ -106,6 +106,36 @@ pub extern "system" fn Java_com_cloudpool_util_RustBridge_decompress<'local>(
 }
 
 #[no_mangle]
+pub extern "system" fn Java_com_cloudpool_util_RustBridge_parseCsv<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    file_path: jstring,
+) -> jstring {
+    let jstr = unsafe { jni::objects::JString::from_raw(file_path) };
+    let path_str: String = match env.get_string(&jstr) {
+        Ok(s) => s.into(),
+        Err(_) => {
+            let _ = env.throw_new("java/lang/IllegalArgumentException", "Failed to get CSV file path");
+            return std::ptr::null_mut();
+        }
+    };
+
+    match crate::data_service::DataService::parse_csv(&path_str) {
+        Ok(json_data) => match env.new_string(json_data) {
+            Ok(jstr) => jstr.into_raw(),
+            Err(_) => {
+                let _ = env.throw_new("java/lang/RuntimeException", "Failed to create Java string");
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            let _ = env.throw_new("java/lang/RuntimeException", format!("CSV parsing failed: {}", e));
+            std::ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
 pub extern "system" fn Java_com_cloudpool_util_RustBridge_convertToWebp<'local>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
