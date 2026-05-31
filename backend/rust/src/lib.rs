@@ -104,3 +104,33 @@ pub extern "system" fn Java_com_cloudpool_util_RustBridge_decompress<'local>(
         }
     }
 }
+
+#[no_mangle]
+pub extern "system" fn Java_com_cloudpool_util_RustBridge_convertToWebp<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    data: jbyteArray,
+) -> jbyteArray {
+    let jarray = unsafe { jni::objects::JByteArray::from_raw(data) };
+    let bytes = match env.convert_byte_array(&jarray) {
+        Ok(b) => b,
+        Err(_) => {
+            let _ = env.throw_new("java/lang/IllegalArgumentException", "Failed to convert byte array");
+            return std::ptr::null_mut();
+        }
+    };
+
+    match FileService::convert_to_webp(&bytes) {
+        Ok(webp_bytes) => match env.byte_array_from_slice(&webp_bytes) {
+            Ok(jarr) => jarr.into_raw(),
+            Err(_) => {
+                let _ = env.throw_new("java/lang/RuntimeException", "Failed to create Java byte array");
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => {
+            let _ = env.throw_new("java/lang/RuntimeException", format!("Image conversion failed: {}", e));
+            std::ptr::null_mut()
+        }
+    }
+}

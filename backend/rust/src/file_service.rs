@@ -65,4 +65,17 @@ impl FileService {
             _ => "application/octet-stream",
         }
     }
+
+    /// Convert image to WebP format
+    pub fn convert_to_webp(data: &[u8]) -> Result<Vec<u8>> {
+        use std::io::Cursor;
+        let img = image::load_from_memory(data)
+            .map_err(|e| CloudpoolError::InvalidInput(format!("Failed to load image: {}", e)))?;
+        
+        let mut bytes: Vec<u8> = Vec::new();
+        img.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::WebP)
+            .map_err(|e| CloudpoolError::IoError(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+            
+        Ok(bytes)
+    }
 }

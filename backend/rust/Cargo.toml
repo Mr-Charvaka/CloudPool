@@ -28,6 +28,7 @@ jni = "0.21"
 # Performance
 rayon = "1.7"
 parking_lot = "0.12"
+image = { version = "0.25.10", features = ["webp"] }
 
 [lib]
 name = "cloudpool_rust"
