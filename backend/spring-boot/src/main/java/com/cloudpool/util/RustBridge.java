@@ -68,4 +68,14 @@ public class RustBridge {
      * Decompress data using native Rust Gzip implementation
      */
     public static native byte[] decompress(byte[] data);
+
+    /**
+     * Parse CSV file using native Rust implementation
+     */
+    public static native String parseCsv(String filePath);
+
+    /**
+     * Convert image data to WebP format using native Rust implementation
+     */
+    public static native byte[] convertToWebp(byte[] data);
 }

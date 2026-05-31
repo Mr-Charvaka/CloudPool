@@ -16,9 +16,31 @@
 
 </div>
 
-**Note:** CloudPool is maintained by a group of Individual developers. We appreciate your patience as we review issues, discussions, and pull requests.
-[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/gzcnkE7yN)
----
+
+<div align="center">
+
+## 🌩️ Building CloudPool Together 🌩️
+
+CloudPool is an open-source Developer Infrastructure Orchestration Platform.
+
+We are actively looking for contributors interested in:
+
+**Spring Boot • Rust • GraphQL • PostgreSQL • DevOps • Distributed Systems**
+
+<br>
+
+[![Discord](https://img.shields.io/badge/Join-Discord%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/gzcnkE7yN)
+![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-success)
+![PRs Welcome](https://img.shields.io/badge/Pull%20Requests-Welcome-brightgreen)
+
+<br>
+
+<sub>
+Maintained by independent developers • Typical PR review time: 3–7 days
+</sub>
+
+</div>
+
 
 # Overview
 
