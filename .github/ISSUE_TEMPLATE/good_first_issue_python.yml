@@ -1,0 +1,37 @@
+name: "✨ Good First Issue — Python"
+description: A contribution task for Python developers (ML/AI/SDK)
+labels: ["good first issue", "python", "help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 👋 Welcome, Python developer!
+
+        This issue is scoped for **Python SDK**, **embedding workers**, or **data pipeline** work.
+        No Java or Rust knowledge required!
+
+        **Where to work:**
+        - Python SDK → `sdk/python/`
+        - Embedding worker → `workers/embedding-worker/`
+        - File processor → `workers/file-processor/`
+
+  - type: textarea
+    id: task
+    attributes:
+      label: Task Description
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Python SDK — new method
+        - Python SDK — bug fix
+        - Python SDK — tests
+        - Embedding worker (FastAPI)
+        - File processor (PDF/OCR)
+        - Data pipeline scripts
+    validations:
+      required: true

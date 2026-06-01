@@ -2,96 +2,230 @@
 
 Thank you for your interest in contributing to CloudPool!
 
-## Getting Started
-
-1. Fork the repository.
-2. Clone your fork:
-   ```bash
-   git clone https://github.com/your-username/cloudpool.git
-   ```
-3. Create a branch:
-   ```bash
-   git checkout -b feature/your-feature
-   ```
-4. Make your changes.
-5. Format and check your code.
-6. Commit:
-   ```bash
-   git commit -am 'feat: add file compression'
-   ```
-7. Push:
-   ```bash
-   git push origin feature/your-feature
-   ```
-8. Open a Pull Request.
+CloudPool is a **polyglot project** — you don't need to know Spring Boot or Rust to contribute meaningfully.
+Every skill set has a home here. Pick the track that matches your background.
 
 ---
 
-## Code Style & Formatting
+## 🗺️ Contribution Tracks by Tech Stack
 
-- **Java**: Follow Google Java Style Guide.
-- **Rust**: Use `rustfmt` via `cargo fmt`.
-- **Spotless Formatting**: Execute Spotless checking inside the Maven folder:
-  ```bash
-  mvn spotless:apply
-  ```
+### ⚛️ MERN / React / Node.js Developers
+**You own the entire frontend and SDK ecosystem.**
 
----
+| Area | Tech | Description |
+|------|------|-------------|
+| [`/frontend/react-dashboard`](./frontend/react-dashboard) | React + TypeScript | Rebuild the admin dashboard as a modern React SPA |
+| [`/sdk/javascript`](./sdk/javascript) | TypeScript/Node.js | Official JS/TS client SDK for CloudPool APIs |
+| [`/cli`](./cli) | Node.js (Commander.js) | `cloudpool` CLI tool — `init`, `deploy`, `tunnel` commands |
+| [`/storage-adapters/s3`](./storage-adapters/s3) | Node.js (Express) | S3-compatible storage microservice |
+| [`/DRAP/dashboard/ui`](./DRAP/dashboard/ui) | SvelteKit (or React) | DRAP tunnel monitoring dashboard |
 
-## Testing Requirements
-
-- Unit tests must be provided for all new code.
-- Integration tests must be updated for API changes.
-- Project coverage should not drop below 80%.
-
-To run all tests locally:
+**Quick start:**
 ```bash
-# In backend/spring-boot
-mvn clean test
+# React Dashboard
+cd frontend/react-dashboard
+npm install && npm run dev
+
+# JavaScript SDK
+cd sdk/javascript
+npm install && npm test
+
+# CLI
+cd cli
+npm install && node bin/cloudpool.js --help
 ```
 
 ---
 
-## Commit Messages
+### 🐍 Python Developers
+**You own the AI/ML layer and data pipelines.**
 
-Follow Conventional Commits:
+| Area | Tech | Description |
+|------|------|-------------|
+| [`/sdk/python`](./sdk/python) | Python | Official Python client SDK |
+| [`/workers/embedding-worker`](./workers/embedding-worker) | Python (FastAPI) | OpenAI embedding generation microservice |
+| [`/workers/file-processor`](./workers/file-processor) | Python | Document parsing, OCR, PDF text extraction |
+| Data pipeline scripts | Python | Bulk data import/export utilities |
 
-- `feat:`: New features.
-- `fix:`: Bug fixes.
-- `docs:`: Documentation updates.
-- `test:`: Adding or updating tests.
-- `refactor:`: Code refactor without interface changes.
-- `chore:`: Dependencies updates or build script modifications.
-
----
-
-## Pull Request Process
-
-1. Update documentation for any new or changed functionality.
-2. Add unit and/or integration tests for your changes.
-3. Ensure all tests pass locally (`mvn clean test`).
-4. Update `CHANGELOG.md` with a summary of your changes.
-5. Request review from at least two maintainers.
+**Quick start:**
+```bash
+cd sdk/python
+pip install -e ".[dev]"
+pytest
+```
 
 ---
 
-## Code Review Process
+### 🐹 Go Developers
+**You own the infrastructure tooling and the DRAP dashboard API.**
 
-- Minimum **2 approvals** are required before merging.
-- All CI checks must pass (build, test, lint).
-- Code coverage must not decrease below the project threshold.
+| Area | Tech | Description |
+|------|------|-------------|
+| [`/DRAP/dashboard/api`](./DRAP/dashboard/api) | Go | REST API for DRAP tunnel dashboard — already Go! |
+| [`/storage-adapters/s3`](./storage-adapters/s3) | Go | S3-compatible storage proxy |
+| [`/cli`](./cli) | Go (Cobra) | Alternative Go CLI implementation |
+| Infrastructure tooling | Go | Health check probes, metrics exporters |
+
+**Quick start:**
+```bash
+cd DRAP/dashboard/api
+go mod download
+go run main.go
+```
 
 ---
 
-## Questions?
+### ☕ Spring Boot / Java Developers
+**You own the core orchestration engine.**
 
-- Open an issue on GitHub for bugs or feature requests.
-- Discuss ideas in our community forum.
-- Contact maintainers directly for security-related issues.
+| Area | Tech | Description |
+|------|------|-------------|
+| [`/backend/spring-boot`](./backend/spring-boot) | Java 21, Spring Boot 3 | Core API — DB provisioning, auth, vector search, compute |
+| Real serverless sandbox | Java + GraalVM Isolates | Replace the Nashorn sandbox with real isolation |
+| S3 storage adapter | Java (Spring) | Plug in AWS S3 / Cloudflare R2 / MinIO |
+| GraphQL schema extensions | Java | Add new GraphQL resolvers and subscriptions |
+
+**Quick start:**
+```bash
+cd backend/spring-boot
+../../apache-maven-3.9.6/bin/mvn spring-boot:run -Dspring-boot.run.profiles=local
+```
 
 ---
 
-## License
+### 🦀 Rust Developers
+**You own the performance layer and the DRAP tunnel.**
 
-By contributing to CloudPool, you agree that your contributions will be licensed under the [Apache License 2.0](../LICENSE).
+| Area | Tech | Description |
+|------|------|-------------|
+| [`/backend/rust`](./backend/rust) | Rust + JNI | Native performance layer — compression, hashing, CSV, WebP |
+| [`/DRAP/crates`](./DRAP/crates) | Rust (tokio, axum) | DRAP tunnel server — control plane, data plane, router |
+| WASM serverless runtime | Rust (wasmtime) | Real sandboxed serverless function execution |
+| Native vector ops | Rust + SIMD | AVX2/NEON cosine similarity, HNSW index |
 
+**Quick start:**
+```bash
+cd backend/rust && cargo build --release
+cd DRAP && cargo build --release
+```
+
+---
+
+### 📝 Technical Writers & Documentation
+**No code required — this is one of the highest-impact contributions.**
+
+| Area | Description |
+|------|-------------|
+| API docs | OpenAPI/Swagger spec for all REST endpoints |
+| GraphQL schema docs | Document all queries, mutations, subscriptions |
+| Deployment guides | AWS, GCP, Docker, bare metal tutorials |
+| SDK guides | Getting started guides for each SDK |
+| Video tutorials | Setup and feature walkthroughs |
+| Translations | Translate docs to other languages |
+
+---
+
+### 🎨 UI/UX Designers
+| Area | Description |
+|------|-------------|
+| React Dashboard design | Figma mockups for the new React dashboard |
+| DRAP Dashboard redesign | Improve the tunnel monitoring UI |
+| Onboarding flow | Design the new user setup wizard |
+| Component library | Build a CloudPool design system |
+
+---
+
+## 🚀 Quick Contribution Path (Any Stack)
+
+1. **Pick your track** from the table above
+2. **Find a `good first issue`** labeled with your stack:
+   - [`good-first-issue` + `react`](https://github.com/Mr-Charvaka/CloudPool/labels/react)
+   - [`good-first-issue` + `nodejs`](https://github.com/Mr-Charvaka/CloudPool/labels/nodejs)
+   - [`good-first-issue` + `python`](https://github.com/Mr-Charvaka/CloudPool/labels/python)
+   - [`good-first-issue` + `go`](https://github.com/Mr-Charvaka/CloudPool/labels/go)
+   - [`good-first-issue` + `java`](https://github.com/Mr-Charvaka/CloudPool/labels/java)
+   - [`good-first-issue` + `rust`](https://github.com/Mr-Charvaka/CloudPool/labels/rust)
+   - [`good-first-issue` + `docs`](https://github.com/Mr-Charvaka/CloudPool/labels/docs)
+3. **Fork, branch, code, PR** — see workflow below
+
+---
+
+## 🔀 Contribution Workflow
+
+```bash
+# Fork the repository on GitHub, then:
+git clone https://github.com/YOUR-USERNAME/CloudPool.git
+cd CloudPool
+
+# Create a branch named after the issue
+git checkout -b feat/issue-42-react-dashboard-sidebar
+
+# Make your changes in your track's directory
+# ...
+
+# Commit with conventional commits
+git commit -m "feat(react): add collapsible sidebar with project navigation"
+
+# Push and open a PR
+git push origin feat/issue-42-react-dashboard-sidebar
+```
+
+---
+
+## 📏 Code Style
+
+| Stack | Formatter | Command |
+|-------|-----------|---------|
+| Java | Google Java Style + Spotless | `mvn spotless:apply` |
+| Rust | rustfmt | `cargo fmt` |
+| JavaScript/TypeScript | ESLint + Prettier | `npm run lint && npm run format` |
+| Python | Black + isort | `black . && isort .` |
+| Go | gofmt | `go fmt ./...` |
+
+---
+
+## ✅ Testing Requirements
+
+- Every new feature needs tests in its own ecosystem
+- **Java**: JUnit 5, Mockito — `mvn clean test`
+- **Rust**: `cargo test`
+- **JS/TS**: Jest — `npm test`
+- **Python**: pytest — `pytest`
+- **Go**: `go test ./...`
+- Coverage should not drop below **80%** in any module
+
+---
+
+## 💬 Getting Help
+
+- **Discord**: [Join the CloudPool Discord](https://discord.gg/gzcnkE7yN)
+- **Issues**: Open a GitHub issue with your question
+- **Stack-specific channels** in Discord: `#react`, `#nodejs`, `#python`, `#go`, `#rust`, `#java`
+
+---
+
+## 📋 Commit Message Format
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+feat(react):      new React feature
+fix(sdk):         bug fix in JS SDK
+docs(api):        API documentation update
+test(python):     add Python SDK test
+refactor(rust):   Rust performance improvement
+chore(cli):       CLI dependency update
+```
+
+---
+
+## 🤝 Code of Conduct
+
+Be respectful. We welcome developers of all skill levels and backgrounds.
+No gatekeeping — every stack matters in CloudPool.
+
+---
+
+## 📄 License
+
+By contributing, you agree your contributions are licensed under [Apache 2.0](./LICENSE).
