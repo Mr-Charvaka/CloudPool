@@ -1,0 +1,7 @@
+relay_host: empirebot.in
+tunnels:
+  spring:
+    proto: http
+    addr: 8080
+    subdomain: cloudpool
+
