@@ -833,6 +833,16 @@
 <script>
   const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:8080' : '';
 
+  function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function getToken() {
     return localStorage.getItem("cp_token");
   }
@@ -1165,17 +1175,19 @@
         const sizeMb = (f.size / (1024 * 1024)).toFixed(2);
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td>${f.originalName}</td>
-          <td>${f.bucket.name}</td>
+          <td>${escapeHTML(f.originalName)}</td>
+          <td>${escapeHTML(f.bucket.name)}</td>
           <td>${sizeMb} MB</td>
-          <td><span class="chip active">${f.extension || 'FILE'}</span></td>
-          <td>${new Date(f.createdAt).toLocaleString()}</td>
+          <td><span class="chip active">${escapeHTML(f.extension || 'FILE')}</span></td>
+          <td>${escapeHTML(new Date(f.createdAt).toLocaleString())}</td>
           <td><span class="chip">${f.public ? 'PUBLIC' : 'PRIVATE'}</span></td>
           <td>
-            <button class="btn btn-outline" style="padding:2px 8px;font-size:9px" onclick="downloadFile('${f.id}')">DOWNLOAD</button>
-            <button class="btn btn-outline" style="padding:2px 8px;font-size:9px;margin-left:4px" onclick="shareFilePrompt('${f.id}','${f.originalName.replace(/'/g, "\\'")}')">SHARE</button>
+            <button class="btn btn-outline btn-dl" style="padding:2px 8px;font-size:9px">DOWNLOAD</button>
+            <button class="btn btn-outline btn-sh" style="padding:2px 8px;font-size:9px;margin-left:4px">SHARE</button>
           </td>
         `;
+        row.querySelector('.btn-dl').onclick = () => downloadFile(f.id);
+        row.querySelector('.btn-sh').onclick = () => shareFilePrompt(f.id, f.originalName);
         tbody.appendChild(row);
       });
     } catch(e) {
@@ -1603,7 +1615,17 @@
     const now = new Date();
     const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
     const line = document.createElement('div'); line.className = 'log-line';
-    line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-${type}">${msg}</span>`;
+    
+    const tsSpan = document.createElement('span');
+    tsSpan.className = 'log-ts';
+    tsSpan.textContent = ts;
+    
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'log-' + type;
+    msgSpan.textContent = msg;
+    
+    line.appendChild(tsSpan);
+    line.appendChild(msgSpan);
     box.appendChild(line); box.scrollTop = box.scrollHeight;
   }
 
@@ -1813,14 +1835,16 @@
         item.style.gap = "6px";
         item.innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-weight:600; font-size:11px;">${t.displayName} <span style="font-weight:normal; font-size:9px; color:var(--muted)">(${t.name})</span></div>
+            <div style="font-weight:600; font-size:11px;">${escapeHTML(t.displayName)} <span style="font-weight:normal; font-size:9px; color:var(--muted)">(${escapeHTML(t.name)})</span></div>
             <div style="display:flex; gap:6px;">
-              <button class="btn" style="padding:2px 8px; font-size:8px" onclick="viewTableRecords('${t.id}', '${t.displayName.replace(/'/g, "\\'")}')">VIEW RECORDS</button>
-              <button class="btn btn-outline" style="padding:2px 8px; font-size:8px" onclick="deleteTable('${t.id}', '${t.displayName.replace(/'/g, "\\'")}')">DELETE</button>
+              <button class="btn btn-view" style="padding:2px 8px; font-size:8px">VIEW RECORDS</button>
+              <button class="btn btn-outline btn-del" style="padding:2px 8px; font-size:8px">DELETE</button>
             </div>
           </div>
-          <div style="font-size:9px; color:var(--muted); line-height:1.4;">${t.description || 'No description.'}</div>
+          <div style="font-size:9px; color:var(--muted); line-height:1.4;">${escapeHTML(t.description) || 'No description.'}</div>
         `;
+        item.querySelector('.btn-view').onclick = () => viewTableRecords(t.id, t.displayName);
+        item.querySelector('.btn-del').onclick = () => deleteTable(t.id, t.displayName);
         container.appendChild(item);
       });
     } catch(e) {

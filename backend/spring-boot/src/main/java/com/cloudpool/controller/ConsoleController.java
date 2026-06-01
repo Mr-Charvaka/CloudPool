@@ -29,21 +29,26 @@ public class ConsoleController {
         }
 
         com.cloudpool.model.DatabaseConnection conn = null;
+        com.cloudpool.model.User user = null;
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof com.cloudpool.model.User) {
+            user = (com.cloudpool.model.User) auth.getPrincipal();
+        }
+
         if (projectIdStr != null && !projectIdStr.trim().isEmpty()) {
             try {
                 UUID projectId = UUID.fromString(projectIdStr);
                 conn = databaseConnectionRepository.findByProjectIdAndDbType(projectId, "POSTGRESQL")
                         .filter(com.cloudpool.model.DatabaseConnection::isActive)
                         .orElse(null);
+                if (conn != null && user != null) {
+                    if (!conn.getProject().getUserId().equals(user.getId())) {
+                        return ResponseEntity.status(403).body("Access denied to requested project database connection");
+                    }
+                }
             } catch (Exception e) {
                 // Ignore and default to local H2
             }
-        }
-
-        com.cloudpool.model.User user = null;
-        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getPrincipal() instanceof com.cloudpool.model.User) {
-            user = (com.cloudpool.model.User) auth.getPrincipal();
         }
 
         return ResponseEntity.ok(consoleService.executeQuery(request.getSql(), conn, user));
@@ -58,12 +63,23 @@ public class ConsoleController {
         }
 
         com.cloudpool.model.DatabaseConnection conn = null;
+        com.cloudpool.model.User user = null;
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof com.cloudpool.model.User) {
+            user = (com.cloudpool.model.User) auth.getPrincipal();
+        }
+
         if (projectIdStr != null && !projectIdStr.trim().isEmpty()) {
             try {
                 UUID projectId = UUID.fromString(projectIdStr);
                 conn = databaseConnectionRepository.findByProjectIdAndDbType(projectId, "REDIS")
                         .filter(com.cloudpool.model.DatabaseConnection::isActive)
                         .orElse(null);
+                if (conn != null && user != null) {
+                    if (!conn.getProject().getUserId().equals(user.getId())) {
+                        return ResponseEntity.status(403).body("Access denied to requested project Redis connection");
+                    }
+                }
             } catch (Exception e) {
                 // Ignore and default to localhost
             }

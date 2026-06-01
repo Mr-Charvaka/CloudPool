@@ -42,7 +42,14 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(csrf -> csrf.disable())
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .ignoringRequestMatchers(
+                    AntPathRequestMatcher.antMatcher("/api/**"),
+                    AntPathRequestMatcher.antMatcher("/graphql"),
+                    AntPathRequestMatcher.antMatcher("/h2-console/**")
+                )
+            )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/actuator/**")).permitAll()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/api/health")).permitAll()

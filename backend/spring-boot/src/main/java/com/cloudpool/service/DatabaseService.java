@@ -54,19 +54,30 @@ public class DatabaseService {
         return jdbcTemplate;
     }
 
+    public static String cleanIdentifier(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException("Identifier cannot be null or empty.");
+        }
+        String clean = value.trim().toLowerCase();
+        if (!IDENTIFIER_PATTERN.matcher(clean).matches()) {
+            throw new IllegalArgumentException("Invalid identifier pattern.");
+        }
+        StringBuilder sb = new StringBuilder();
+        for (char c : clean.toCharArray()) {
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
     @Transactional
     public DevTable createTable(UUID userId, UUID projectId, String name, String displayName, String description, List<FieldRequest> fields) {
         // Validate table name
-        if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("Table name cannot be null or empty.");
-        }
-        String cleanName = name.trim().toLowerCase();
-        if (!IDENTIFIER_PATTERN.matcher(cleanName).matches()) {
-            throw new IllegalArgumentException("Invalid table name. Only alphanumeric characters and underscores are allowed, starting with a letter.");
-        }
+        String cleanName = cleanIdentifier(name);
 
         // Generate clean physical name
-        String userIdStr = userId.toString().replace("-", "_");
+        String userIdStr = cleanIdentifier(userId.toString().replace("-", "_"));
         String physicalName = "dev_tbl_" + userIdStr + "_" + cleanName;
 
         // Check if table metadata or physical table already exists
@@ -92,10 +103,7 @@ public class DatabaseService {
                 throw new IllegalArgumentException("Field type cannot be null or empty.");
             }
 
-            String fieldName = field.getFieldName().trim().toLowerCase();
-            if (!IDENTIFIER_PATTERN.matcher(fieldName).matches()) {
-                throw new IllegalArgumentException("Invalid field name '" + field.getFieldName() + "'. Only alphanumeric characters and underscores are allowed.");
-            }
+            String fieldName = cleanIdentifier(field.getFieldName());
             if (fieldNames.contains(fieldName)) {
                 throw new IllegalArgumentException("Duplicate field name '" + fieldName + "'.");
             }
@@ -111,11 +119,11 @@ public class DatabaseService {
 
         // Construct DDL
         StringBuilder ddl = new StringBuilder();
-        ddl.append("CREATE TABLE ").append(physicalName).append(" (");
+        ddl.append("CREATE TABLE ").append(cleanIdentifier(physicalName)).append(" (");
         ddl.append("id VARCHAR(36) PRIMARY KEY");
 
         for (FieldRequest field : validatedFields) {
-            ddl.append(", ").append(field.getFieldName()).append(" ");
+            ddl.append(", ").append(cleanIdentifier(field.getFieldName())).append(" ");
             
             switch (field.getFieldType()) {
                 case "VARCHAR":
@@ -204,7 +212,7 @@ public class DatabaseService {
         DevTable devTable = getTable(tableId, userId);
 
         String physicalName = devTable.getName();
-        String dropDdl = "DROP TABLE IF EXISTS " + physicalName;
+        String dropDdl = "DROP TABLE IF EXISTS " + cleanIdentifier(physicalName);
 
         log.info("Executing DDL: {}", dropDdl);
         try {
@@ -283,9 +291,10 @@ public class DatabaseService {
         }
 
         // Build dynamic INSERT SQL
-        String columnsSql = String.join(", ", insertColumns);
+        List<String> cleanColumns = insertColumns.stream().map(DatabaseService::cleanIdentifier).collect(Collectors.toList());
+        String columnsSql = String.join(", ", cleanColumns);
         String placeholdersSql = insertColumns.stream().map(c -> "?").collect(Collectors.joining(", "));
-        String insertSql = "INSERT INTO " + devTable.getName() + " (" + columnsSql + ") VALUES (" + placeholdersSql + ")";
+        String insertSql = "INSERT INTO " + cleanIdentifier(devTable.getName()) + " (" + columnsSql + ") VALUES (" + placeholdersSql + ")";
 
         log.info("Executing DML: {} with values {}", insertSql, insertValues);
         try {
@@ -300,7 +309,7 @@ public class DatabaseService {
 
     public List<Map<String, Object>> queryRecords(UUID tableId, UUID userId) {
         DevTable devTable = getTable(tableId, userId);
-        String selectSql = "SELECT * FROM " + devTable.getName();
+        String selectSql = "SELECT * FROM " + cleanIdentifier(devTable.getName());
 
         log.info("Executing DML: {}", selectSql);
         try {
@@ -314,7 +323,7 @@ public class DatabaseService {
     @Transactional
     public void deleteRecord(UUID tableId, String recordId, UUID userId) {
         DevTable devTable = getTable(tableId, userId);
-        String deleteSql = "DELETE FROM " + devTable.getName() + " WHERE id = ?";
+        String deleteSql = "DELETE FROM " + cleanIdentifier(devTable.getName()) + " WHERE id = ?";
 
         log.info("Executing DML: {} with id={}", deleteSql, recordId);
         try {

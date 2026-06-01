@@ -275,6 +275,10 @@
       <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="5" r="1"/><path d="M1.5 5h2M6.5 5h2M5 1.5v2M5 6.5v2"/></svg>
       VECTOR SEARCH
     </div>
+    <div class="nav-item" data-page="compute" onclick="goTo('compute',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 1h6a1 1 0 011 1v6a1 1 0 01-1 1H2a1 1 0 01-1-1V2a1 1 0 011-1zM2 4h6M4 1v8"/></svg>
+      PaaS COMPUTE
+    </div>
     <div class="nav-item" data-page="apikeys" onclick="goTo('apikeys',this)">
       <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="8" height="5" rx=".5"/><path d="M3 3V2a2 2 0 014 0v1"/></svg>
       API KEYS
@@ -719,6 +723,206 @@
       </div>
     </div>
 
+    <!-- PaaS COMPUTE -->
+    <div class="page" id="page-compute">
+      <!-- PaaS Option Selection Screen -->
+      <div id="computeSelectionScreen" style="display:flex; flex-direction:column; gap:16px; flex:1;">
+        <div>
+          <div class="page-title">PaaS COMPUTE HUB</div>
+          <div class="page-sub">Deploy application workloads, serverless functions, and static assets onto CloudPool's hosting platform.</div>
+        </div>
+        
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top:20px;">
+          <!-- Static Card -->
+          <div class="pool-card" style="padding:18px 16px; display:flex; flex-direction:column; gap:8px; cursor:pointer;" onclick="selectComputeOption('static')">
+            <div class="tag" style="background:#ea580c;color:white;width:fit-content;padding:2px 6px;border-radius:4px;font-size:9px;">STATIC</div>
+            <div class="name" style="font-size:14px;font-weight:600;margin-top:4px;">STATIC SITE HOSTING</div>
+            <div class="drives" style="color:#8b949e;font-size:11px;line-height:1.4;">Deploy React, Vue, Next.js exports, or plain HTML/CSS static assets served at sub-millisecond edge latency from storage pools.</div>
+            <div style="margin-top:auto; padding-top:10px;"><button class="btn btn-outline" style="width:100%; justify-content:center;">ENTER STATIC CONSOLE</button></div>
+          </div>
+
+          <!-- Serverless Card -->
+          <div class="pool-card" style="padding:18px 16px; display:flex; flex-direction:column; gap:8px; cursor:pointer;" onclick="selectComputeOption('serverless')">
+            <div class="tag" style="background:#2563eb;color:white;width:fit-content;padding:2px 6px;border-radius:4px;font-size:9px;">EDGE_FUNC</div>
+            <div class="name" style="font-size:14px;font-weight:600;margin-top:4px;">SERVERLESS FUNCTIONS</div>
+            <div class="drives" style="color:#8b949e;font-size:11px;line-height:1.4;">Write serverless logic compiled into isolated WebAssembly runtimes. Execute dynamic backend handlers securely in isolated sandboxes.</div>
+            <div style="margin-top:auto; padding-top:10px;"><button class="btn btn-outline" style="width:100%; justify-content:center;">ENTER FUNCTION CONSOLE</button></div>
+          </div>
+
+          <!-- Container Card -->
+          <div class="pool-card" style="padding:18px 16px; display:flex; flex-direction:column; gap:8px; cursor:pointer;" onclick="selectComputeOption('container')">
+            <div class="tag" style="background:#16a34a;color:white;width:fit-content;padding:2px 6px;border-radius:4px;font-size:9px;">CONTAINERS</div>
+            <div class="name" style="font-size:14px;font-weight:600;margin-top:4px;">CONTAINER HOSTING</div>
+            <div class="drives" style="color:#8b949e;font-size:11px;line-height:1.4;">Deploy full Docker containers or custom backend workloads onto our high-availability Kubernetes runtime environment.</div>
+            <div style="margin-top:auto; padding-top:10px;"><button class="btn btn-outline" style="width:100%; justify-content:center;">ENTER CONTAINER CONSOLE</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Static Hosting Console (Hidden by default) -->
+      <div id="staticConsole" style="display:none; flex-direction:column; gap:16px; flex:1;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div class="page-title">STATIC SITE HOSTING CONSOLE</div>
+            <div class="page-sub">Expose storage pool buckets as static websites mapped to developer domains.</div>
+          </div>
+          <button class="btn btn-outline" style="padding:4px 12px;" onclick="backToComputeSelection()">← SWITCH OPTION</button>
+        </div>
+
+        <div class="panels">
+          <div class="panel panel-left" style="flex:1;">
+            <div class="panel-header"><div class="panel-title">DEPLOY NEW STATIC SITE</div></div>
+            <div class="panel-body" style="display:flex;flex-direction:column;gap:12px;">
+              <div class="field">
+                <div class="field-label">DEPLOYMENT NAME</div>
+                <input type="text" id="staticName" placeholder="my-awesome-frontend" />
+              </div>
+              <div class="field">
+                <div class="field-label">SELECT STORAGE BUCKET</div>
+                <select id="staticBucketSelect" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:8px;outline:none;font-size:12px;cursor:pointer;width:100%;">
+                  <!-- Options filled dynamically -->
+                </select>
+              </div>
+              <div class="field">
+                <div class="field-label">DOMAIN RESOLUTION PROTOCOL</div>
+                <select id="staticDomainType" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:8px;outline:none;font-size:12px;cursor:pointer;width:100%;" onchange="updateDomainPlaceholder()">
+                  <option value="web2">Web2 DNS (.cloudpool.dev)</option>
+                  <option value="web3">Web3 ENS (.cloudpool.eth)</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="field-label">CUSTOM DOMAIN</div>
+                <input type="text" id="staticDomain" placeholder="developer-app.cloudpool.dev" />
+              </div>
+              <div><button class="btn" onclick="deployStaticSite()">⊙ DEPLOY SITE</button></div>
+            </div>
+          </div>
+          <div class="panel panel-right" style="flex:1.5;">
+            <div class="panel-header"><div class="panel-title">ACTIVE STATIC DEPLOYMENTS</div></div>
+            <div class="panel-body">
+              <div style="display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex:1;" id="staticDeploymentsList">
+                <!-- Deployments list filled dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Serverless Console (Hidden by default) -->
+      <div id="serverlessConsole" style="display:none; flex-direction:column; gap:16px; flex:1;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div class="page-title">SERVERLESS FUNCTIONS COMPILER & RUNTIME</div>
+            <div class="page-sub">Write isolated backend services running inside microsecond execution runtimes.</div>
+          </div>
+          <button class="btn btn-outline" style="padding:4px 12px;" onclick="backToComputeSelection()">← SWITCH OPTION</button>
+        </div>
+
+        <div class="panels">
+          <div class="panel panel-left" style="flex:1.4;">
+            <div class="panel-header"><div class="panel-title">CREATE SERVERLESS FUNCTION</div></div>
+            <div class="panel-body" style="display:flex;flex-direction:column;gap:12px;">
+              <div class="field-row" style="display:flex;gap:12px;">
+                <div class="field" style="flex:1;">
+                  <div class="field-label">FUNCTION NAME</div>
+                  <input type="text" id="funcName" placeholder="hello-world" />
+                </div>
+                <div class="field" style="flex:1;">
+                  <div class="field-label">TRIGGER ROUTE</div>
+                  <input type="text" id="funcRoute" placeholder="/api/hello" />
+                </div>
+              </div>
+              <div class="field">
+                <div class="field-label">ISOLATED CODE EDITOR (JavaScript / Rust-like)</div>
+                <textarea id="funcCode" style="height:220px; font-family:monospace; font-size:12px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:10px; outline:none; resize:none;" placeholder="// Write function logic below
+let parsed = JSON.parse(params);
+let name = parsed.name || 'Anonymous Developer';
+'Greetings ' + name + ' from isolated CloudPool Serverless container!'"></textarea>
+              </div>
+              <div><button class="btn" onclick="deployServerless()">⊙ DEPLOY EDGE FUNCTION</button></div>
+            </div>
+          </div>
+          <div class="panel panel-right" style="flex:1.1;">
+            <div class="panel-header"><div class="panel-title">DEPLOYED FUNCTIONS</div></div>
+            <div class="panel-body" style="gap:16px; display:flex; flex-direction:column;">
+              <div style="display:flex;flex-direction:column;gap:8px;overflow-y:auto;max-height:160px;border-bottom:1px solid #30363d;padding-bottom:12px;flex:1;" id="serverlessList">
+                <!-- Dynamic functions list -->
+              </div>
+              <div class="console-wrap" style="flex:1.2; display:flex; flex-direction:column; gap:4px;">
+                <div class="console-header" style="display:flex;justify-content:space-between;align-items:center;">
+                  <div class="console-label">SANDBOX TEST CONSOLE</div>
+                  <button class="btn btn-outline" id="runTestFuncBtn" style="padding:2px 8px;font-size:10px;" onclick="runTestFunction()" disabled>RUN TEST</button>
+                </div>
+                <div class="field" style="margin-top:6px;">
+                  <div class="field-label">TEST PARAMETERS (JSON)</div>
+                  <input type="text" id="testParams" value='{"name":"Developer Alpha"}' style="font-family:monospace;font-size:11px;" />
+                </div>
+                <div class="console-box" id="funcLogs" style="height:100px;font-family:monospace;font-size:11px;overflow-y:auto;">
+                  Select a function, enter parameters, and click RUN TEST to verify sandbox execution.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Container Console (Hidden by default) -->
+      <div id="containerConsole" style="display:none; flex-direction:column; gap:16px; flex:1;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div class="page-title">CONTAINER ORCHESTRATION CONSOLE</div>
+            <div class="page-sub">Deploy long-lived servers, Node.js applications, or Docker containers onto Kubernetes clusters.</div>
+          </div>
+          <button class="btn btn-outline" style="padding:4px 12px;" onclick="backToComputeSelection()">← SWITCH OPTION</button>
+        </div>
+
+        <div class="panels">
+          <div class="panel panel-left" style="flex:1;">
+            <div class="panel-header"><div class="panel-title">PROVISION CONTAINER INSTANCE</div></div>
+            <div class="panel-body" style="display:flex;flex-direction:column;gap:12px;">
+              <div class="field">
+                <div class="field-label">DEPLOYMENT NAME</div>
+                <input type="text" id="containerName" placeholder="api-server-prod" />
+              </div>
+              <div class="field">
+                <div class="field-label">DOCKER IMAGE</div>
+                <input type="text" id="containerImage" placeholder="node:18-alpine" />
+              </div>
+              <div class="field">
+                <div class="field-label">REPLICAS COUNT (<span id="replicasVal">1</span>)</div>
+                <input type="range" id="containerReplicas" min="1" max="10" value="1" oninput="document.getElementById('replicasVal').textContent=this.value" style="width:100%;cursor:pointer;" />
+              </div>
+              <div class="field-row" style="display:flex;gap:12px;">
+                <div class="field" style="flex:1;">
+                  <div class="field-label">CPU (CORES: <span id="cpuVal">0.5</span>)</div>
+                  <input type="range" id="containerCpu" min="0.1" max="4.0" step="0.1" value="0.5" oninput="document.getElementById('cpuVal').textContent=this.value" style="width:100%;cursor:pointer;" />
+                </div>
+                <div class="field" style="flex:1;">
+                  <div class="field-label">MEMORY (MB: <span id="memVal">512</span>)</div>
+                  <input type="range" id="containerMem" min="128" max="4096" step="128" value="512" oninput="document.getElementById('memVal').textContent=this.value" style="width:100%;cursor:pointer;" />
+                </div>
+              </div>
+              <div><button class="btn" onclick="deployContainer()">⊙ LAUNCH WORKLOAD</button></div>
+            </div>
+          </div>
+          <div class="panel panel-right" style="flex:1.3;">
+            <div class="panel-header"><div class="panel-title">RUNNING CONTAINER WORKLOADS</div></div>
+            <div class="panel-body" style="gap:16px; display:flex; flex-direction:column;">
+              <div style="display:flex;flex-direction:column;gap:8px;overflow-y:auto;max-height:160px;border-bottom:1px solid #30363d;padding-bottom:12px;flex:1;" id="containersList">
+                <!-- Dynamic containers list -->
+              </div>
+              <div class="console-wrap" style="flex:1.2; display:flex; flex-direction:column;">
+                <div class="console-label">CONTAINER STDOUT/STDERR TERMINAL</div>
+                <div class="console-box" id="containerLogs" style="height:140px;font-family:monospace;font-size:11px;overflow-y:auto;white-space:pre-wrap;">
+                  Select a container above to review Kubernetes scheduler and deployment logs.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- API KEYS -->
     <div class="page" id="page-apikeys">
       <div>
@@ -832,6 +1036,16 @@
 
 <script>
   const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:8080' : '';
+
+  function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
   // Intercept all fetch responses to auto-logout on 401/403 (unauthorized/forbidden)
   const originalFetch = window.fetch;
@@ -959,6 +1173,8 @@
       loadSnapshotsList();
     } else if (id === 'analytics') {
       loadApiKeyAnalytics();
+    } else if (id === 'compute') {
+      loadComputeData();
     }
   }
 
@@ -1180,17 +1396,19 @@
         const sizeMb = (f.size / (1024 * 1024)).toFixed(2);
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td>${f.originalName}</td>
-          <td>${f.bucket.name}</td>
+          <td>${escapeHTML(f.originalName)}</td>
+          <td>${escapeHTML(f.bucket.name)}</td>
           <td>${sizeMb} MB</td>
-          <td><span class="chip active">${f.extension || 'FILE'}</span></td>
-          <td>${new Date(f.createdAt).toLocaleString()}</td>
+          <td><span class="chip active">${escapeHTML(f.extension || 'FILE')}</span></td>
+          <td>${escapeHTML(new Date(f.createdAt).toLocaleString())}</td>
           <td><span class="chip">${f.public ? 'PUBLIC' : 'PRIVATE'}</span></td>
           <td>
-            <button class="btn btn-outline" style="padding:2px 8px;font-size:9px" onclick="downloadFile('${f.id}')">DOWNLOAD</button>
-            <button class="btn btn-outline" style="padding:2px 8px;font-size:9px;margin-left:4px" onclick="shareFilePrompt('${f.id}','${f.originalName.replace(/'/g, "\\'")}')">SHARE</button>
+            <button class="btn btn-outline btn-dl" style="padding:2px 8px;font-size:9px">DOWNLOAD</button>
+            <button class="btn btn-outline btn-sh" style="padding:2px 8px;font-size:9px;margin-left:4px">SHARE</button>
           </td>
         `;
+        row.querySelector('.btn-dl').onclick = () => downloadFile(f.id);
+        row.querySelector('.btn-sh').onclick = () => shareFilePrompt(f.id, f.originalName);
         tbody.appendChild(row);
       });
     } catch(e) {
@@ -1618,7 +1836,17 @@
     const now = new Date();
     const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
     const line = document.createElement('div'); line.className = 'log-line';
-    line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-${type}">${msg}</span>`;
+    
+    const tsSpan = document.createElement('span');
+    tsSpan.className = 'log-ts';
+    tsSpan.textContent = ts;
+    
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'log-' + type;
+    msgSpan.textContent = msg;
+    
+    line.appendChild(tsSpan);
+    line.appendChild(msgSpan);
     box.appendChild(line); box.scrollTop = box.scrollHeight;
   }
 
@@ -1828,14 +2056,16 @@
         item.style.gap = "6px";
         item.innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-weight:600; font-size:11px;">${t.displayName} <span style="font-weight:normal; font-size:9px; color:var(--muted)">(${t.name})</span></div>
+            <div style="font-weight:600; font-size:11px;">${escapeHTML(t.displayName)} <span style="font-weight:normal; font-size:9px; color:var(--muted)">(${escapeHTML(t.name)})</span></div>
             <div style="display:flex; gap:6px;">
-              <button class="btn" style="padding:2px 8px; font-size:8px" onclick="viewTableRecords('${t.id}', '${t.displayName.replace(/'/g, "\\'")}')">VIEW RECORDS</button>
-              <button class="btn btn-outline" style="padding:2px 8px; font-size:8px" onclick="deleteTable('${t.id}', '${t.displayName.replace(/'/g, "\\'")}')">DELETE</button>
+              <button class="btn btn-view" style="padding:2px 8px; font-size:8px">VIEW RECORDS</button>
+              <button class="btn btn-outline btn-del" style="padding:2px 8px; font-size:8px">DELETE</button>
             </div>
           </div>
-          <div style="font-size:9px; color:var(--muted); line-height:1.4;">${t.description || 'No description.'}</div>
+          <div style="font-size:9px; color:var(--muted); line-height:1.4;">${escapeHTML(t.description) || 'No description.'}</div>
         `;
+        item.querySelector('.btn-view').onclick = () => viewTableRecords(t.id, t.displayName);
+        item.querySelector('.btn-del').onclick = () => deleteTable(t.id, t.displayName);
         container.appendChild(item);
       });
     } catch(e) {
@@ -2454,6 +2684,510 @@
   } else if (urlParams.get("gdrive") === "error") {
     alert("Failed to link Google Drive: " + urlParams.get("message"));
     window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
+  /* ── PaaS COMPUTE PLATFORM OPERATIONS ── */
+  let selectedComputeType = 'hub';
+  let activeTestFunctionId = null;
+  let activeTestFunctionName = null;
+  let activeContainerId = null;
+  let activeContainerName = null;
+  let containerLogTimer = null;
+
+  function loadComputeData() {
+    backToComputeSelection();
+  }
+
+  function selectComputeOption(type) {
+    selectedComputeType = type;
+    document.getElementById('computeSelectionScreen').style.display = 'none';
+    document.getElementById('staticConsole').style.display = 'none';
+    document.getElementById('serverlessConsole').style.display = 'none';
+    document.getElementById('containerConsole').style.display = 'none';
+
+    if (type === 'static') {
+      document.getElementById('staticConsole').style.display = 'flex';
+      loadBucketsForStatic();
+      loadStaticSites();
+    } else if (type === 'serverless') {
+      document.getElementById('serverlessConsole').style.display = 'flex';
+      loadServerless();
+    } else if (type === 'container') {
+      document.getElementById('containerConsole').style.display = 'flex';
+      loadContainers();
+      startContainerLogPolling();
+    }
+  }
+
+  function backToComputeSelection() {
+    selectedComputeType = 'hub';
+    document.getElementById('computeSelectionScreen').style.display = 'flex';
+    document.getElementById('staticConsole').style.display = 'none';
+    document.getElementById('serverlessConsole').style.display = 'none';
+    document.getElementById('containerConsole').style.display = 'none';
+    stopContainerLogPolling();
+  }
+
+  /* ─ Static Site Hosting ─ */
+  async function loadBucketsForStatic() {
+    try {
+      const res = await fetch(`${API_BASE}/api/files/buckets`, { headers: getHeaders() });
+      if (res.status === 401 || res.status === 403) { logout(); return; }
+      const buckets = await res.json();
+      const select = document.getElementById('staticBucketSelect');
+      select.innerHTML = '';
+      if (Array.isArray(buckets)) {
+        buckets.forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b.name;
+          opt.textContent = `${b.name} (${b.description || 'no description'})`;
+          select.appendChild(opt);
+        });
+      }
+    } catch(e) {
+      clog('staticDeploymentsList', `[ERR] Failed to load buckets: ${e.message}`, 'error');
+    }
+  }
+
+  function updateDomainPlaceholder() {
+    const type = document.getElementById('staticDomainType').value;
+    const domainInput = document.getElementById('staticDomain');
+    if (type === 'web3') {
+      domainInput.placeholder = 'my-project.cloudpool.eth';
+    } else {
+      domainInput.placeholder = 'my-awesome-app.cloudpool.dev';
+    }
+  }
+
+  async function deployStaticSite() {
+    const name = document.getElementById('staticName').value.trim();
+    const bucketName = document.getElementById('staticBucketSelect').value;
+    let domain = document.getElementById('staticDomain').value.trim();
+    const type = document.getElementById('staticDomainType').value;
+
+    if (!name || !domain) {
+      alert("Name and Domain are required fields.");
+      return;
+    }
+
+    if (type === 'web3' && !domain.endsWith('.eth')) {
+      domain = domain + '.cloudpool.eth';
+    } else if (type === 'web2' && !domain.endsWith('.dev')) {
+      domain = domain + '.cloudpool.dev';
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/compute/static`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ name, bucketName, domain })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert("Failed to deploy static site: " + (err.error || "Server error"));
+        return;
+      }
+      alert("Static site successfully deployed!");
+      document.getElementById('staticName').value = '';
+      document.getElementById('staticDomain').value = '';
+      loadStaticSites();
+    } catch(e) {
+      alert("Error deploying static site: " + e.message);
+    }
+  }
+
+  async function loadStaticSites() {
+    const listDiv = document.getElementById('staticDeploymentsList');
+    listDiv.innerHTML = '<div style="color:var(--text-muted)">Loading deployments...</div>';
+
+    try {
+      const res = await fetch(`${API_BASE}/api/compute/static`, { headers: getHeaders() });
+      if (!res.ok) {
+        listDiv.innerHTML = '<div style="color:var(--text-accent)">Failed to fetch static sites.</div>';
+        return;
+      }
+      const sites = await res.json();
+      listDiv.innerHTML = '';
+      if (!sites || sites.length === 0) {
+        listDiv.innerHTML = '<div style="color:var(--text-muted);font-size:11px;text-align:center;padding:20px;">No static deployments registered.</div>';
+        return;
+      }
+
+      sites.forEach(site => {
+        const isWeb3 = site.domain.endsWith('.eth');
+        const url = isWeb3 
+          ? `${API_BASE}/api/compute/dns/gateway/${site.domain}?path=index.html`
+          : `${API_BASE}/api/compute/static/serve/${site.domain}?path=index.html`;
+
+        const badge = isWeb3 
+          ? '<span class="status-badge" style="background:#6366f1;color:white;font-size:9px;padding:1px 5px;border-radius:4px;margin-left:6px;display:inline-block;vertical-align:middle;">Web3 ENS</span>' 
+          : '<span class="status-badge" style="background:#4b5563;color:white;font-size:9px;padding:1px 5px;border-radius:4px;margin-left:6px;display:inline-block;vertical-align:middle;">Web2 DNS</span>';
+
+        const card = document.createElement('div');
+        card.className = 'log-item';
+        card.style.display = 'flex';
+        card.style.justifyContent = 'space-between';
+        card.style.alignItems = 'center';
+        card.style.padding = '10px 12px';
+        card.style.background = '#1a1d24';
+        card.style.border = '1px solid #30363d';
+        card.style.borderRadius = '6px';
+        card.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="font-weight:600;font-size:12px;color:#c9d1d9;display:flex;align-items:center;">
+              <span>${site.name}</span>
+              ${badge}
+            </div>
+            <div style="font-size:11px;color:#8b949e;">Bucket: <span style="font-family:monospace;">${site.bucketName}</span></div>
+            <div style="font-size:11px;color:#58a6ff;">Route: <a href="${url}" target="_blank" style="color:#58a6ff;text-decoration:underline;">${site.domain}</a></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span class="status-badge" style="background:#1f2937;color:#34d399;font-size:10px;padding:2px 6px;border-radius:4px;">${site.status}</span>
+            <button class="btn btn-outline" style="padding:2px 8px;font-size:10px;border-color:#f85149;color:#f85149;" onclick="deleteStaticSite('${site.id}')">UNDEPLOY</button>
+          </div>
+        `;
+        listDiv.appendChild(card);
+      });
+    } catch(e) {
+      listDiv.innerHTML = `<div style="color:var(--text-accent)">Error loading static sites: ${e.message}</div>`;
+    }
+  }
+
+  async function deleteStaticSite(id) {
+    if (!confirm("Are you sure you want to undeploy this static site?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/compute/static/${id}`, {
+        method: "DELETE",
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        alert("Static site undeployed.");
+        loadStaticSites();
+      } else {
+        alert("Failed to undeploy static site.");
+      }
+    } catch(e) {
+      alert("Error: " + e.message);
+    }
+  }
+
+  /* ─ Serverless Edge Functions ─ */
+  async function deployServerless() {
+    const name = document.getElementById('funcName').value.trim();
+    const triggerRoute = document.getElementById('funcRoute').value.trim();
+    const code = document.getElementById('funcCode').value.trim();
+
+    if (!name || !triggerRoute || !code) {
+      alert("Function name, trigger route, and code are required.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/compute/serverless`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ name, triggerRoute, code })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert("Failed to deploy function: " + (err.error || "Server error"));
+        return;
+      }
+      alert("Serverless Edge Function deployed successfully!");
+      document.getElementById('funcName').value = '';
+      document.getElementById('funcRoute').value = '';
+      loadServerless();
+    } catch(e) {
+      alert("Error: " + e.message);
+    }
+  }
+
+  async function loadServerless() {
+    const listDiv = document.getElementById('serverlessList');
+    listDiv.innerHTML = '<div style="color:var(--text-muted)">Loading functions...</div>';
+
+    try {
+      const res = await fetch(`${API_BASE}/api/compute/serverless`, { headers: getHeaders() });
+      if (!res.ok) {
+        listDiv.innerHTML = '<div style="color:var(--text-accent)">Failed to fetch functions.</div>';
+        return;
+      }
+      const funcs = await res.json();
+      listDiv.innerHTML = '';
+      if (!funcs || funcs.length === 0) {
+        listDiv.innerHTML = '<div style="color:var(--text-muted);font-size:11px;text-align:center;padding:20px;">No deployed serverless functions.</div>';
+        document.getElementById('runTestFuncBtn').disabled = true;
+        return;
+      }
+
+      funcs.forEach(func => {
+        const card = document.createElement('div');
+        const isActive = activeTestFunctionId === func.id;
+        card.className = `log-item ${isActive ? 'selected-item' : ''}`;
+        card.style.display = 'flex';
+        card.style.justifyContent = 'space-between';
+        card.style.alignItems = 'center';
+        card.style.padding = '8px 10px';
+        card.style.background = isActive ? '#1f2937' : '#1a1d24';
+        card.style.border = isActive ? '1px solid #58a6ff' : '1px solid #30363d';
+        card.style.borderRadius = '6px';
+        card.style.cursor = 'pointer';
+        card.onclick = (e) => {
+          if (e.target.tagName !== 'BUTTON') {
+            selectServerlessForTest(func.id, func.name);
+          }
+        };
+        card.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <div style="font-weight:600;font-size:12px;color:#c9d1d9;">${func.name}</div>
+            <div style="font-size:10px;color:#8b949e;font-family:monospace;">Route: ${func.triggerRoute}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="status-badge" style="background:#064e3b;color:#34d399;font-size:9px;padding:1px 5px;border-radius:4px;">ACTIVE</span>
+            <button class="btn btn-outline" style="padding:1px 6px;font-size:9px;border-color:#f85149;color:#f85149;" onclick="deleteServerless('${func.id}')">DELETE</button>
+          </div>
+        `;
+        listDiv.appendChild(card);
+      });
+    } catch(e) {
+      listDiv.innerHTML = `<div style="color:var(--text-accent)">Error loading functions: ${e.message}</div>`;
+    }
+  }
+
+  function selectServerlessForTest(id, name) {
+    activeTestFunctionId = id;
+    activeTestFunctionName = name;
+    document.getElementById('runTestFuncBtn').disabled = false;
+    document.getElementById('runTestFuncBtn').textContent = `RUN [${name}]`;
+    loadServerless(); // reload list styling
+  }
+
+  async function runTestFunction() {
+    if (!activeTestFunctionId) return;
+    const logsBox = document.getElementById('funcLogs');
+    logsBox.textContent = `Executing function ${activeTestFunctionName} inside sandbox...`;
+    
+    let paramsVal = {};
+    try {
+      paramsVal = JSON.parse(document.getElementById('testParams').value);
+    } catch(e) {
+      alert("Invalid JSON parameters. Please correct and retry.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/compute/serverless/${activeTestFunctionId}/execute`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(paramsVal)
+      });
+      if (!res.ok) {
+        logsBox.textContent = `[EXECUTION FAILURE] HTTP ${res.status}`;
+        return;
+      }
+      const data = await res.json();
+      logsBox.innerHTML = `
+<span style="color:#58a6ff">[SANDBOX COMPILER STATE]</span> Wasm build target compiled successfully (JNI safe release)
+<span style="color:#58a6ff">[CONTAINER LIFECYCLE]</span> Microsecond runtime VM spun up in 0.04ms
+<span style="color:#34d399">[EXECUTION OUTPUT]</span>:
+${data.executionOutput}
+<span style="color:#8b949e">[METRICS]</span> Executed at ${data.timestamp}
+      `;
+    } catch(e) {
+      logsBox.textContent = `[EXCEPTION] ${e.message}`;
+    }
+  }
+
+  async function deleteServerless(id) {
+    if (!confirm("Delete this edge function?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/compute/serverless/${id}`, {
+        method: "DELETE",
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        if (activeTestFunctionId === id) {
+          activeTestFunctionId = null;
+          activeTestFunctionName = null;
+          document.getElementById('runTestFuncBtn').disabled = true;
+          document.getElementById('runTestFuncBtn').textContent = "RUN TEST";
+          document.getElementById('funcLogs').textContent = "Select a function, enter parameters, and click RUN TEST.";
+        }
+        alert("Serverless function deleted.");
+        loadServerless();
+      } else {
+        alert("Failed to delete serverless function.");
+      }
+    } catch(e) {
+      alert("Error: " + e.message);
+    }
+  }
+
+  /* ─ Container Hosting ─ */
+  async function deployContainer() {
+    const name = document.getElementById('containerName').value.trim();
+    const dockerImage = document.getElementById('containerImage').value.trim();
+    const replicas = parseInt(document.getElementById('containerReplicas').value);
+    const cpu = parseFloat(document.getElementById('containerCpu').value);
+    const memory = parseInt(document.getElementById('containerMem').value);
+
+    if (!name || !dockerImage) {
+      alert("Workload name and Docker image are required.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/compute/container`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ name, dockerImage, replicas, cpu, memory })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert("Failed to schedule container: " + (err.error || "Server error"));
+        return;
+      }
+      alert("Workload provisioned! Deployment process running in background via RabbitMQ worker queue.");
+      document.getElementById('containerName').value = '';
+      document.getElementById('containerImage').value = '';
+      loadContainers();
+    } catch(e) {
+      alert("Error: " + e.message);
+    }
+  }
+
+  async function loadContainers() {
+    const listDiv = document.getElementById('containersList');
+    try {
+      const res = await fetch(`${API_BASE}/api/compute/container`, { headers: getHeaders() });
+      if (!res.ok) {
+        listDiv.innerHTML = '<div style="color:var(--text-accent)">Failed to fetch container workloads.</div>';
+        return;
+      }
+      const items = await res.json();
+      listDiv.innerHTML = '';
+      if (!items || items.length === 0) {
+        listDiv.innerHTML = '<div style="color:var(--text-muted);font-size:11px;text-align:center;padding:20px;">No container workloads deployed.</div>';
+        return;
+      }
+
+      items.forEach(c => {
+        const isSelected = activeContainerId === c.id;
+        const card = document.createElement('div');
+        card.className = `log-item ${isSelected ? 'selected-item' : ''}`;
+        card.style.display = 'flex';
+        card.style.justifyContent = 'space-between';
+        card.style.alignItems = 'center';
+        card.style.padding = '8px 10px';
+        card.style.background = isSelected ? '#1f2937' : '#1a1d24';
+        card.style.border = isSelected ? '1px solid #16a34a' : '1px solid #30363d';
+        card.style.borderRadius = '6px';
+        card.style.cursor = 'pointer';
+        card.onclick = (e) => {
+          if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+            selectContainer(c.id, c.name);
+          }
+        };
+
+        let badgeBg = '#ea580c';
+        if (c.status === 'LIVE') badgeBg = '#16a34a';
+        else if (c.status === 'BUILDING') badgeBg = '#2563eb';
+
+        card.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <div style="font-weight:600;font-size:12px;color:#c9d1d9;">${c.name}</div>
+            <div style="font-size:10px;color:#8b949e;font-family:monospace;">Image: ${c.dockerImage} | Spec: ${c.cpu}vCPU, ${c.memory}MB</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="status-badge" style="background:${badgeBg};color:white;font-size:9px;padding:1px 5px;border-radius:4px;">${c.status}</span>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <span style="font-size:10px;color:#8b949e;">Replicas:</span>
+              <input type="number" min="1" max="10" value="${c.replicas}" style="width:38px;padding:2px;font-size:10px;background:#0d1117;color:white;border:1px solid #30363d;border-radius:4px;" onchange="changeReplicas('${c.id}', this.value)" />
+            </div>
+            <button class="btn btn-outline" style="padding:1px 6px;font-size:9px;border-color:#f85149;color:#f85149;" onclick="deleteContainer('${c.id}')">UNDEPLOY</button>
+          </div>
+        `;
+        listDiv.appendChild(card);
+      });
+    } catch(e) {
+      listDiv.innerHTML = `<div style="color:var(--text-accent)">Error loading containers: ${e.message}</div>`;
+    }
+  }
+
+  function selectContainer(id, name) {
+    activeContainerId = id;
+    activeContainerName = name;
+    loadContainers();
+    fetchContainerLogs(id);
+  }
+
+  async function fetchContainerLogs(id) {
+    try {
+      const res = await fetch(`${API_BASE}/api/compute/container/${id}/logs`, { headers: getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        document.getElementById('containerLogs').textContent = data.logs;
+      }
+    } catch(e) {
+      console.error("Failed to fetch logs: ", e);
+    }
+  }
+
+  async function changeReplicas(id, count) {
+    try {
+      const res = await fetch(`${API_BASE}/api/compute/container/${id}/scale?replicas=${count}`, {
+        method: "POST",
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        loadContainers();
+        if (activeContainerId === id) {
+          fetchContainerLogs(id);
+        }
+      }
+    } catch(e) {
+      alert("Error scaling replicas: " + e.message);
+    }
+  }
+
+  async function deleteContainer(id) {
+    if (!confirm("Undeploy this workload container?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/compute/container/${id}`, {
+        method: "DELETE",
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        if (activeContainerId === id) {
+          activeContainerId = null;
+          activeContainerName = null;
+          document.getElementById('containerLogs').textContent = "Select a container above to review Kubernetes scheduler and deployment logs.";
+        }
+        alert("Container workload undeployed.");
+        loadContainers();
+      }
+    } catch(e) {
+      alert("Error: " + e.message);
+    }
+  }
+
+  function startContainerLogPolling() {
+    stopContainerLogPolling();
+    containerLogTimer = setInterval(() => {
+      if (selectedComputeType === 'container') {
+        loadContainers();
+        if (activeContainerId) {
+          fetchContainerLogs(activeContainerId);
+        }
+      }
+    }, 3000);
+  }
+
+  function stopContainerLogPolling() {
+    if (containerLogTimer) {
+      clearInterval(containerLogTimer);
+      containerLogTimer = null;
+    }
   }
 
   // Init

@@ -137,9 +137,24 @@ public class ProjectService {
         return databaseConnectionRepository.findByProjectId(projectId);
     }
 
+    private void validateHost(String host) {
+        if (host == null || host.trim().isEmpty()) {
+            throw new IllegalArgumentException("Host cannot be empty");
+        }
+        try {
+            java.net.InetAddress addr = java.net.InetAddress.getByName(host.trim());
+            if (addr.isLoopbackAddress() || addr.isAnyLocalAddress() || addr.isLinkLocalAddress() || addr.isSiteLocalAddress()) {
+                throw new SecurityException("Access to internal, loopback, or link-local address is denied");
+            }
+        } catch (java.net.UnknownHostException e) {
+            throw new IllegalArgumentException("Invalid host address: " + host);
+        }
+    }
+
     @Transactional
     public DatabaseConnection saveConnection(UUID projectId, String dbType, String host, int port, String databaseName, String username, String password, boolean active, UUID userId) {
         Project project = getProject(projectId, userId);
+        validateHost(host);
         Optional<DatabaseConnection> existing = databaseConnectionRepository.findByProjectIdAndDbType(projectId, dbType.trim().toUpperCase());
         DatabaseConnection conn;
         if (existing.isPresent()) {
@@ -174,6 +189,7 @@ public class ProjectService {
     }
 
     public boolean testConnection(String dbType, String host, int port, String databaseName, String username, String password) {
+        validateHost(host);
         if ("POSTGRESQL".equalsIgnoreCase(dbType)) {
             try {
                 org.springframework.jdbc.datasource.DriverManagerDataSource dataSource = new org.springframework.jdbc.datasource.DriverManagerDataSource();
