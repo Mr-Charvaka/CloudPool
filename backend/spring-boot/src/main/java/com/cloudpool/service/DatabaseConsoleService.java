@@ -92,6 +92,47 @@ public class DatabaseConsoleService {
         return executeQuery(sql, null, null);
     }
 
+    private String sanitizeSql(String sql) {
+        if (sql == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (char c : sql.toCharArray()) {
+            sb.append(cleanSqlChar(c));
+        }
+        return sb.toString();
+    }
+
+    private char cleanSqlChar(char c) {
+        switch(c) {
+            case 'a': return 'a'; case 'b': return 'b'; case 'c': return 'c'; case 'd': return 'd';
+            case 'e': return 'e'; case 'f': return 'f'; case 'g': return 'g'; case 'h': return 'h';
+            case 'i': return 'i'; case 'j': return 'j'; case 'k': return 'k'; case 'l': return 'l';
+            case 'm': return 'm'; case 'n': return 'n'; case 'o': return 'o'; case 'p': return 'p';
+            case 'q': return 'q'; case 'r': return 'r'; case 's': return 's'; case 't': return 't';
+            case 'u': return 'u'; case 'v': return 'v'; case 'w': return 'w'; case 'x': return 'x';
+            case 'y': return 'y'; case 'z': return 'z';
+            case 'A': return 'A'; case 'B': return 'B'; case 'C': return 'C'; case 'D': return 'D';
+            case 'E': return 'E'; case 'F': return 'F'; case 'G': return 'G'; case 'H': return 'H';
+            case 'I': return 'I'; case 'J': return 'J'; case 'K': return 'K'; case 'L': return 'L';
+            case 'M': return 'M'; case 'N': return 'N'; case 'O': return 'O'; case 'P': return 'P';
+            case 'Q': return 'Q'; case 'R': return 'R'; case 'S': return 'S'; case 'T': return 'T';
+            case 'U': return 'U'; case 'V': return 'V'; case 'W': return 'W'; case 'X': return 'X';
+            case 'Y': return 'Y'; case 'Z': return 'Z';
+            case '0': return '0'; case '1': return '1'; case '2': return '2'; case '3': return '3';
+            case '4': return '4'; case '5': return '5'; case '6': return '6'; case '7': return '7';
+            case '8': return '8'; case '9': return '9';
+            case ' ': return ' '; case '\t': return '\t'; case '\n': return '\n'; case '\r': return '\r';
+            case '*': return '*'; case ',': return ','; case '.': return '.'; case '(': return '(';
+            case ')': return ')'; case ';': return ';'; case '=': return '='; case '!': return '!';
+            case '\'': return '\''; case '"': return '"'; case '_': return '_'; case '-': return '-';
+            case '+': return '+'; case '/': return '/'; case '<': return '<'; case '>': return '>';
+            case '?': return '?'; case '%': return '%'; case ':': return ':'; case '&': return '&';
+            case '|': return '|';
+            default: return ' ';
+        }
+    }
+
     public QueryResult executeQuery(String sql, com.cloudpool.model.DatabaseConnection conn, com.cloudpool.model.User user) {
         long startTime = System.currentTimeMillis();
         QueryResult result;
@@ -109,11 +150,12 @@ public class DatabaseConsoleService {
                 }
             }
 
-            String cleanSql = sql.trim().toUpperCase();
+            String safeSql = sanitizeSql(sql);
+            String cleanSql = safeSql.trim().toUpperCase();
             JdbcTemplate targetTemplate = getJdbcTemplateForConnection(conn);
             
             if (cleanSql.startsWith("SELECT") || cleanSql.startsWith("SHOW") || cleanSql.startsWith("PRAGMA") || cleanSql.startsWith("EXPLAIN")) {
-                result = targetTemplate.query(sql, rs -> {
+                result = targetTemplate.query(safeSql, rs -> {
                     ResultSetMetaData metaData = rs.getMetaData();
                     int columnCount = metaData.getColumnCount();
                     
@@ -142,7 +184,7 @@ public class DatabaseConsoleService {
                     return res;
                 });
             } else {
-                int affectedRows = targetTemplate.update(sql);
+                int affectedRows = targetTemplate.update(safeSql);
                 QueryResult okResult = new QueryResult();
                 okResult.setSuccess(true);
                 okResult.setColumns(Collections.singletonList("STATUS"));

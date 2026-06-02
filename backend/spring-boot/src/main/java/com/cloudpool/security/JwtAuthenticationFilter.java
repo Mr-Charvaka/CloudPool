@@ -59,7 +59,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String apiKeyRaw = request.getHeader("X-API-KEY");
                 if (StringUtils.hasText(apiKeyRaw)) {
                     String hashedKey = hashApiKey(apiKeyRaw);
-                    Optional<ApiKey> apiKeyOpt = apiKeyRepository.findByKeyHash(hashedKey);
+                    Optional<ApiKey> apiKeyOpt = apiKeyRepository.findByKeyHashWithUser(hashedKey);
 
                     if (apiKeyOpt.isPresent() && apiKeyOpt.get().isActive()) {
                         ApiKey apiKey = apiKeyOpt.get();

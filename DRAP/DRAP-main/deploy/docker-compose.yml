@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: drap-db
+    environment:
+      POSTGRES_USER: drap
+      POSTGRES_PASSWORD: drap_password
+      POSTGRES_DB: drap
+    ports:
+      - "5432:5432"
+    volumes:
+      - drap-db-data:/var/lib/postgresql/data
+      - ../init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+  relay:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.server
+    container_name: drap-server
+    environment:
+      DATABASE_URL: postgres://drap:drap_password@postgres:5432/drap
+      RUST_LOG: info
+    ports:
+      - "4443:4443"  # Control
+      - "8081:8081"  # Data
+      - "9090:9090"  # Metrics
+    depends_on:
+      - postgres
+
+volumes:
+  drap-db-data:

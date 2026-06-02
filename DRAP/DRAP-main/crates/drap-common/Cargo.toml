@@ -1,0 +1,11 @@
+[package]
+name = "drap-common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+uuid = { workspace = true }
+serde = { workspace = true }
+tokio-rustls = "0.26"
+rustls-pemfile = "2"
+thiserror = "1"

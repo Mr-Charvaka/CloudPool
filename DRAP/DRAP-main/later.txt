@@ -1,0 +1,70 @@
+# D-RAP: Future Improvements & TODOs
+
+### Architecture
+- [ ] Implement QUIC transport to eliminate head-of-line blocking.
+- [ ] horizontal scaling: Use Redis/Shared store for routing tables.
+
+### Security
+- [ ] Replace self-signed certs with Let's Encrypt / ACME integration.
+- [ ] Implement real token-based authentication (database backed).
+- [ ] Add mTLS for Client-Server authentication.
+- [ ] Handle graceful TLS EOF (unexpected EOF warning in server).
+
+### Networking
+- [ ] Implement Flow Control (Windowing) logic in multiplexer.
+- [ ] Add UDP tunneling support.
+- [ ] Implement zstd compression for payloads.
+
+### UI/UX
+- [ ] Build the full Go-based Dashboard API.
+- [ ] Build the Svelte Dashboard UI.
+- [ ] Add request replay functionality.
+
+
+
+
+
+
+
+Viewed DARP.txt:1-800
+Viewed DARP.txt:801-1600
+Viewed DARP.txt:1601-2400
+
+I have completed a thorough cross-reference between the original **DARP.txt** specification and our current implementation. We have successfully built the "Level 2" platform and are well into the "Advanced Networking" phase.
+
+I have created a detailed status report comparing our current build against the original roadmap.
+
+# Implementation Status Report: D-RAP vs. Original Vision
+
+## 🟢 Completed (P0 Core) - The Foundations
+We have successfully implemented the hardest parts of the "Reverse Proxy" architecture:
+- **Custom Wire Protocol**: The `drap-protocol` crate implements the exact binary framing, stream IDs, and frame types (Data, Headers, Auth, etc.) envisioned in the spec.
+- **Relay Architecture**: We have a working **Control Plane** (port 4443) and **Data Plane** (port 8081).
+- **Subdomain Routing**: The `Router` successfully maps `sub.drap.io` to a connected `TunnelSession` using a thread-safe `DashMap`.
+- **Dynamic Subdomains**: Handled via `nanoid` generation when a client doesn't request a specific prefix.
+- **HTTP Tunneling**: Full request/response proxying with `httparse` metadata extraction.
+
+## 🟡 In Progress / Partially Implemented (P1 Important)
+- **Request Inspection & Replay**:
+    - **Current**: We have the `Inspector` capturing metadata and the `Replay` frame logic. The Go Dashboard can trigger replays that hit the local client.
+    - **Gap**: Timing metrics (DNS/TLS/Transit latency breakdown) are currently simplified placeholders.
+- **Security & Rate Limiting**:
+    - **Current**: Per-tunnel **Token Bucket** rate limiting is active. Mandatory secret token auth is enforced.
+    - **Gap**: **IP Whitelisting** and **Level 2 (Public URL) Auth** like Basic Auth or Bearer tokens for the public endpoint are not yet implemented.
+- **Advanced Networking**:
+    - **Current**: **UDP Tunneling** is implemented and registered in the protocol.
+    - **Gap**: **TCP Tunneling** (raw port proxy) works conceptually via the `Data` frame, but we haven't added the specific `drap tcp <port>` CLI command and remote port allocation logic yet.
+
+## 🔴 Pending (P2/P3 Nice-to-Have/Future)
+- **Configuration Engine**: We are still using CLI flags; the `drap.yml` config file parser from the spec is not yet implemented.
+- **Multi-Tunnel Multiplexing**: While the server supports many tunnels, the CLI client is currently optimized for managing a single active tunnel session per process.
+- **Wildcard Domains**: Robust handling for `*.myapp.drap.io` needs deeper DNS/Router integration.
+- **Performance Tuning**: We haven't yet moved to the `copy_bidirectional` zero-copy optimization mentioned in Group 4 of our roadmap.
+
+### 🎯 Next Steps
+To reach "100% Alignment" with the P0/P1 goals, we should focus on:
+1.  **TCP CLI Command**: Enabling raw TCP port forwarding.
+2.  **Config Engine**: Implementing the `drap.yml` file support.
+3.  **Performance**: Integrating `tokio::io::copy_bidirectional` for the data path.
+
+**How would you like to proceed? We can wrap up the remaining P1/P2 items, or focus on a specific area like the Configuration Engine.**

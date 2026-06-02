@@ -113,4 +113,30 @@ impl DataService {
 
         Ok(json!(result))
     }
+
+    /// Parse CSV file from path
+    pub fn parse_csv(file_path: &str) -> Result<String> {
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(true)
+            .from_path(file_path)
+            .map_err(|e| CloudpoolError::IoError(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+
+        let headers = reader.headers()
+            .map_err(|e| CloudpoolError::InvalidInput(format!("CSV headers error: {}", e)))?
+            .clone();
+        
+        let mut records_vec = Vec::new();
+        for result in reader.records() {
+            let record = result.map_err(|e| CloudpoolError::InvalidInput(format!("CSV parsing error: {}", e)))?;
+            let mut obj = serde_json::Map::new();
+            for (header, field) in headers.iter().zip(record.iter()) {
+                obj.insert(header.to_string(), Value::String(field.to_string()));
+            }
+            records_vec.push(Value::Object(obj));
+        }
+
+        let json_array = Value::Array(records_vec);
+        serde_json::to_string(&json_array)
+            .map_err(|e| CloudpoolError::SerializationError(e))
+    }
 }

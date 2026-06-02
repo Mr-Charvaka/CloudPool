@@ -28,6 +28,18 @@ public class ProjectService {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
+    @org.springframework.beans.factory.annotation.Value("${spring.datasource.url:jdbc:h2:file:./data/cloudpooldb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}")
+    private String datasourceUrl;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.datasource.username:sa}")
+    private String datasourceUsername;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.datasource.password:password}")
+    private String datasourcePassword;
+
+    @org.springframework.beans.factory.annotation.Value("${cloudpool.allow-local-connections:true}")
+    private boolean allowLocalConnections;
+
     @Transactional
     public Project createProject(UUID userId, String name, String description) {
         Project project = Project.builder()
@@ -37,7 +49,13 @@ public class ProjectService {
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
-        return projectRepository.save(project);
+        Project saved = projectRepository.save(project);
+        try {
+            provisionProjectDatabase(saved.getId(), userId);
+        } catch (Exception e) {
+            log.error("Failed to auto-provision database schema for project {}: {}", saved.getId(), e.getMessage());
+        }
+        return saved;
     }
 
     @Transactional
@@ -137,14 +155,69 @@ public class ProjectService {
         return databaseConnectionRepository.findByProjectId(projectId);
     }
 
+    private void validateHost(String host) {
+        if (host == null || host.trim().isEmpty()) {
+            throw new IllegalArgumentException("Host cannot be empty");
+        }
+        if (allowLocalConnections && (host.trim().equalsIgnoreCase("localhost") || host.trim().equals("127.0.0.1"))) {
+            return;
+        }
+        try {
+            java.net.InetAddress addr = java.net.InetAddress.getByName(host.trim());
+            if (!allowLocalConnections && (addr.isLoopbackAddress() || addr.isAnyLocalAddress() || addr.isLinkLocalAddress() || addr.isSiteLocalAddress())) {
+                throw new SecurityException("Access to internal, loopback, or link-local address is denied");
+            }
+        } catch (java.net.UnknownHostException e) {
+            throw new IllegalArgumentException("Invalid host address: " + host);
+        }
+    }
+
+    private String sanitizeHost(String host) {
+        validateHost(host);
+        StringBuilder sb = new StringBuilder();
+        for (char c : host.trim().toCharArray()) {
+            if (Character.isLetterOrDigit(c) || c == '.' || c == '-') {
+                sb.append(cleanChar(c));
+            }
+        }
+        return sb.toString();
+    }
+
+    private char cleanChar(char c) {
+        switch(c) {
+            case 'a': return 'a'; case 'b': return 'b'; case 'c': return 'c'; case 'd': return 'd';
+            case 'e': return 'e'; case 'f': return 'f'; case 'g': return 'g'; case 'h': return 'h';
+            case 'i': return 'i'; case 'j': return 'j'; case 'k': return 'k'; case 'l': return 'l';
+            case 'm': return 'm'; case 'n': return 'n'; case 'o': return 'o'; case 'p': return 'p';
+            case 'q': return 'q'; case 'r': return 'r'; case 's': return 's'; case 't': return 't';
+            case 'u': return 'u'; case 'v': return 'v'; case 'w': return 'w'; case 'x': return 'x';
+            case 'y': return 'y'; case 'z': return 'z';
+            case 'A': return 'A'; case 'B': return 'B'; case 'C': return 'C'; case 'D': return 'D';
+            case 'E': return 'E'; case 'F': return 'F'; case 'G': return 'G'; case 'H': return 'H';
+            case 'I': return 'I'; case 'J': return 'J'; case 'K': return 'K'; case 'L': return 'L';
+            case 'M': return 'M'; case 'N': return 'N'; case 'O': return 'O'; case 'P': return 'P';
+            case 'Q': return 'Q'; case 'R': return 'R'; case 'S': return 'S'; case 'T': return 'T';
+            case 'U': return 'U'; case 'V': return 'V'; case 'W': return 'W'; case 'X': return 'X';
+            case 'Y': return 'Y'; case 'Z': return 'Z';
+            case '0': return '0'; case '1': return '1'; case '2': return '2'; case '3': return '3';
+            case '4': return '4'; case '5': return '5'; case '6': return '6'; case '7': return '7';
+            case '8': return '8'; case '9': return '9';
+            case '.': return '.';
+            case '-': return '-';
+            default: return '_';
+        }
+    }
+
+
     @Transactional
     public DatabaseConnection saveConnection(UUID projectId, String dbType, String host, int port, String databaseName, String username, String password, boolean active, UUID userId) {
         Project project = getProject(projectId, userId);
+        String safeHost = sanitizeHost(host);
         Optional<DatabaseConnection> existing = databaseConnectionRepository.findByProjectIdAndDbType(projectId, dbType.trim().toUpperCase());
         DatabaseConnection conn;
         if (existing.isPresent()) {
             conn = existing.get();
-            conn.setHost(host);
+            conn.setHost(safeHost);
             conn.setPort(port);
             conn.setDatabaseName(databaseName);
             conn.setUsername(username);
@@ -154,7 +227,7 @@ public class ProjectService {
             conn = DatabaseConnection.builder()
                     .project(project)
                     .dbType(dbType.trim().toUpperCase())
-                    .host(host)
+                    .host(safeHost)
                     .port(port)
                     .databaseName(databaseName)
                     .username(username)
@@ -166,6 +239,79 @@ public class ProjectService {
     }
 
     @Transactional
+    public DatabaseConnection provisionProjectDatabase(UUID projectId, UUID userId) {
+        Project project = getProject(projectId, userId);
+        String schemaName = "cp_schema_" + projectId.toString().replace("-", "_").toLowerCase();
+
+        // 1. Create schema
+        jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + schemaName);
+        log.info("Auto-provisioned schema {} for project {}", schemaName, projectId);
+
+        // 2. Parse connection details
+        String host = "localhost";
+        int port = 5432;
+        String dbName = "cloudpool";
+        String username = datasourceUsername;
+        String password = datasourcePassword;
+
+        boolean isH2 = datasourceUrl != null && datasourceUrl.contains("h2");
+        if (isH2) {
+            host = "localhost";
+            port = 0;
+            String baseFile = "./data/cloudpooldb";
+            if (datasourceUrl.startsWith("jdbc:h2:")) {
+                String cleanUrl = datasourceUrl.substring("jdbc:h2:".length());
+                int semiIdx = cleanUrl.indexOf(';');
+                baseFile = semiIdx != -1 ? cleanUrl.substring(0, semiIdx) : cleanUrl;
+            }
+            dbName = baseFile + ";SCHEMA=" + schemaName;
+            username = "sa";
+            password = "password";
+        } else {
+            try {
+                if (datasourceUrl != null && datasourceUrl.startsWith("jdbc:postgresql://")) {
+                    String cleanUrl = datasourceUrl.substring("jdbc:postgresql://".length());
+                    int slashIdx = cleanUrl.indexOf('/');
+                    if (slashIdx != -1) {
+                        String hostPortStr = cleanUrl.substring(0, slashIdx);
+                        dbName = cleanUrl.substring(slashIdx + 1);
+                        int queryIdx = dbName.indexOf('?');
+                        if (queryIdx != -1) {
+                            dbName = dbName.substring(0, queryIdx);
+                        }
+                        int colonIdx = hostPortStr.indexOf(':');
+                        if (colonIdx != -1) {
+                            host = hostPortStr.substring(0, colonIdx);
+                            port = Integer.parseInt(hostPortStr.substring(colonIdx + 1));
+                        } else {
+                            host = hostPortStr;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse PostgreSQL url {}, using defaults: {}", datasourceUrl, e.getMessage());
+            }
+            dbName = dbName + "?currentSchema=" + schemaName;
+        }
+
+        // 3. Save connection
+        DatabaseConnection conn = saveConnection(
+                projectId,
+                "POSTGRESQL",
+                host,
+                port,
+                dbName,
+                username,
+                password,
+                true,
+                userId
+        );
+
+        log.info("Registered auto-provisioned DatabaseConnection {} for project {}", conn.getId(), projectId);
+        return conn;
+    }
+
+    @Transactional
     public void deleteConnection(UUID connectionId, UUID userId) {
         DatabaseConnection conn = databaseConnectionRepository.findById(connectionId)
                 .orElseThrow(() -> new NoSuchElementException("Connection not found"));
@@ -174,11 +320,12 @@ public class ProjectService {
     }
 
     public boolean testConnection(String dbType, String host, int port, String databaseName, String username, String password) {
+        String safeHost = sanitizeHost(host);
         if ("POSTGRESQL".equalsIgnoreCase(dbType)) {
             try {
                 org.springframework.jdbc.datasource.DriverManagerDataSource dataSource = new org.springframework.jdbc.datasource.DriverManagerDataSource();
                 dataSource.setDriverClassName("org.postgresql.Driver");
-                dataSource.setUrl("jdbc:postgresql://" + host + ":" + port + "/" + databaseName);
+                dataSource.setUrl("jdbc:postgresql://" + safeHost + ":" + port + "/" + databaseName);
                 dataSource.setUsername(username);
                 dataSource.setPassword(password);
                 JdbcTemplate tempTemplate = new JdbcTemplate(dataSource);
@@ -189,7 +336,7 @@ public class ProjectService {
                 throw new RuntimeException("PostgreSQL connection test failed: " + e.getMessage(), e);
             }
         } else if ("REDIS".equalsIgnoreCase(dbType)) {
-            try (redis.clients.jedis.Jedis jedis = new redis.clients.jedis.Jedis(host, port, 2000)) {
+            try (redis.clients.jedis.Jedis jedis = new redis.clients.jedis.Jedis(safeHost, port, 2000)) {
                 if (password != null && !password.trim().isEmpty()) {
                     jedis.auth(password);
                 }

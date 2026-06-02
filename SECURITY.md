@@ -13,7 +13,7 @@ Only the latest release versions are supported with security updates.
 
 We take the security of CloudPool seriously. If you find a security vulnerability, please do not report it publicly via GitHub issues. Instead, follow these steps:
 
-1. Send an email to the security team or maintainers (or open a private vulnerability report on GitHub if available).
+1. Send an email to the security team or maintainers(aman71204@hotmail.com) or open a private vulnerability report on GitHub if available.
 2. Provide a detailed description of the vulnerability, including step-by-step reproduction steps, payload samples, and affected components.
 3. We will acknowledge receipt of your report within 48 hours and work on a fix promptly.
 

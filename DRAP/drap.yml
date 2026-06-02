@@ -1,0 +1,18 @@
+# D-RAP Configuration File
+# Expose multiple services with one command
+
+tunnels:
+  web:
+    proto: http
+    addr: 3000
+    subdomain: portal
+    auth: "admin:pass123"
+  api:
+    proto: http
+    addr: 8080
+    allowed_ips:
+      - "127.0.0.1"
+      - "192.168.1.5"
+  db:
+    proto: tcp
+    addr: 5432

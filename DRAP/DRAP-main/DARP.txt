@@ -1,0 +1,4717 @@
+# Project: **D-RAP**
+
+## *Like ngrok, But You Built It From Scratch*
+
+---
+
+# 📖 COMPLETE IDEA DOCUMENTATION
+
+---
+
+## Table of Contents
+
+1. [Executive Summary](#1-executive-summary)
+2. [Vision & Philosophy](#2-vision--philosophy)
+3. [Problem Statement](#3-problem-statement)
+4. [What D-RAP Does](#4-what-d-rap-does)
+5. [Architecture Overview](#5-architecture-overview)
+6. [Tech Stack Decision](#6-tech-stack-decision)
+7. [Core Components Deep Dive](#7-core-components-deep-dive)
+   - 7.1 [D-RAP CLI Client](#71-d-rap-cli-client)
+   - 7.2 [D-RAP Relay Server](#72-d-rap-relay-server)
+   - 7.3 [D-RAP Dashboard](#73-d-rap-dashboard)
+   - 7.4 [Control Plane Protocol](#74-control-plane-protocol)
+   - 7.5 [Data Plane & Tunneling Engine](#75-data-plane--tunneling-engine)
+   - 7.6 [Subdomain Router](#76-subdomain-router)
+   - 7.7 [TLS Termination Layer](#77-tls-termination-layer)
+   - 7.8 [Authentication & Authorization System](#78-authentication--authorization-system)
+   - 7.9 [Rate Limiter](#79-rate-limiter)
+   - 7.10 [Request Inspector & Replay Engine](#710-request-inspector--replay-engine)
+   - 7.11 [Connection Pool Manager](#711-connection-pool-manager)
+8. [Networking Deep Dive](#8-networking-deep-dive)
+   - 8.1 [NAT Traversal Strategy](#81-nat-traversal-strategy)
+   - 8.2 [Reverse Tunneling Mechanism](#82-reverse-tunneling-mechanism)
+   - 8.3 [Connection Multiplexing](#83-connection-multiplexing)
+   - 8.4 [TCP Proxy Architecture](#84-tcp-proxy-architecture)
+   - 8.5 [Keep-Alive & Heartbeat Protocol](#85-keep-alive--heartbeat-protocol)
+9. [Protocol Design](#9-protocol-design)
+   - 9.1 [D-RAP Wire Protocol](#91-d-rap-wire-protocol)
+   - 9.2 [Frame Types](#92-frame-types)
+   - 9.3 [Handshake Flow](#93-handshake-flow)
+   - 9.4 [Error Handling Protocol](#94-error-handling-protocol)
+10. [Feature Specifications](#10-feature-specifications)
+    - 10.1 [HTTP Tunneling](#101-http-tunneling)
+    - 10.2 [TCP Tunneling](#102-tcp-tunneling)
+    - 10.3 [Custom Subdomains](#103-custom-subdomains)
+    - 10.4 [Request Inspection](#104-request-inspection)
+    - 10.5 [Request Replay](#105-request-replay)
+    - 10.6 [Tunnel Authentication](#106-tunnel-authentication)
+    - 10.7 [Rate Limiting](#107-rate-limiting)
+    - 10.8 [Active Tunnel Dashboard](#108-active-tunnel-dashboard)
+11. [Security Architecture](#11-security-architecture)
+12. [Concurrency Model](#12-concurrency-model)
+13. [Data Flow Diagrams](#13-data-flow-diagrams)
+14. [Database Schema](#14-database-schema)
+15. [API Design](#15-api-design)
+16. [CLI Design](#16-cli-design)
+17. [Dashboard UI Design](#17-dashboard-ui-design)
+18. [Deployment Architecture](#18-deployment-architecture)
+19. [Performance Targets & Benchmarks](#19-performance-targets--benchmarks)
+20. [Testing Strategy](#20-testing-strategy)
+21. [Development Phases & Timeline](#21-development-phases--timeline)
+22. [Repository Structure](#22-repository-structure)
+23. [Risk Assessment & Mitigation](#23-risk-assessment--mitigation)
+24. [Future Roadmap](#24-future-roadmap)
+25. [Why This Project Matters](#25-why-this-project-matters)
+
+---
+
+---
+
+## 1. Executive Summary
+
+**D-RAP** (Dynamic Relay Access Point) is a self-built, open-source tunneling platform that exposes local development servers to the public internet through secure tunnels. Think **ngrok**, but built entirely from scratch — from raw TCP sockets, through custom protocol design, to a real-time dashboard.
+
+**The one-liner:**
+
+> Run a single CLI command. Get a public URL. Your localhost is now accessible from anywhere on Earth.
+
+```
+$ drap http 3000
+
+D-RAP v1.0.0                                    
+Status:     online                                
+Account:    dev@axiom.io                          
+Region:     us-east-1                             
+
+Forwarding:  https://wild-fox-42.drap.io → http://localhost:3000
+             tcp://wild-fox-42.drap.io:44301 → tcp://localhost:3000
+
+Dashboard:   http://127.0.0.1:4040                
+Requests:    0 total | 0/min                      
+
+Connections: 1 active tunnel                      
+```
+
+**This is not a wrapper around SSH tunneling.** This is not a port-forward script. This is a full, ground-up implementation involving:
+
+- **Custom binary wire protocol** for control/data plane communication
+- **Reverse tunnel establishment** through NAT/firewalls
+- **Connection multiplexing** over a single TCP connection
+- **TLS termination** at the edge
+- **Subdomain routing** with wildcard DNS
+- **Request inspection, logging, and replay**
+- **Token-based authentication** on tunnels
+- **Sliding-window rate limiting**
+- **Real-time web dashboard** for monitoring
+- **High-concurrency architecture** handling thousands of simultaneous connections
+
+**Tech stack:** Rust (core engine) + Go (dashboard API) + Svelte (dashboard UI) + SQLite (metadata) + Redis (rate limiting & session state)
+
+**Estimated scope:** ~15,000–25,000 lines of code across all components.
+
+---
+
+---
+
+## 2. Vision & Philosophy
+
+### 2.1 Why Build This?
+
+ngrok is a **$3.2 billion company** (as of 2024). It's one of the most-used developer tools in the world. Every web developer, mobile developer, webhook integrator, and API tester has used it.
+
+And yet, at its core, it's "just" networking. TCP proxying. Reverse tunnels. TLS. Routing. All things that are **buildable** if you understand the fundamentals.
+
+Building D-RAP proves you understand:
+
+| Concept | Depth |
+|---|---|
+| TCP/IP networking | Socket-level, not library-level |
+| NAT traversal | How connections survive firewalls |
+| Protocol design | Designing a wire format from scratch |
+| Concurrency | Handling 10,000+ simultaneous connections |
+| Cryptography (applied) | TLS termination, token auth, certificate management |
+| Systems programming | Raw memory management, zero-copy I/O |
+| Distributed systems | Relay servers, connection routing, state management |
+| Developer tooling | CLI design, DX, documentation |
+| Full-stack capability | Backend engine + web dashboard |
+
+### 2.2 Design Principles
+
+1. **Zero Magic**: Every byte on the wire is accounted for. No hidden abstractions.
+2. **Performance First**: The relay server should add <5ms latency to proxied requests.
+3. **Developer Experience Matters**: The CLI should feel as polished as ngrok's.
+4. **Security by Default**: All tunnels use TLS. Auth tokens are non-optional in production mode.
+5. **Observability Built In**: Every request is loggable, inspectable, and replayable.
+6. **Single Binary Distribution**: The CLI compiles to one binary. No runtime dependencies.
+
+### 2.3 What This Is NOT
+
+- **Not a VPN.** D-RAP tunnels specific ports/services, not entire network interfaces.
+- **Not an SSH tunnel wrapper.** The protocol is custom, purpose-built, and more efficient.
+- **Not a toy.** This should handle real development workloads — webhook testing, API development, demo sharing, IoT device exposure.
+
+---
+
+---
+
+## 3. Problem Statement
+
+### 3.1 The Core Problem
+
+A developer runs a web application on `localhost:3000`. They need it accessible from the public internet for:
+
+- **Webhook testing** (Stripe, GitHub, Twilio send events to a public URL)
+- **Mobile app development** (phone needs to hit the API running on laptop)
+- **Demo sharing** (show a client your WIP without deploying)
+- **IoT/embedded** (device behind NAT needs to be reachable)
+- **Collaborative debugging** (teammate needs to see your local environment)
+- **API integration testing** (third-party service needs to reach your endpoint)
+
+### 3.2 Why This Is Hard
+
+The developer's machine is behind:
+
+```
+[Developer's Machine]
+        │
+   [Home Router / NAT]
+        │
+   [ISP's CGNAT (possibly)]
+        │
+   [The Internet]
+        │
+   [Webhook Sender / Client]
+```
+
+**NAT (Network Address Translation)** means the developer's machine doesn't have a public IP address. Incoming connections from the internet cannot reach it directly.
+
+**Traditional solutions and their problems:**
+
+| Solution | Problem |
+|---|---|
+| Port forwarding on router | Requires router access, static IP, security risk |
+| Dynamic DNS | Still requires port forwarding, doesn't solve NAT |
+| SSH reverse tunnel | Clunky, no HTTP-specific features, no inspection |
+| Deploy to staging | Slow iteration cycle, costs money |
+| ngrok | Proprietary, rate-limited on free tier, costs money at scale |
+
+### 3.3 D-RAP's Solution
+
+D-RAP solves this with a **relay architecture**:
+
+```
+[localhost:3000] ←TCP→ [D-RAP Client] ═══TUNNEL═══▶ [D-RAP Relay Server] ←HTTPS→ [Public Internet]
+                       (developer's                  (cloud server with             (webhook sender,
+                        machine)                      public IP & DNS)               browser, etc.)
+```
+
+The key insight: **The D-RAP client initiates the connection outward** (which NAT allows), and then the relay server **reverses the direction** of request flow over that established connection.
+
+---
+
+---
+
+## 4. What D-RAP Does
+
+### 4.1 Feature Matrix
+
+| Feature | Description | Priority |
+|---|---|---|
+| **HTTP Tunneling** | Expose local HTTP/HTTPS servers via public URL | P0 — Core |
+| **TCP Tunneling** | Expose any TCP service (databases, game servers, SSH) | P0 — Core |
+| **Custom Subdomains** | `drap http 3000 --subdomain=myapp` → `myapp.drap.io` | P0 — Core |
+| **Random Subdomains** | Auto-generated: `wild-fox-42.drap.io` | P0 — Core |
+| **TLS Termination** | All public URLs served over HTTPS automatically | P0 — Core |
+| **Request Inspection** | View headers, body, timing of every request in real-time | P1 — Important |
+| **Request Replay** | Re-send any captured request to your local server | P1 — Important |
+| **Rate Limiting** | Protect tunnels from abuse with configurable limits | P1 — Important |
+| **Tunnel Authentication** | Require username/password or token to access tunnel | P1 — Important |
+| **Web Dashboard** | Real-time UI showing tunnels, requests, metrics | P1 — Important |
+| **Multiple Tunnels** | Run several tunnels simultaneously from one client | P2 — Nice |
+| **Config File** | Define tunnels in `drap.yml` instead of CLI args | P2 — Nice |
+| **Wildcard Domains** | `*.myapp.drap.io` routes all subdomains to local | P2 — Nice |
+| **IP Whitelisting** | Only allow specific IPs to access tunnel | P2 — Nice |
+| **Webhook Signature Verification** | Verify webhook authenticity at the relay | P3 — Future |
+| **gRPC Tunneling** | HTTP/2 based gRPC tunnel support | P3 — Future |
+| **UDP Tunneling** | DNS, game servers, VoIP | P3 — Future |
+
+### 4.2 User Workflows
+
+**Workflow 1: Simple HTTP Tunnel**
+```
+Developer runs:     $ drap http 3000
+Gets URL:           https://abc123.drap.io
+Shares URL:         Sends to Stripe webhook config
+Stripe sends POST:  POST https://abc123.drap.io/webhook
+D-RAP relays:       → POST http://localhost:3000/webhook
+Developer sees:     Request appears in local server logs + D-RAP dashboard
+```
+
+**Workflow 2: Custom Subdomain with Auth**
+```
+Developer runs:     $ drap http 8080 --subdomain=demo --auth="user:pass123"
+Gets URL:           https://demo.drap.io
+Client visits:      Browser prompts for Basic Auth
+After auth:         Proxied to localhost:8080
+```
+
+**Workflow 3: TCP Tunnel for Database**
+```
+Developer runs:     $ drap tcp 5432
+Gets address:       tcp://abc123.drap.io:54320
+Teammate connects:  psql -h abc123.drap.io -p 54320 -U postgres
+D-RAP relays:       → TCP connection to localhost:5432
+```
+
+**Workflow 4: Request Inspection & Replay**
+```
+Developer runs:     $ drap http 3000 --inspect
+Dashboard opens:    http://127.0.0.1:4040
+Webhook arrives:    POST /api/payment-complete
+Developer sees:     Full request in dashboard (headers, body, timing)
+Developer clicks:   [Replay] button
+Request re-sent:    Same POST hits localhost:3000 again
+Developer debugs:   Fixes handler, replays again, confirms fix
+```
+
+**Workflow 5: Config File Multi-Tunnel**
+```yaml
+# drap.yml
+authtoken: drap_tok_abc123xyz
+tunnels:
+  frontend:
+    proto: http
+    addr: 3000
+    subdomain: my-frontend
+    inspect: true
+  api:
+    proto: http
+    addr: 8080
+    subdomain: my-api
+    auth: "admin:secret"
+    rate_limit: 100/min
+  database:
+    proto: tcp
+    addr: 5432
+```
+```
+$ drap start --config drap.yml
+
+Tunnels:
+  https://my-frontend.drap.io → http://localhost:3000
+  https://my-api.drap.io      → http://localhost:8080
+  tcp://rand-slug.drap.io:44301 → tcp://localhost:5432
+```
+
+---
+
+---
+
+## 5. Architecture Overview
+
+### 5.1 High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          THE INTERNET                                   │
+│                                                                         │
+│   [Browser]  [Stripe Webhook]  [Mobile App]  [Teammate's Machine]      │
+│       │            │                │               │                    │
+│       └────────────┴────────────────┴───────────────┘                    │
+│                              │                                           │
+│                         HTTPS / TCP                                      │
+│                              │                                           │
+├──────────────────────────────┼───────────────────────────────────────────┤
+│                              ▼                                           │
+│  ┌─────────────────────────────────────────────────────────────────┐     │
+│  │                    D-RAP RELAY SERVER                            │     │
+│  │                    (Cloud, Public IP)                            │     │
+│  │                                                                  │     │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌────────────────────┐     │     │
+│  │  │ TLS          │  │ Subdomain    │  │ Rate Limiter       │     │     │
+│  │  │ Termination  │→│ Router       │→│ + Auth Gate        │     │     │
+│  │  └──────────────┘  └──────────────┘  └────────┬───────────┘     │     │
+│  │                                                │                 │     │
+│  │  ┌─────────────────────────────────────────────▼──────────────┐  │     │
+│  │  │              TUNNEL MANAGER                                 │  │     │
+│  │  │                                                             │  │     │
+│  │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │  │     │
+│  │  │  │ Tunnel #1   │  │ Tunnel #2   │  │ Tunnel #3   │       │  │     │
+│  │  │  │ HTTP        │  │ HTTP        │  │ TCP         │       │  │     │
+│  │  │  │ myapp.drap  │  │ demo.drap   │  │ port:44301  │       │  │     │
+│  │  │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘       │  │     │
+│  │  │         │                │                │                │  │     │
+│  │  │         └────────────────┴────────────────┘                │  │     │
+│  │  │                          │                                  │  │     │
+│  │  │              ┌───────────▼────────────┐                    │  │     │
+│  │  │              │ Connection Multiplexer │                    │  │     │
+│  │  │              └───────────┬────────────┘                    │  │     │
+│  │  └──────────────────────────┼─────────────────────────────────┘  │     │
+│  │                             │                                     │     │
+│  │  ┌──────────────┐  ┌───────▼──────────┐  ┌──────────────────┐   │     │
+│  │  │ Request      │  │ Control Plane    │  │ Dashboard API    │   │     │
+│  │  │ Inspector    │  │ (D-RAP Protocol) │  │ (REST + WebSocket│   │     │
+│  │  │ + Replay     │  │                  │  │  for live data)  │   │     │
+│  │  └──────────────┘  └───────┬──────────┘  └──────────────────┘   │     │
+│  │                            │                                      │     │
+│  └────────────────────────────┼──────────────────────────────────────┘     │
+│                               │                                           │
+│                    D-RAP Custom Wire Protocol                             │
+│                    (Multiplexed, Binary Frames)                           │
+│                               │                                           │
+│                          Single TCP                                       │
+│                          Connection                                       │
+│                          (TLS encrypted)                                  │
+│                               │                                           │
+├───────────────────────────────┼───────────────────────────────────────────┤
+│                               │                                           │
+│                          [NAT / Firewall]                                 │
+│                               │                                           │
+├───────────────────────────────┼───────────────────────────────────────────┤
+│                               ▼                                           │
+│  ┌─────────────────────────────────────────────────────────────────┐     │
+│  │                    D-RAP CLI CLIENT                              │     │
+│  │                    (Developer's Machine)                         │     │
+│  │                                                                  │     │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │     │
+│  │  │ Control      │  │ Local Proxy  │  │ Local Dashboard      │  │     │
+│  │  │ Connection   │  │ Manager      │  │ Server (:4040)       │  │     │
+│  │  │ Manager      │  │              │  │                      │  │     │
+│  │  └──────────────┘  └──────┬───────┘  └──────────────────────┘  │     │
+│  │                           │                                     │     │
+│  └───────────────────────────┼─────────────────────────────────────┘     │
+│                              │                                           │
+│                         localhost:3000                                    │
+│                         localhost:8080                                    │
+│                         localhost:5432                                    │
+│                              │                                           │
+│                    [Developer's Application]                              │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 Component Map
+
+```
+D-RAP
+├── drap-client/          # CLI client binary (Rust)
+├── drap-server/          # Relay server binary (Rust)
+├── drap-protocol/        # Shared wire protocol library (Rust)
+├── drap-dashboard-api/   # Dashboard REST + WebSocket API (Go)
+├── drap-dashboard-ui/    # Dashboard web frontend (Svelte)
+├── drap-common/          # Shared types, crypto utils (Rust)
+└── drap-tests/           # Integration & load tests
+```
+
+### 5.3 Data Flow — HTTP Request Lifecycle
+
+```
+Step 1:  Client app starts, connects to relay server via TLS
+Step 2:  Client sends AUTH frame with token
+Step 3:  Server validates token, sends AUTH_OK
+Step 4:  Client sends TUNNEL_REQ (proto=HTTP, subdomain="myapp")
+Step 5:  Server checks subdomain availability
+Step 6:  Server registers subdomain in routing table
+Step 7:  Server sends TUNNEL_CREATED (url="https://myapp.drap.io")
+Step 8:  Client displays URL to developer
+         --- Tunnel is now established ---
+
+Step 9:  External client sends: GET https://myapp.drap.io/api/users
+Step 10: Relay server terminates TLS
+Step 11: Subdomain router matches "myapp" → Tunnel #X
+Step 12: Rate limiter checks: within limits? ✓
+Step 13: Auth gate checks: auth required? (if yes, validate)
+Step 14: Request inspector logs the full request
+Step 15: Server creates DATA frame with request bytes
+Step 16: Server sends DATA frame over multiplexed tunnel connection
+Step 17: Client receives DATA frame
+Step 18: Client demultiplexes: this is for stream #42
+Step 19: Client opens TCP connection to localhost:3000
+Step 20: Client forwards request bytes to localhost:3000
+Step 21: Local app processes request, sends response
+Step 22: Client reads response from localhost:3000
+Step 23: Client wraps response in DATA frame (stream #42)
+Step 24: Client sends DATA frame back to relay server
+Step 25: Server demultiplexes: stream #42
+Step 26: Request inspector logs the full response
+Step 27: Server sends HTTP response to external client
+Step 28: Dashboard updates in real-time via WebSocket
+```
+
+**Total added latency target: <5ms** (excluding network transit time)
+
+---
+
+---
+
+## 6. Tech Stack Decision
+
+### 6.1 Decision Matrix
+
+| Component | Language/Tech | Why This Over Alternatives |
+|---|---|---|
+| **CLI Client** | **Rust** | Single binary, zero runtime deps, raw socket access, memory safety without GC pauses, async ecosystem (tokio) |
+| **Relay Server** | **Rust** | Same reasons + needs maximum performance for high concurrency proxy workload |
+| **Wire Protocol** | **Custom binary (Rust)** | Need control over every byte; no existing protocol fits exactly |
+| **Dashboard API** | **Go** | Fast HTTP server, great for WebSocket handling, lighter weight than Rust for a CRUD API layer |
+| **Dashboard UI** | **Svelte** | Minimal bundle size, reactive by default, no virtual DOM overhead, perfect for real-time dashboards |
+| **Metadata Store** | **SQLite** | Embedded, zero-config, file-based, perfect for local client state + server metadata |
+| **Session/Rate Limit Store** | **Redis** | In-memory speed, built-in TTL, atomic counters, pub/sub for multi-instance relay servers |
+| **TLS** | **rustls** | Pure-Rust TLS, no OpenSSL dependency hell, audited, modern |
+| **Async Runtime** | **tokio** | Industry-standard async runtime for Rust, work-stealing scheduler, io_uring support |
+| **Serialization** | **Custom binary + serde/JSON for API** | Binary for wire protocol (speed), JSON for REST API (interop) |
+| **Testing** | **Rust's built-in + Go test + Playwright** | Unit tests in respective languages, E2E with Playwright for dashboard |
+| **CI/CD** | **GitHub Actions** | Standard, free for open-source, great Rust/Go support |
+| **Deployment** | **Single binary + Docker** | Distribute CLI as single binary, relay server as Docker container |
+
+### 6.2 Why Rust for the Core?
+
+This is a networking-heavy, performance-critical system. The relay server might handle **thousands of concurrent tunnels**, each with **hundreds of concurrent requests**. Every microsecond of latency matters. Every byte of memory matters.
+
+**Rust gives us:**
+
+1. **Zero-cost abstractions** — Generics, traits, iterators compile to the same code you'd write in C
+2. **No garbage collector** — No GC pauses means predictable latency (critical for a proxy)
+3. **Ownership model** — Prevents data races at compile time (critical for concurrent networking)
+4. **async/await + tokio** — Handles millions of concurrent connections with minimal threads
+5. **Single binary** — `cargo build --release` produces one file, cross-compile for any platform
+6. **Ecosystem** — `tokio`, `rustls`, `hyper`, `bytes`, `tracing` are battle-tested
+7. **Memory safety** — A proxy handles untrusted input; buffer overflows are unacceptable
+
+**Why not Go?** Go would be the second choice. Its goroutine model is great for concurrency, but:
+- GC pauses can cause tail latency spikes in the proxy path
+- Less control over memory layout
+- Larger binary sizes
+- We use Go for the dashboard API where these tradeoffs are acceptable
+
+**Why not C/C++?** We already proved we can write C (OS project). Rust gives us the same performance with safety guarantees. In a networking proxy that handles untrusted input, safety is non-negotiable.
+
+### 6.3 Why Go for the Dashboard API?
+
+The dashboard API is a standard REST + WebSocket server. It doesn't need Rust's performance. Go gives us:
+- Faster development for CRUD operations
+- `net/http` is excellent out of the box
+- `gorilla/websocket` is mature
+- JSON handling is trivial
+- Smaller cognitive overhead for a simpler component
+
+### 6.4 Why Svelte for the Dashboard UI?
+
+The dashboard is a real-time monitoring tool. It needs to:
+- Update live as requests flow through
+- Display request/response bodies (potentially large)
+- Feel snappy and responsive
+- Have minimal bundle size (served from the CLI client locally)
+
+Svelte compiles to vanilla JS with no runtime library. The bundle will be tiny. Reactivity is built into the language. Perfect fit.
+
+### 6.5 Dependency Policy
+
+**Allowed dependencies (Rust):**
+- `tokio` — Async runtime (not reinventing an event loop)
+- `rustls` / `tokio-rustls` — TLS (not reimplementing crypto)
+- `bytes` — Efficient byte buffer management
+- `tracing` — Structured logging
+- `clap` — CLI argument parsing
+- `serde` — Serialization framework
+- `uuid` — ID generation
+- `dashmap` — Concurrent hash map
+- `sqlx` — SQLite async driver
+
+**NOT allowed:**
+- `hyper` — We're building our own HTTP parser
+- `axum` / `warp` / `actix` — We're building our own server
+- Any tunneling library — That's the whole point
+- Any proxy library — Same
+
+**The HTTP parsing, proxying, tunneling, multiplexing, and protocol handling are all built from scratch.** Libraries are only used for things outside the project's learning scope (TLS crypto, async runtime, CLI parsing).
+
+---
+
+---
+
+## 7. Core Components Deep Dive
+
+### 7.1 D-RAP CLI Client
+
+**Responsibility:** The binary that runs on the developer's machine. Establishes tunnel connections, proxies traffic between local services and the relay server.
+
+**Sub-components:**
+
+```
+drap-client/
+├── main.rs                    # Entry point, CLI parsing
+├── config/
+│   ├── mod.rs
+│   ├── cli_args.rs            # clap argument definitions
+│   ├── file_config.rs         # drap.yml parser
+│   └── merged_config.rs       # CLI args + file config merge logic
+├── auth/
+│   ├── mod.rs
+│   ├── token_store.rs         # Persist auth token to ~/.drap/authtoken
+│   └── authenticator.rs       # Handle auth flow with relay server
+├── tunnel/
+│   ├── mod.rs
+│   ├── tunnel_manager.rs      # Manages lifecycle of all tunnels
+│   ├── http_tunnel.rs         # HTTP-specific tunnel logic
+│   ├── tcp_tunnel.rs          # TCP-specific tunnel logic
+│   └── tunnel_state.rs        # State machine for tunnel lifecycle
+├── connection/
+│   ├── mod.rs
+│   ├── control_connection.rs  # Single persistent connection to relay
+│   ├── multiplexer.rs         # Stream multiplexing over control conn
+│   └── reconnector.rs         # Auto-reconnect with exponential backoff
+├── proxy/
+│   ├── mod.rs
+│   ├── local_proxy.rs         # Connects to localhost services
+│   ├── http_proxy.rs          # HTTP request/response forwarding
+│   └── tcp_proxy.rs           # Raw TCP byte forwarding
+├── inspector/
+│   ├── mod.rs
+│   ├── request_logger.rs      # Captures requests for inspection
+│   └── replay_engine.rs       # Re-sends captured requests
+├── dashboard/
+│   ├── mod.rs
+│   ├── local_server.rs        # HTTP server on :4040
+│   ├── websocket.rs           # Live updates to dashboard UI
+│   └── static_assets.rs       # Embedded Svelte build
+└── display/
+    ├── mod.rs
+    ├── terminal_ui.rs         # Pretty terminal output
+    └── status_display.rs      # Live connection status
+```
+
+**Key Design Decisions:**
+
+1. **Single persistent control connection:** The client maintains exactly ONE TLS connection to the relay server. All tunnels are multiplexed over this connection. This minimizes resource usage and NAT mapping entries.
+
+2. **Lazy local connections:** The client does NOT pre-connect to localhost services. It connects to `localhost:3000` only when a request arrives that needs to be forwarded. Connections are pooled and reused.
+
+3. **Embedded dashboard:** The Svelte dashboard UI is compiled and embedded directly into the Rust binary using `include_bytes!()`. No external files needed.
+
+4. **Graceful shutdown:** SIGINT/SIGTERM triggers: close all tunnels → send TUNNEL_CLOSE frames → drain in-flight requests (5s timeout) → close control connection → exit.
+
+### 7.2 D-RAP Relay Server
+
+**Responsibility:** The cloud-hosted server with a public IP. Accepts incoming tunnel connections from clients. Accepts incoming HTTP/TCP connections from the public internet. Routes public traffic to the correct tunnel.
+
+**Sub-components:**
+
+```
+drap-server/
+├── main.rs
+├── config/
+│   ├── mod.rs
+│   └── server_config.rs       # Port bindings, domain, TLS certs, limits
+├── listener/
+│   ├── mod.rs
+│   ├── tls_acceptor.rs        # TLS termination for public HTTPS
+│   ├── http_listener.rs       # Accept public HTTP connections (port 443)
+│   ├── tcp_listener.rs        # Accept public TCP connections (port range)
+│   └── control_listener.rs    # Accept tunnel client connections (port 4443)
+├── router/
+│   ├── mod.rs
+│   ├── subdomain_router.rs    # Map subdomain → tunnel
+│   ├── tcp_port_router.rs     # Map public port → tunnel
+│   └── routing_table.rs       # Thread-safe routing table (DashMap)
+├── tunnel/
+│   ├── mod.rs
+│   ├── tunnel_registry.rs     # All active tunnels
+│   ├── tunnel_session.rs      # State per connected client
+│   └── tunnel_allocator.rs    # Assign subdomains, TCP ports
+├── proxy/
+│   ├── mod.rs
+│   ├── http_proxy.rs          # Parse HTTP, forward via tunnel, return response
+│   ├── tcp_proxy.rs           # Raw byte forwarding via tunnel
+│   └── bidirectional_copy.rs  # Efficient async bidirectional byte copy
+├── connection/
+│   ├── mod.rs
+│   ├── control_handler.rs     # Handle D-RAP protocol messages
+│   ├── multiplexer.rs         # Server-side stream multiplexing
+│   └── connection_pool.rs     # Pool connections per tunnel
+├── security/
+│   ├── mod.rs
+│   ├── auth_gate.rs           # Tunnel-level authentication (Basic Auth, token)
+│   ├── rate_limiter.rs        # Sliding window rate limiting
+│   ├── ip_whitelist.rs        # IP-based access control
+│   └── token_validator.rs     # Validate client auth tokens
+├── inspector/
+│   ├── mod.rs
+│   ├── request_capture.rs     # Capture full req/res for inspection
+│   ├── storage.rs             # Store captured requests (SQLite + in-memory ring buffer)
+│   └── replay.rs              # Replay request through tunnel
+├── metrics/
+│   ├── mod.rs
+│   ├── counter.rs             # Request counts, byte counts
+│   ├── latency.rs             # Request latency histograms
+│   └── exporter.rs            # Expose metrics for dashboard
+└── admin/
+    ├── mod.rs
+    └── management_api.rs      # Internal API for tunnel management
+```
+
+**Key Design Decisions:**
+
+1. **Separate listener ports:**
+   - Port `443` — Public HTTPS traffic (subdomain-routed)
+   - Port `4443` — D-RAP client control connections
+   - Ports `40000-50000` — Public TCP tunnel endpoints
+   This separation ensures the relay server can independently scale and secure each listener.
+
+2. **Shared-nothing tunnel sessions:** Each connected client gets its own `TunnelSession` with its own multiplexer state. Sessions don't interact directly — only through the routing table.
+
+3. **Lock-free routing table:** The subdomain routing table uses `DashMap` (sharded concurrent hash map) for lock-free reads. Subdomain lookups happen on every incoming request — they must be O(1) and lock-free.
+
+4. **Horizontal scalability consideration:** While V1 is a single relay server, the architecture is designed so that multiple relay servers could share state via Redis and a global routing layer (future).
+
+### 7.3 D-RAP Dashboard
+
+**Architecture:**
+
+```
+┌─────────────────────────────────────────────────┐
+│                  BROWSER                         │
+│                                                  │
+│  ┌─────────────────────────────────────────┐     │
+│  │          Svelte Dashboard UI            │     │
+│  │                                          │     │
+│  │  ┌─────────┐ ┌──────────┐ ┌─────────┐  │     │
+│  │  │ Tunnel  │ │ Request  │ │ Metrics │  │     │
+│  │  │ List    │ │ Inspector│ │ Charts  │  │     │
+│  │  └─────────┘ └──────────┘ └─────────┘  │     │
+│  │                                          │     │
+│  │  WebSocket for real-time updates         │     │
+│  └──────────────┬──────────────────────────┘     │
+│                 │                                  │
+└─────────────────┼──────────────────────────────────┘
+                  │ HTTP + WS
+                  ▼
+┌─────────────────────────────────────────────────┐
+│           Go Dashboard API (:4040)               │
+│                                                  │
+│  REST Endpoints:                                 │
+│    GET  /api/tunnels          → List tunnels     │
+│    GET  /api/tunnels/:id      → Tunnel details   │
+│    GET  /api/requests         → List requests    │
+│    GET  /api/requests/:id     → Request detail   │
+│    POST /api/requests/:id/replay → Replay req    │
+│    GET  /api/metrics          → Current metrics  │
+│                                                  │
+│  WebSocket:                                      │
+│    WS /api/ws                 → Live events      │
+│      → new_request                               │
+│      → tunnel_connected                          │
+│      → tunnel_disconnected                       │
+│      → metrics_update                            │
+│                                                  │
+│  Reads from:                                     │
+│    → In-memory ring buffer (recent requests)     │
+│    → SQLite (persisted requests)                 │
+│    → Tunnel registry (active tunnels)            │
+└─────────────────────────────────────────────────┘
+```
+
+**Dashboard Pages:**
+
+1. **Overview** — Active tunnels, total requests, current throughput graph
+2. **Tunnel Detail** — URL, status, uptime, recent requests for this tunnel
+3. **Request Inspector** — Filterable list of all requests. Click to expand: headers, body (formatted JSON/XML), timing breakdown, response
+4. **Replay** — Button on each request to re-send it. Shows replay result side-by-side with original
+5. **Settings** — Rate limit config, auth config, IP whitelist management
+
+### 7.4 Control Plane Protocol
+
+The **control plane** is how the CLI client and relay server communicate about tunnel lifecycle — creating tunnels, destroying tunnels, authentication, heartbeats, errors.
+
+**This uses the D-RAP Wire Protocol (Section 9) with specific control frame types.**
+
+```
+Control Plane Messages:
+
+CLIENT → SERVER:
+  AUTH_REQ          → Authenticate with token
+  TUNNEL_REQ        → Request a new tunnel
+  TUNNEL_CLOSE      → Close an existing tunnel
+  HEARTBEAT_PONG    → Respond to heartbeat
+  
+SERVER → CLIENT:
+  AUTH_OK           → Authentication successful
+  AUTH_FAIL         → Authentication failed (reason)
+  TUNNEL_CREATED    → Tunnel established (URL, port info)
+  TUNNEL_DENIED     → Tunnel request denied (subdomain taken, limit reached)
+  TUNNEL_CLOSED_ACK → Confirmed tunnel closed
+  HEARTBEAT_PING    → Are you alive?
+  ERROR             → General error
+  SERVER_SHUTDOWN   → Server is shutting down, reconnect
+```
+
+**Control connection lifecycle:**
+
+```
+Client                                    Server
+  │                                          │
+  │──── TCP Connect ──────────────────────→ │
+  │──── TLS Handshake ───────────────────→ │
+  │──── AUTH_REQ {token: "drap_tok_..."} ──→│
+  │                                          │
+  │◀── AUTH_OK {user: "dev@axiom.io"} ──── │
+  │                                          │
+  │──── TUNNEL_REQ {proto: HTTP,           │
+  │      subdomain: "myapp"} ─────────────→│
+  │                                          │
+  │◀── TUNNEL_CREATED {                    │
+  │      tunnel_id: "t_abc123",            │
+  │      url: "https://myapp.drap.io"} ─── │
+  │                                          │
+  │         ... tunnel is live ...           │
+  │                                          │
+  │◀── HEARTBEAT_PING ──────────────────── │
+  │──── HEARTBEAT_PONG ──────────────────→ │
+  │                                          │
+  │         ... heartbeat every 30s ...     │
+  │                                          │
+  │──── TUNNEL_CLOSE {id: "t_abc123"} ───→ │
+  │◀── TUNNEL_CLOSED_ACK ───────────────── │
+  │                                          │
+  │──── TCP FIN ──────────────────────────→ │
+```
+
+### 7.5 Data Plane & Tunneling Engine
+
+The **data plane** is how actual HTTP/TCP traffic flows between the relay server and the CLI client. This is the performance-critical path.
+
+**Design: Multiplexed Streams Over Single Connection**
+
+Rather than opening a new TCP connection for every proxied request, D-RAP multiplexes all traffic over the **single control connection** using **stream IDs** (similar to HTTP/2's multiplexing concept).
+
+```
+Single TCP Connection (TLS):
+┌──────────────────────────────────────────────┐
+│ Stream 1: GET /api/users      → Response     │
+│ Stream 2: POST /webhook       → Response     │
+│ Stream 3: GET /health         → Response     │
+│ Stream 4: [TCP bytes for DB connection]      │
+│ Stream 5: GET /api/orders     → Response     │
+│ Control:  HEARTBEAT_PING / PONG              │
+│ Control:  TUNNEL_REQ / TUNNEL_CREATED        │
+└──────────────────────────────────────────────┘
+```
+
+Each stream has:
+- A unique 32-bit stream ID
+- A tunnel ID (which tunnel this stream belongs to)
+- A state machine: OPEN → DATA_FLOWING → HALF_CLOSED → CLOSED
+- Flow control: per-stream window size to prevent a slow local service from blocking other streams
+
+**Why multiplexing over a single connection?**
+
+1. **NAT mapping preservation:** NAT tables have limited entries. One connection = one entry.
+2. **Fewer TLS handshakes:** TLS handshake is expensive (~2 RTT). We do it once.
+3. **Simpler firewall traversal:** Only one outbound connection to manage.
+4. **Resource efficiency:** Fewer file descriptors, fewer TCP buffers.
+
+**Tradeoff:** Head-of-line blocking on the TCP level. If one packet is lost, all streams are blocked until retransmission. This is the same tradeoff HTTP/2 makes. Acceptable for our use case.
+
+### 7.6 Subdomain Router
+
+**Responsibility:** When a request arrives at `https://myapp.drap.io/some/path`, determine which tunnel it should be routed to.
+
+**Implementation approach:**
+
+```
+Incoming request:
+  Host: myapp.drap.io
+
+Router logic:
+  1. Extract Host header
+  2. Parse subdomain: "myapp" from "myapp.drap.io"
+  3. Lookup in routing table: subdomain_map["myapp"] → TunnelSession #42
+  4. If not found → return 502 "Tunnel not found"
+  5. If found but tunnel is disconnected → return 504 "Tunnel offline"
+  6. Forward to TunnelSession #42's multiplexer
+```
+
+**DNS Setup:**
+```
+*.drap.io  A     <relay-server-IP>
+*.drap.io  AAAA  <relay-server-IPv6>
+drap.io    A     <relay-server-IP>
+```
+
+A wildcard DNS record means ALL subdomains resolve to the relay server. The relay server then routes based on the subdomain.
+
+**TLS for Wildcard:**
+A wildcard TLS certificate (`*.drap.io`) covers all subdomains. One certificate, unlimited tunnels.
+
+**Subdomain Allocation Rules:**
+- Reserved words: `www`, `api`, `admin`, `dashboard`, `status`, `mail`, etc.
+- Custom subdomains: first-come-first-served, must be 3-63 chars, alphanumeric + hyphens
+- Random subdomains: adjective-noun-number format (`wild-fox-42`)
+- Subdomain expires when tunnel closes (not reserved permanently on free tier)
+
+### 7.7 TLS Termination Layer
+
+**Where TLS happens:**
+
+```
+Public Client  ──HTTPS──▶  [Relay Server: TLS Termination]  ──Plaintext──▶  [Tunnel Mux]
+                                                                                 │
+                                                                           D-RAP Protocol
+                                                                           (over TLS)
+                                                                                 │
+                                                                          [CLI Client]
+                                                                                 │
+                                                                         ──Plaintext──▶
+                                                                          localhost:3000
+```
+
+**Two TLS contexts on the relay server:**
+
+1. **Public-facing TLS** (port 443): Uses wildcard cert `*.drap.io`. Terminates HTTPS from browsers/webhooks/clients. Standard TLS 1.3.
+
+2. **Client-facing TLS** (port 4443): Uses server cert for `relay.drap.io`. Authenticates the relay server to CLI clients. The CLI client validates this cert. Could add mTLS for client certificates in the future.
+
+**Certificate management:**
+- V1: Manual certificate (Let's Encrypt wildcard via DNS challenge)
+- Future: ACME integration for automatic renewal
+- Certificate stored on disk, loaded into `rustls::ServerConfig` at startup
+- Hot-reloading: watch cert files for changes, swap `ServerConfig` atomically
+
+### 7.8 Authentication & Authorization System
+
+**Two levels of authentication:**
+
+**Level 1: Client Authentication (Who are you?)**
+```
+When: Client connects to relay server
+How:  AUTH_REQ frame with auth token
+Token format: drap_tok_<base64(random 32 bytes)>
+Storage: ~/.drap/authtoken on client, users table in server's SQLite
+Verification: Constant-time comparison on server
+```
+
+**Level 2: Tunnel Authentication (Who can access your tunnel?)**
+```
+When: Public user accesses a tunnel URL
+Options:
+  a) None (public, default)
+  b) HTTP Basic Auth (username:password, set by tunnel owner)
+  c) Bearer Token (X-Drap-Token header)
+  d) IP Whitelist (only specific IPs can access)
+  e) OAuth2 (future: GitHub, Google login to access tunnel)
+```
+
+**Auth flow for Basic Auth on tunnels:**
+
+```
+Browser → GET https://myapp.drap.io
+Relay   → 401 Unauthorized, WWW-Authenticate: Basic realm="D-RAP Tunnel"
+Browser → GET (with Authorization: Basic base64(user:pass))
+Relay   → Validates credentials against tunnel config
+        → If valid: proxy request to tunnel
+        → If invalid: 403 Forbidden
+```
+
+### 7.9 Rate Limiter
+
+**Algorithm: Sliding Window Log with Token Bucket Hybrid**
+
+Why not just token bucket? We want precise per-second granularity AND burst tolerance.
+
+**Implementation:**
+
+```
+For each tunnel:
+  - Configurable rate: X requests per Y seconds (e.g., 100 req/min)
+  - Burst allowance: Z requests above limit in short burst (e.g., 20)
+  
+Storage: Redis
+  Key: rate:{tunnel_id}
+  Value: Sorted set of timestamps
+
+Check logic:
+  1. Current time = now
+  2. Remove entries older than window (now - Y seconds)
+  3. Count remaining entries
+  4. If count < X + Z: ALLOW, add timestamp
+  5. Else: DENY, return 429 Too Many Requests
+
+Response headers:
+  X-RateLimit-Limit: 100
+  X-RateLimit-Remaining: 42
+  X-RateLimit-Reset: 1699999999
+  Retry-After: 30 (if rate limited)
+```
+
+**Rate limiting layers:**
+1. **Global server rate limit:** Protects the relay server itself (e.g., 10,000 req/s total)
+2. **Per-account rate limit:** Free tier vs paid tier limits
+3. **Per-tunnel rate limit:** Configurable by the tunnel owner
+4. **Per-IP rate limit:** Prevents a single source from abusing a tunnel
+
+### 7.10 Request Inspector & Replay Engine
+
+**What gets captured (for HTTP tunnels with inspection enabled):**
+
+```
+CapturedRequest {
+    id: UUID,
+    tunnel_id: String,
+    timestamp: DateTime,
+    duration_ms: u64,
+    
+    request: {
+        method: String,          // "POST"
+        url: String,             // "/api/webhook"
+        headers: Map<String, String>,
+        body: Bytes,             // Raw body
+        body_size: u64,
+        content_type: String,    // "application/json"
+        remote_addr: IpAddr,
+    },
+    
+    response: {
+        status_code: u16,        // 200
+        headers: Map<String, String>,
+        body: Bytes,
+        body_size: u64,
+        content_type: String,
+    },
+    
+    timing: {
+        dns_ms: u64,             // 0 (not applicable for proxy)
+        tls_ms: u64,             // TLS termination time
+        tunnel_rtt_ms: u64,      // Time to reach client through tunnel
+        local_processing_ms: u64, // Time local server took to respond
+        total_ms: u64,
+    }
+}
+```
+
+**Storage strategy:**
+- **Hot storage:** In-memory ring buffer, last 500 requests per tunnel. Zero-latency access for dashboard.
+- **Warm storage:** SQLite on relay server. Last 24 hours of requests. Queryable.
+- **Body storage:** Bodies > 1MB are stored to disk, referenced by path. Bodies > 10MB are not captured (configurable).
+
+**Replay engine:**
+
+```
+User clicks "Replay" on request #abc123 in dashboard:
+
+1. Dashboard UI → POST /api/requests/abc123/replay
+2. Dashboard API → Reads original request from storage
+3. Dashboard API → Sends replay command to relay server via internal channel
+4. Relay server → Creates new DATA frame with original request bytes
+5. Relay server → Sends through tunnel to CLI client
+6. CLI client → Forwards to localhost:3000
+7. Response flows back
+8. New CapturedRequest created with is_replay: true
+9. Dashboard shows original and replay side-by-side
+```
+
+### 7.11 Connection Pool Manager
+
+**Two connection pools exist:**
+
+**Pool 1: CLI Client → Local Services**
+
+```
+The client maintains a pool of TCP connections to each local address.
+
+localhost:3000 pool:
+  ├── Connection A (idle, keepalive)
+  ├── Connection B (active, streaming response)
+  └── Connection C (idle, keepalive)
+
+Pool config:
+  - min_idle: 2
+  - max_connections: 50
+  - idle_timeout: 60s
+  - connect_timeout: 5s
+  
+On incoming proxied request:
+  1. Try to acquire idle connection from pool
+  2. If available: use it, send request
+  3. If not available and pool < max: create new connection
+  4. If pool at max: queue request, wait up to 5s
+  5. If timeout: return 502 to relay server
+  
+Connection health:
+  - Check connection is still alive before use (TCP keepalive)
+  - If connection reset mid-request: retry once with new connection
+  - Remove broken connections from pool
+```
+
+**Pool 2: Relay Server — Managed Implicitly**
+
+The relay server doesn't pool connections TO clients (the tunnel IS the connection). But it pools internal resources:
+- Redis connection pool (for rate limiting)
+- SQLite connection pool (for request storage)
+- Pre-allocated byte buffers for frame parsing (object pool pattern)
+
+---
+
+---
+
+## 8. Networking Deep Dive
+
+### 8.1 NAT Traversal Strategy
+
+**The problem:**
+```
+Developer's machine: 192.168.1.100 (private IP)
+Router's public IP:  73.42.198.55
+                     But which port? NAT mapping is unpredictable.
+                     And incoming connections are blocked by default.
+```
+
+**D-RAP's approach: Outbound-Only Connection**
+
+We don't try to punch through NAT. We don't use STUN/TURN/ICE. Instead:
+
+```
+Strategy: The client ALWAYS initiates the connection outward.
+
+1. Client connects to relay server (outbound TCP on port 4443)
+   → NAT creates mapping: 192.168.1.100:54321 ↔ 73.42.198.55:54321 → relay:4443
+   
+2. This connection stays open (persistent, keepalive)
+
+3. When public traffic arrives at relay server, it's forwarded 
+   OVER THIS EXISTING CONNECTION back to the client
+
+4. NAT sees this as response traffic on an established connection
+   → Allowed through without any configuration
+```
+
+This is why D-RAP works behind:
+- Home routers
+- Corporate firewalls
+- Hotel/airport WiFi
+- CGNAT (carrier-grade NAT)
+- Multiple layers of NAT
+
+**The only requirement:** The client can make outbound TCP connections on port 4443 (or configurable). This works ~99.9% of the time.
+
+### 8.2 Reverse Tunneling Mechanism
+
+**Detailed reverse tunnel flow:**
+
+```
+Phase 1: Tunnel Establishment (Client → Server)
+═══════════════════════════════════════════════
+
+Client                          Server
+  │                                │
+  │ ─── SYN ─────────────────────→ │  TCP handshake
+  │ ←── SYN-ACK ─────────────────  │
+  │ ─── ACK ─────────────────────→ │
+  │                                │
+  │ ─── ClientHello ─────────────→ │  TLS handshake
+  │ ←── ServerHello, Cert ────────  │
+  │ ─── Finished ────────────────→ │
+  │ ←── Finished ─────────────────  │
+  │                                │
+  │    [TLS established]           │
+  │                                │
+  │ ─── AUTH_REQ(token) ─────────→ │  D-RAP auth
+  │ ←── AUTH_OK ──────────────────  │
+  │                                │
+  │ ─── TUNNEL_REQ(HTTP,"myapp")─→ │  Request tunnel
+  │ ←── TUNNEL_CREATED(url) ──────  │
+  │                                │
+  │    [Tunnel is now LIVE]        │
+
+
+Phase 2: Reverse Traffic Flow (Server → Client → localhost)
+═══════════════════════════════════════════════════════════
+
+Public Client         Server                    D-RAP Client        Local App
+    │                    │                          │                    │
+    │ ── HTTPS GET ────→ │                          │                    │
+    │                    │                          │                    │
+    │                    │ TLS terminate             │                    │
+    │                    │ Route: "myapp" → tunnel   │                    │
+    │                    │ Rate limit: OK            │                    │
+    │                    │                          │                    │
+    │                    │ ── DATA(stream=1, ──────→ │                    │
+    │                    │    request bytes)         │                    │
+    │                    │                          │                    │
+    │                    │                          │ ── HTTP GET ──────→ │
+    │                    │                          │                    │
+    │                    │                          │ ←── HTTP 200 ───── │
+    │                    │                          │                    │
+    │                    │ ←── DATA(stream=1, ───── │                    │
+    │                    │     response bytes)       │                    │
+    │                    │                          │                    │
+    │ ←── HTTPS 200 ──── │                          │                    │
+    │                    │                          │                    │
+```
+
+**Key insight:** The "reverse" part is that data flows SERVER → CLIENT over an existing connection. Normally, the client initiates data flow. Here, the server pushes data to the client. The client then acts as a local proxy to the developer's application.
+
+### 8.3 Connection Multiplexing
+
+**Why multiplexing?**
+
+Without multiplexing:
+```
+Request 1: [Open TCP] [TLS Handshake] [Send Request] [Get Response] [Close TCP]
+Request 2: [Open TCP] [TLS Handshake] [Send Request] [Get Response] [Close TCP]
+Request 3: [Open TCP] [TLS Handshake] [Send Request] [Get Response] [Close TCP]
+```
+
+With multiplexing:
+```
+Single connection:
+  Stream 1: [Send Request] ──────────────────── [Get Response]
+  Stream 2:      [Send Request] ──── [Get Response]
+  Stream 3:           [Send Request] ────────── [Get Response]
+```
+
+**D-RAP multiplexing design (inspired by HTTP/2, simplified):**
+
+```
+┌─────────────────────────────────────────────┐
+│              Single TCP Connection            │
+│                                               │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐        │
+│  │Stream 1 │ │Stream 2 │ │Stream 3 │  ...   │
+│  │(req #1) │ │(req #2) │ │(req #3) │        │
+│  └─────────┘ └─────────┘ └─────────┘        │
+│       │           │           │               │
+│       ▼           ▼           ▼               │
+│  ┌─────────────────────────────────────┐     │
+│  │         Frame Scheduler              │     │
+│  │                                      │     │
+│  │  Interleaves frames from all streams │     │
+│  │  Fair scheduling (round-robin)       │     │
+│  │  Priority support (future)           │     │
+│  └──────────────┬──────────────────────┘     │
+│                 │                              │
+│                 ▼                              │
+│  ┌─────────────────────────────────────┐     │
+│  │         Frame Serializer             │     │
+│  │                                      │     │
+│  │  Frame → bytes on wire               │     │
+│  └──────────────┬──────────────────────┘     │
+│                 │                              │
+│                 ▼                              │
+│            TCP SOCKET                         │
+└─────────────────────────────────────────────┘
+```
+
+**Stream lifecycle state machine:**
+
+```
+            TUNNEL_REQ
+                │
+                ▼
+        ┌──────────────┐
+        │   RESERVED   │
+        └──────┬───────┘
+               │ TUNNEL_CREATED
+               ▼
+        ┌──────────────┐
+        │    OPEN      │ ←── DATA frames flow both ways
+        └──────┬───────┘
+               │
+        ┌──────┴───────┐
+        │              │
+        ▼              ▼
+  ┌───────────┐  ┌───────────┐
+  │HALF_CLOSED│  │HALF_CLOSED│
+  │ (local)   │  │ (remote)  │
+  └─────┬─────┘  └─────┬─────┘
+        │              │
+        └──────┬───────┘
+               ▼
+        ┌──────────────┐
+        │   CLOSED     │
+        └──────────────┘
+```
+
+**Flow control:**
+- Each stream has a window size (default: 64KB)
+- Sender cannot send more bytes than the receiver's advertised window
+- Receiver sends WINDOW_UPDATE frames to increase the window
+- Prevents a slow consumer from causing unbounded buffering
+
+**Max concurrent streams:** 256 per tunnel connection (configurable)
+
+### 8.4 TCP Proxy Architecture
+
+For TCP tunnels (databases, game servers, SSH, etc.), D-RAP acts as a raw byte proxy — no HTTP parsing, no inspection, just bidirectional byte forwarding.
+
+```
+Public TCP Client ◀═══▶ Relay Server ◀═══TUNNEL═══▶ CLI Client ◀═══▶ localhost:5432
+```
+
+**How TCP tunneling differs from HTTP tunneling:**
+
+| Aspect | HTTP Tunnel | TCP Tunnel |
+|---|---|---|
+| Public endpoint | `https://sub.drap.io` (port 443) | `tcp://sub.drap.io:44301` (random high port) |
+| Protocol awareness | Parses HTTP requests/responses | No parsing, raw bytes |
+| Inspection | Full request/response capture | Byte count only |
+| Multiplexing | Many HTTP requests per stream | One TCP connection per stream |
+| Connection lifecycle | Short-lived (request/response) | Long-lived (persistent connection) |
+
+**TCP port allocation:**
+```
+Port range: 40000 - 50000 (10,000 ports)
+Allocation: Random available port from range
+Release: When tunnel closes
+Tracking: HashMap<u16, TunnelId> on relay server
+```
+
+**Bidirectional byte copying:**
+
+The core of TCP proxying is an efficient bidirectional copy loop:
+
+```
+Conceptually:
+
+loop {
+    select! {
+        // Data from public client → send through tunnel to CLI client
+        bytes = public_socket.read() => {
+            tunnel.send_data(stream_id, bytes).await;
+        }
+        
+        // Data from tunnel (CLI client's local service) → send to public client
+        frame = tunnel.receive_data(stream_id) => {
+            public_socket.write(frame.payload).await;
+        }
+    }
+}
+```
+
+In Rust with tokio, this is implemented using `tokio::io::copy_bidirectional` semantics with custom frame wrapping/unwrapping.
+
+### 8.5 Keep-Alive & Heartbeat Protocol
+
+**Problem:** TCP connections through NAT can be silently dropped if idle for too long. NAT tables have timeouts (commonly 60-300 seconds).
+
+**Solution:** Application-level heartbeat protocol.
+
+```
+Every 30 seconds:
+  Server → Client: HEARTBEAT_PING { timestamp: 1699999999 }
+  Client → Server: HEARTBEAT_PONG { timestamp: 1699999999, client_time: 1699999998 }
+
+If no PONG received within 10 seconds:
+  Server marks tunnel as STALE
+  After 3 missed heartbeats (90 seconds):
+    Server closes tunnel, removes from routing table
+    
+If no PING received by client within 60 seconds:
+  Client assumes connection lost
+  Client begins reconnection with exponential backoff:
+    Attempt 1: wait 1s
+    Attempt 2: wait 2s
+    Attempt 3: wait 4s
+    Attempt 4: wait 8s
+    ...up to max 60s between attempts
+    Jitter: ±25% on each wait time
+```
+
+**Heartbeat data also serves as:**
+- RTT measurement (server → client → server)
+- Clock skew detection (comparing timestamps)
+- Connection quality monitoring (track consecutive misses)
+
+---
+
+---
+
+## 9. Protocol Design
+
+### 9.1 D-RAP Wire Protocol
+
+D-RAP uses a **custom binary protocol** for communication between CLI client and relay server. This is the heart of the system.
+
+**Why custom instead of HTTP/2 or gRPC?**
+
+| Option | Why Not |
+|---|---|
+| HTTP/2 | Close, but too heavyweight. We don't need HPACK, pseudo-headers, or HTTP semantics on the control plane |
+| gRPC | Requires HTTP/2, adds Protobuf overhead, overkill for our frame types |
+| WebSocket | Text-oriented, framing overhead, would need custom binary protocol on top anyway |
+| Raw TCP | No framing. We'd need to build framing anyway. |
+| QUIC | Would solve head-of-line blocking but adds massive complexity (UDP, custom congestion control) |
+
+D-RAP's protocol is purpose-built: minimal overhead, binary-efficient, multiplexing-aware, and exactly the right abstraction level for tunneling.
+
+### 9.2 Frame Types
+
+**Frame header (fixed 9 bytes, inspired by HTTP/2):**
+```
+┌───────────────────────────────────────────────────────────────┐
+│  Length (3 bytes)  │  Type (1 byte)  │  Flags (1 byte)  │  Stream ID (4 bytes)  │
+├───────────────────────────────────────────────────────────────┤
+│                         Payload (variable)                       │
+└───────────────────────────────────────────────────────────────┘
+
+Total header: 9 bytes
+Max payload: 16,777,215 bytes (2^24 - 1, ~16MB)
+Default max payload: 65,535 bytes (64KB) — configurable via SETTINGS
+```
+
+**Frame type definitions:**
+
+```
+Type ID │ Name              │ Direction       │ Purpose
+────────┼───────────────────┼─────────────────┼─────────────────────────────────
+0x00    │ DATA              │ Bidirectional   │ Tunnel payload (HTTP/TCP bytes)
+0x01    │ HEADERS           │ Bidirectional   │ HTTP headers (for inspection)
+0x02    │ RST_STREAM        │ Bidirectional   │ Abort a single stream
+0x03    │ SETTINGS          │ Bidirectional   │ Connection-level config
+0x04    │ PING              │ Server→Client   │ Heartbeat ping
+0x05    │ PONG              │ Client→Server   │ Heartbeat pong
+0x06    │ WINDOW_UPDATE     │ Bidirectional   │ Flow control window increase
+0x07    │ AUTH_REQ          │ Client→Server   │ Authentication request
+0x08    │ AUTH_OK           │ Server→Client   │ Authentication success
+0x09    │ AUTH_FAIL         │ Server→Client   │ Authentication failure
+0x0A    │ TUNNEL_REQ        │ Client→Server   │ Request new tunnel
+0x0B    │ TUNNEL_CREATED    │ Server→Client   │ Tunnel established
+0x0C    │ TUNNEL_DENIED     │ Server→Client   │ Tunnel request rejected
+0x0D    │ TUNNEL_CLOSE      │ Client→Server   │ Close tunnel request
+0x0E    │ TUNNEL_CLOSED_ACK │ Server→Client   │ Tunnel closed confirmation
+0x0F    │ STREAM_OPEN       │ Server→Client   │ New proxied request incoming
+0x10    │ STREAM_CLOSE      │ Bidirectional   │ Stream finished
+0x11    │ ERROR             │ Bidirectional   │ Error with code and message
+0x12    │ GOAWAY            │ Bidirectional   │ Graceful shutdown
+```
+
+**Frame flags (bitmask):**
+
+```
+Bit 0 (0x01): END_STREAM    — Last frame for this stream
+Bit 1 (0x02): END_HEADERS   — Complete header block
+Bit 2 (0x04): PADDED        — Payload is padded (for traffic analysis resistance)
+Bit 3 (0x08): PRIORITY      — Stream has priority information
+Bit 4 (0x10): COMPRESSED    — Payload is zstd compressed
+Bit 5 (0x20): ACK           — Frame is acknowledgment
+Bits 6-7:     Reserved
+```
+
+**Detailed frame payloads:**
+
+```
+AUTH_REQ (0x07):
+┌──────────────────────────────────────┐
+│ Token Length (2 bytes)               │
+│ Token (variable, UTF-8)             │
+│ Client Version (2 bytes, major.minor)│
+│ OS (1 byte: 0=Linux,1=Mac,2=Win)    │
+│ Capabilities Bitmask (2 bytes)       │
+└──────────────────────────────────────┘
+
+AUTH_OK (0x08):
+┌──────────────────────────────────────┐
+│ Session ID (16 bytes, UUID)          │
+│ Account Name Length (2 bytes)        │
+│ Account Name (variable, UTF-8)       │
+│ Max Tunnels (2 bytes)                │
+│ Max Bandwidth (4 bytes, bytes/sec)   │
+│ Server Version (2 bytes)             │
+└──────────────────────────────────────┘
+
+AUTH_FAIL (0x09):
+┌──────────────────────────────────────┐
+│ Error Code (2 bytes)                 │
+│ Reason Length (2 bytes)              │
+│ Reason (variable, UTF-8)            │
+└──────────────────────────────────────┘
+  Error codes: 
+    0x01 = INVALID_TOKEN
+    0x02 = TOKEN_EXPIRED
+    0x03 = ACCOUNT_SUSPENDED
+    0x04 = VERSION_MISMATCH
+
+TUNNEL_REQ (0x0A):
+┌──────────────────────────────────────┐
+│ Protocol (1 byte: 0=HTTP, 1=TCP)     │
+│ Local Port (2 bytes)                 │
+│ Subdomain Length (1 byte)            │
+│ Subdomain (variable, UTF-8, 0=random)│
+│ Options Bitmask (2 bytes)            │
+│   Bit 0: Inspect enabled             │
+│   Bit 1: Auth required               │
+│   Bit 2: Rate limit enabled          │
+│   Bit 3: IP whitelist enabled        │
+│ [If auth]: Auth Type (1 byte)        │
+│   0=Basic, 1=Bearer                  │
+│ [If auth]: Credentials Length (2 b)  │
+│ [If auth]: Credentials (variable)    │
+│ [If rate limit]: Limit (4 bytes)     │
+│ [If rate limit]: Window sec (2 bytes)│
+│ [If IP whitelist]: Count (2 bytes)   │
+│ [If IP whitelist]: IPs (4/16 bytes each) │
+└──────────────────────────────────────┘
+
+TUNNEL_CREATED (0x0B):
+┌──────────────────────────────────────┐
+│ Tunnel ID (16 bytes, UUID)           │
+│ Public URL Length (2 bytes)          │
+│ Public URL (variable, UTF-8)         │
+│ [If TCP]: Assigned Port (2 bytes)    │
+│ Assigned Subdomain Length (1 byte)   │
+│ Assigned Subdomain (variable)        │
+└──────────────────────────────────────┘
+
+DATA (0x00):
+┌──────────────────────────────────────┐
+│ [If PADDED]: Pad Length (1 byte)     │
+│ Payload (variable)                   │
+│ [If PADDED]: Padding (variable, 0s) │
+└──────────────────────────────────────┘
+  Stream ID in header identifies which request/connection
+  END_STREAM flag indicates last DATA frame
+
+STREAM_OPEN (0x0F):
+┌──────────────────────────────────────┐
+│ Tunnel ID (16 bytes)                 │
+│ Remote Addr Length (1 byte)          │
+│ Remote Addr (variable, IP string)    │
+│ Remote Port (2 bytes)                │
+│ [If HTTP]: Method Length (1 byte)    │
+│ [If HTTP]: Method (variable)         │
+│ [If HTTP]: Path Length (2 bytes)     │
+│ [If HTTP]: Path (variable)           │
+└──────────────────────────────────────┘
+
+WINDOW_UPDATE (0x06):
+┌──────────────────────────────────────┐
+│ Window Size Increment (4 bytes)      │
+└──────────────────────────────────────┘
+
+SETTINGS (0x03):
+┌──────────────────────────────────────┐
+│ Setting ID (2 bytes) │ Value (4 bytes)│  (repeated)
+└──────────────────────────────────────┘
+  Setting IDs:
+    0x01 = MAX_CONCURRENT_STREAMS (default: 256)
+    0x02 = INITIAL_WINDOW_SIZE (default: 65535)
+    0x03 = MAX_FRAME_SIZE (default: 65535)
+    0x04 = HEARTBEAT_INTERVAL (default: 30000ms)
+    0x05 = COMPRESSION_ENABLED (default: 0)
+
+ERROR (0x11):
+┌──────────────────────────────────────┐
+│ Error Code (4 bytes)                 │
+│ Message Length (2 bytes)             │
+│ Message (variable, UTF-8)           │
+└──────────────────────────────────────┘
+  Error codes:
+    0x00000001 = PROTOCOL_ERROR
+    0x00000002 = INTERNAL_ERROR
+    0x00000003 = FLOW_CONTROL_ERROR
+    0x00000004 = STREAM_CLOSED
+    0x00000005 = FRAME_SIZE_ERROR
+    0x00000006 = TUNNEL_NOT_FOUND
+    0x00000007 = TIMEOUT
+    0x00000008 = RESOURCE_EXHAUSTED
+
+GOAWAY (0x12):
+┌──────────────────────────────────────┐
+│ Last Stream ID (4 bytes)             │
+│ Error Code (4 bytes)                 │
+│ Debug Data Length (2 bytes)          │
+│ Debug Data (variable)                │
+└──────────────────────────────────────┘
+```
+
+### 9.3 Handshake Flow
+
+**Complete connection establishment sequence:**
+
+```
+Client                                           Server
+  │                                                 │
+  │ ═══ TCP SYN ═══════════════════════════════════▶│
+  │ ◀══ TCP SYN-ACK ══════════════════════════════ │
+  │ ═══ TCP ACK ═══════════════════════════════════▶│
+  │                                                 │
+  │ ═══ TLS ClientHello ══════════════════════════▶│
+  │     (ALPN: "drap/1")                           │
+  │ ◀══ TLS ServerHello + Certificate ════════════ │
+  │ ═══ TLS Finished ════════════════════════════▶ │
+  │ ◀══ TLS Finished ═════════════════════════════ │
+  │                                                 │
+  │     [TLS 1.3 established, ALPN negotiated]     │
+  │                                                 │
+  │ ─── MAGIC BYTES: "DRAP" (4 bytes) ──────────▶ │  Protocol identification
+  │ ─── VERSION: 0x0001 (2 bytes) ──────────────▶ │  Protocol version
+  │                                                 │
+  │ ◀── MAGIC BYTES: "DRAP" (4 bytes) ─────────── │  Server confirms
+  │ ◀── VERSION: 0x0001 (2 bytes) ─────────────── │  Agreed version
+  │                                                 │
+  │ ─── SETTINGS frame ─────────────────────────▶ │  Client settings
+  │     { MAX_CONCURRENT_STREAMS: 256,             │
+  │       INITIAL_WINDOW_SIZE: 65535,              │
+  │       HEARTBEAT_INTERVAL: 30000 }              │
+  │                                                 │
+  │ ◀── SETTINGS frame ──────────────────────────  │  Server settings
+  │     { MAX_CONCURRENT_STREAMS: 256,             │
+  │       MAX_FRAME_SIZE: 65535 }                  │
+  │                                                 │
+  │ ─── SETTINGS frame (ACK flag) ──────────────▶ │  Acknowledge server settings
+  │ ◀── SETTINGS frame (ACK flag) ───────────────  │  Acknowledge client settings
+  │                                                 │
+  │     [Settings negotiated]                      │
+  │                                                 │
+  │ ─── AUTH_REQ frame ─────────────────────────▶ │
+  │     { token: "drap_tok_abc123...",             │
+  │       version: [1, 0],                        │
+  │       os: LINUX,                               │
+  │       capabilities: 0b00000111 }               │
+  │                                                 │
+  │ ◀── AUTH_OK frame ──────────────────────────── │
+  │     { session_id: "550e8400-e29b-...",         │
+  │       account: "dev@axiom.io",                 │
+  │       max_tunnels: 5,                          │
+  │       max_bandwidth: 104857600 }               │
+  │                                                 │
+  │     [Authenticated, ready for tunnel requests] │
+  │                                                 │
+  │ ─── TUNNEL_REQ (stream 1) ──────────────────▶ │
+  │     { proto: HTTP, subdomain: "myapp",         │
+  │       inspect: true, rate_limit: 100/60 }      │
+  │                                                 │
+  │ ◀── TUNNEL_CREATED (stream 1) ────────────────│
+  │     { tunnel_id: "t_xyz789",                   │
+  │       url: "https://myapp.drap.io",            │
+  │       subdomain: "myapp" }                     │
+  │                                                 │
+  │     [TUNNEL IS LIVE]                           │
+  │                                                 │
+  │     ... heartbeats every 30s ...               │
+  │     ... data frames flow ...                   │
+```
+
+**ALPN (Application-Layer Protocol Negotiation):**
+The client advertises `drap/1` during TLS handshake. This allows the relay server to distinguish D-RAP client connections from regular HTTPS connections on the same IP (if needed in the future).
+
+### 9.4 Error Handling Protocol
+
+**Error handling philosophy:** Errors are categorized by recoverability.
+
+```
+Category 1: Stream-Level Errors (recoverable)
+──────────────────────────────────────────────
+A single request/stream failed. Other streams unaffected.
+
+Response: RST_STREAM frame on the affected stream.
+Client action: Report error for that request, continue normally.
+
+Examples:
+  - Local service connection refused (localhost not running)
+  - Local service timeout
+  - Request too large
+  
+  Client → Server:
+    RST_STREAM { stream: 42, error: CONNECT_FAILED }
+  
+  Server action: Return 502 Bad Gateway to public client
+
+
+Category 2: Tunnel-Level Errors (partially recoverable)
+───────────────────────────────────────────────────────
+A tunnel has an issue. Other tunnels on same connection unaffected.
+
+Response: TUNNEL_DENIED or ERROR frame with tunnel context.
+Client action: Report to user, retry tunnel creation if transient.
+
+Examples:
+  - Subdomain already taken
+  - Account tunnel limit reached
+  - Rate limit exhausted at account level
+
+
+Category 3: Connection-Level Errors (requires reconnect)
+────────────────────────────────────────────────────────
+The entire connection is compromised.
+
+Response: GOAWAY frame, then close TCP.
+Client action: Reconnect with exponential backoff, re-establish all tunnels.
+
+Examples:
+  - Protocol error (malformed frame)
+  - Version mismatch
+  - Server shutting down
+  - Authentication revoked
+  
+  Server → Client:
+    GOAWAY { last_stream: 42, error: SERVER_SHUTDOWN,
+             debug: "Scheduled maintenance, back in 60s" }
+  
+  Client action:
+    1. Stop sending new frames
+    2. Wait for in-flight streams (up to last_stream) to complete
+    3. Close connection
+    4. Reconnect with backoff
+    5. Re-send TUNNEL_REQ for all previously active tunnels
+
+
+Category 4: Fatal Errors (no recovery)
+──────────────────────────────────────
+Something fundamentally wrong.
+
+Response: AUTH_FAIL or ERROR frame, then close.
+Client action: Display error, exit.
+
+Examples:
+  - Invalid auth token
+  - Account suspended
+  - Banned IP
+```
+
+**Timeout hierarchy:**
+
+```
+Timeout                          │ Duration │ Action on Expiry
+─────────────────────────────────┼──────────┼──────────────────────────
+TCP connect timeout              │ 10s      │ Retry with backoff
+TLS handshake timeout            │ 10s      │ Retry with backoff
+Auth response timeout            │ 5s       │ Retry with backoff
+Tunnel creation response timeout │ 5s       │ Retry once, then fail
+Heartbeat response timeout       │ 10s      │ Mark stale, retry ping
+Connection idle timeout          │ 90s      │ Close + reconnect (3 missed pings)
+Stream idle timeout              │ 30s      │ RST_STREAM
+Local connect timeout            │ 5s       │ RST_STREAM (502 to client)
+Local response timeout           │ 60s      │ RST_STREAM (504 to client)
+Graceful shutdown drain timeout  │ 5s       │ Force close remaining streams
+```
+
+---
+
+---
+
+## 10. Feature Specifications
+
+### 10.1 HTTP Tunneling
+
+**The primary use case.** Expose a local HTTP server via a public HTTPS URL.
+
+```
+Command:    $ drap http 3000
+Result:     https://wild-fox-42.drap.io → http://localhost:3000
+
+Command:    $ drap http 3000 --subdomain=myapp
+Result:     https://myapp.drap.io → http://localhost:3000
+
+Command:    $ drap http 8443 --local-https
+Result:     https://abc123.drap.io → https://localhost:8443
+```
+
+**HTTP-specific behaviors:**
+
+1. **Host header rewriting:**
+   ```
+   Incoming: Host: myapp.drap.io
+   Forwarded as: Host: localhost:3000
+   (Configurable: --host-header=myapp.local)
+   ```
+
+2. **X-Forwarded headers injected:**
+   ```
+   X-Forwarded-For: 203.0.113.42       (original client IP)
+   X-Forwarded-Proto: https             (original protocol)
+   X-Forwarded-Host: myapp.drap.io      (original host)
+   X-Drap-Tunnel-Id: t_xyz789          (tunnel identifier)
+   ```
+
+3. **WebSocket upgrade support:**
+   ```
+   If request has: Upgrade: websocket
+   D-RAP switches stream to bidirectional byte mode
+   WebSocket frames pass through unmodified
+   Connection: kept alive for WebSocket duration
+   ```
+
+4. **Chunked transfer encoding:**
+   ```
+   If local server sends chunked response:
+   D-RAP forwards chunks as they arrive (streaming)
+   No buffering of entire response
+   ```
+
+5. **Error pages:**
+   ```
+   Local server not running:    502 Bad Gateway (branded D-RAP error page)
+   Local server timeout:         504 Gateway Timeout
+   Tunnel not found:             404 Not Found ("No tunnel found for this subdomain")
+   Rate limited:                 429 Too Many Requests
+   Auth required:                401 Unauthorized
+   ```
+
+### 10.2 TCP Tunneling
+
+**For non-HTTP protocols:** databases, SSH, game servers, MQTT, custom protocols.
+
+```
+Command:    $ drap tcp 5432
+Result:     tcp://wild-fox-42.drap.io:44301 → tcp://localhost:5432
+
+Command:    $ drap tcp 22 --remote-port=2222
+Result:     tcp://abc123.drap.io:2222 → tcp://localhost:22
+```
+
+**TCP-specific behaviors:**
+
+1. **No protocol awareness:** D-RAP treats the connection as raw bytes. No parsing. No modification.
+
+2. **One stream per connection:** Each incoming TCP connection gets its own multiplexed stream. Unlike HTTP where multiple requests share a concept, TCP connections are 1:1 with streams.
+
+3. **Connection lifecycle tied to stream lifecycle:**
+   ```
+   Public client connects → STREAM_OPEN → CLI connects to local port
+   Bytes flow bidirectionally via DATA frames
+   Either side closes → END_STREAM flag → other side notified → connection closed
+   ```
+
+4. **No inspection:** TCP traffic cannot be meaningfully inspected without protocol knowledge. Dashboard shows only: connection time, bytes transferred, duration, remote IP.
+
+5. **Port allocation:**
+   - Default: Random port from 40000-50000
+   - `--remote-port=N`: Request specific port (subject to availability)
+   - Port released immediately when tunnel closes
+
+### 10.3 Custom Subdomains
+
+**Allocation rules:**
+
+```
+Valid subdomain:
+  - 3-63 characters
+  - Lowercase alphanumeric and hyphens only
+  - Cannot start or end with hyphen
+  - Cannot be a reserved word
+  
+Reserved words (not exhaustive):
+  www, api, admin, dashboard, status, mail, ftp, ssh,
+  relay, control, metrics, health, drap, app, cdn,
+  static, assets, media, blog, docs, support, help
+
+Random subdomain generation:
+  Format: {adjective}-{noun}-{2-digit-number}
+  Examples: wild-fox-42, quiet-river-17, bright-moon-83
+  
+  Adjective pool: ~200 words (wild, quiet, bright, swift, calm, ...)
+  Noun pool: ~200 words (fox, river, moon, tree, cloud, ...)
+  Number: 10-99
+  
+  Total combinations: 200 × 200 × 90 = 3,600,000 unique subdomains
+  Collision handling: If generated subdomain is taken, regenerate (up to 5 attempts)
+```
+
+**Subdomain lifecycle:**
+
+```
+1. Client requests subdomain "myapp"
+2. Server checks routing table
+3. If available:
+   a. Add to routing table: "myapp" → TunnelSession
+   b. Return TUNNEL_CREATED
+   c. Subdomain is now routable
+4. If taken:
+   a. Return TUNNEL_DENIED with SUBDOMAIN_TAKEN error
+   b. Client can retry with different subdomain or request random
+
+5. When tunnel closes:
+   a. Remove from routing table
+   b. Subdomain immediately available for others
+   
+6. Future (paid feature): Reserved subdomains that persist across sessions
+```
+
+### 10.4 Request Inspection
+
+**Available when:** HTTP tunnels with `--inspect` flag (enabled by default).
+
+**What is captured:**
+
+```
+Per request:
+┌─────────────────────────────────────────────┐
+│ ID:        req_550e8400                     │
+│ Timestamp: 2024-01-15T10:30:42.123Z        │
+│ Tunnel:    myapp.drap.io                    │
+│                                              │
+│ REQUEST:                                     │
+│   Method:  POST                              │
+│   Path:    /api/webhooks/stripe              │
+│   Headers:                                   │
+│     Content-Type: application/json           │
+│     Stripe-Signature: t=1699999,v1=abc...   │
+│     User-Agent: Stripe/1.0                   │
+│     X-Request-Id: req_123                    │
+│   Body (234 bytes):                          │
+│     {                                        │
+│       "type": "payment_intent.succeeded",    │
+│       "data": {                              │
+│         "object": {                          │
+│           "amount": 2000,                    │
+│           "currency": "usd"                  │
+│         }                                    │
+│       }                                      │
+│     }                                        │
+│                                              │
+│ RESPONSE:                                    │
+│   Status:  200 OK                            │
+│   Headers:                                   │
+│     Content-Type: application/json           │
+│   Body (15 bytes):                           │
+│     {"received":true}                        │
+│                                              │
+│ TIMING:                                      │
+│   TLS termination:    1.2ms                  │
+│   Routing:            0.1ms                  │
+│   Tunnel transit:     3.4ms                  │
+│   Local processing:   12.8ms                 │
+│   Total:              17.5ms                 │
+│                                              │
+│ META:                                        │
+│   Remote IP:  54.187.174.169                 │
+│   Replayed:   No                             │
+│   Rate Limited: No                           │
+└─────────────────────────────────────────────┘
+```
+
+**Storage limits:**
+
+```
+In-memory ring buffer:
+  - Last 500 requests per tunnel
+  - Bodies up to 256KB stored inline
+  - Larger bodies: stored in temp directory, referenced by path
+  - Cleared when tunnel closes
+
+SQLite persistence:
+  - Last 10,000 requests total (across all tunnels)
+  - Bodies up to 1MB stored as BLOBs
+  - Larger bodies: filepath reference
+  - Auto-pruned: DELETE WHERE timestamp < now() - interval '24 hours'
+
+Hard limits:
+  - Bodies > 10MB: not captured (only metadata recorded)
+  - Binary bodies: stored as-is, displayed as hex in dashboard
+  - Configurable: --inspect-body-limit=1048576
+```
+
+### 10.5 Request Replay
+
+**Purpose:** Re-send a previously captured request to the local service. Essential for debugging webhooks.
+
+**Replay flow:**
+
+```
+Dashboard UI:
+  User finds request req_550e8400
+  Clicks [Replay]
+  Optional: Edit request before replay (modify headers, body)
+  Clicks [Send]
+  
+API:
+  POST /api/requests/req_550e8400/replay
+  Body (optional): { "modified_headers": {...}, "modified_body": "..." }
+  
+Server:
+  1. Load original request from storage
+  2. Apply modifications if any
+  3. Create a new stream on the tunnel
+  4. Send STREAM_OPEN + DATA frames with request
+  5. Wait for response
+  6. Store as new CapturedRequest with:
+     - is_replay: true
+     - original_request_id: "req_550e8400"
+  7. Return response to dashboard
+
+Dashboard UI:
+  Shows side-by-side:
+  ┌──────────────────┬──────────────────┐
+  │  Original         │  Replay          │
+  │  POST /webhook    │  POST /webhook   │
+  │  Status: 500      │  Status: 200     │
+  │  12.8ms           │  8.2ms           │
+  │  Body: error...   │  Body: ok        │
+  └──────────────────┴──────────────────┘
+```
+
+### 10.6 Tunnel Authentication
+
+**Options available per tunnel:**
+
+```
+Option A: No Authentication (default)
+  $ drap http 3000
+  → Anyone with URL can access
+
+Option B: HTTP Basic Auth
+  $ drap http 3000 --auth="username:password"
+  → Browser shows login prompt
+  → Credentials validated at relay server
+  → Not forwarded to local service
+
+Option C: Bearer Token
+  $ drap http 3000 --auth-token="my-secret-token"
+  → Requests must include: Authorization: Bearer my-secret-token
+  → OR query param: ?token=my-secret-token
+  → Token stripped before forwarding to local service
+
+Option D: IP Whitelist
+  $ drap http 3000 --allow-ip="203.0.113.0/24,198.51.100.42"
+  → Only requests from listed IPs/CIDRs allowed
+  → Others get 403 Forbidden
+
+Option E: Combined
+  $ drap http 3000 --auth="admin:pass" --allow-ip="10.0.0.0/8"
+  → Must pass BOTH auth and IP check
+```
+
+**Password hashing:**
+Tunnel auth passwords are hashed with bcrypt before storage in the tunnel session. The relay server never stores plaintext passwords.
+
+### 10.7 Rate Limiting
+
+**Configurable via CLI:**
+
+```
+$ drap http 3000 --rate-limit=100/min
+$ drap http 3000 --rate-limit=1000/hour
+$ drap http 3000 --rate-limit=10/sec
+
+Format: {count}/{window}
+Windows: sec, min, hour
+```
+
+**Implementation layers:**
+
+```
+Layer 1: Per-Tunnel Rate Limit
+  Configured by user (--rate-limit)
+  Stored in Redis: ZSET rate:tunnel:{tunnel_id}
+  Algorithm: Sliding window log
+  
+Layer 2: Per-Source-IP Rate Limit (automatic)
+  Protects individual tunnels from single-source abuse
+  Default: 60 req/min per IP per tunnel
+  Stored in Redis: ZSET rate:ip:{tunnel_id}:{ip}
+  
+Layer 3: Global Server Rate Limit
+  Protects relay server infrastructure
+  Default: 50,000 req/sec total
+  Implemented: In-memory atomic counter, no Redis call
+  Token bucket algorithm for burst tolerance
+
+Rate Limit Response:
+  HTTP 429 Too Many Requests
+  Headers:
+    X-RateLimit-Limit: 100
+    X-RateLimit-Remaining: 0
+    X-RateLimit-Reset: 1700000060
+    Retry-After: 42
+  Body:
+    {
+      "error": "rate_limit_exceeded",
+      "message": "Rate limit of 100 requests per minute exceeded",
+      "retry_after_seconds": 42
+    }
+```
+
+### 10.8 Active Tunnel Dashboard
+
+**Served locally at:** `http://127.0.0.1:4040`
+
+**Dashboard pages:**
+
+```
+PAGE 1: OVERVIEW
+═══════════════════════════════════════════════════
+  ┌─────────────────────────────────────────────┐
+  │  D-RAP Dashboard                     v1.0.0 │
+  ├─────────────────────────────────────────────┤
+  │                                              │
+  │  Active Tunnels: 2                           │
+  │  Total Requests: 1,247                       │
+  │  Uptime: 2h 34m                              │
+  │                                              │
+  │  ┌──────────────────────────────────────┐    │
+  │  │  Requests/min (live chart)           │    │
+  │  │  ████████████▓▓▓▓░░░░░░░░░░░░       │    │
+  │  │  30 ──────────────────────── 0       │    │
+  │  └──────────────────────────────────────┘    │
+  │                                              │
+  │  TUNNELS:                                    │
+  │  ┌─────────┬──────────────────────┬──────┐   │
+  │  │ Status  │ URL                  │ Reqs │   │
+  │  ├─────────┼──────────────────────┼──────┤   │
+  │  │ 🟢 Live │ myapp.drap.io       │  891 │   │
+  │  │ 🟢 Live │ api.drap.io         │  356 │   │
+  │  └─────────┴──────────────────────┴──────┘   │
+  │                                              │
+  └─────────────────────────────────────────────┘
+
+PAGE 2: REQUEST INSPECTOR
+═══════════════════════════════════════════════════
+  ┌─────────────────────────────────────────────┐
+  │  Filter: [All Tunnels ▼] [All Methods ▼]    │
+  │  Search: [________________________] 🔍       │
+  │                                              │
+  │  ┌────┬────────┬─────────────────┬─────┬───┐ │
+  │  │Time│ Method │ Path            │ Code│ ms│ │
+  │  ├────┼────────┼─────────────────┼─────┼───┤ │
+  │  │ 3s │ POST   │ /webhook        │ 200 │ 14│ │
+  │  │ 8s │ GET    │ /api/users      │ 200 │  6│ │
+  │  │12s │ POST   │ /api/orders     │ 201 │ 23│ │
+  │  │15s │ GET    │ /health         │ 200 │  2│ │
+  │  │22s │ POST   │ /webhook        │ 500 │ 45│ │  ← Red highlight
+  │  └────┴────────┴─────────────────┴─────┴───┘ │
+  │                                              │
+  │  Click a row to expand ▼                     │
+  │  ┌──────────────────────────────────────────┐│
+  │  │ POST /webhook                             ││
+  │  │                                           ││
+  │  │ [Headers] [Body] [Response] [Timing]      ││
+  │  │                                           ││
+  │  │ Request Headers:                          ││
+  │  │   Content-Type: application/json          ││
+  │  │   Stripe-Signature: t=1699...            ││
+  │  │                                           ││
+  │  │ Request Body (formatted):                 ││
+  │  │   {                                       ││
+  │  │     "type": "payment_intent.succeeded",   ││
+  │  │     "data": { ... }                       ││
+  │  │   }                                       ││
+  │  │                                           ││
+  │  │ [🔄 Replay] [📋 Copy as cURL] [📥 Export]││
+  │  └──────────────────────────────────────────┘│
+  │                                              │
+  └─────────────────────────────────────────────┘
+
+PAGE 3: TUNNEL DETAIL
+═══════════════════════════════════════════════════
+  Shows per-tunnel:
+  - Connection status, uptime, reconnection count
+  - Public URL (clickable)
+  - Configuration (auth, rate limit, inspect settings)
+  - Request volume chart (1min, 5min, 1hr windows)
+  - Status code distribution pie chart
+  - Avg/p50/p95/p99 latency
+  - Top paths by request count
+  - Recent errors
+```
+
+---
+
+---
+
+## 11. Security Architecture
+
+### 11.1 Threat Model
+
+```
+Threat 1: Unauthorized Tunnel Creation
+  Attack:  Attacker connects to relay server, creates tunnels
+  Defense: Auth tokens required, validated on every connection
+  
+Threat 2: Tunnel Hijacking
+  Attack:  Attacker guesses subdomain of active tunnel, intercepts traffic
+  Defense: Subdomains are cryptographically random or chosen by authenticated user.
+           Traffic flows through authenticated tunnel connection only.
+           
+Threat 3: Man-in-the-Middle on Tunnel
+  Attack:  Attacker intercepts traffic between client and relay
+  Defense: TLS on the control connection. Certificate pinning option for CLI client.
+  
+Threat 4: Traffic Sniffing on Public Side
+  Attack:  Intercepting HTTPS traffic to tunnel URLs
+  Defense: TLS termination with valid wildcard certificate. HSTS headers.
+  
+Threat 5: Denial of Service
+  Attack:  Flooding a tunnel with requests
+  Defense: Multi-layer rate limiting (per-IP, per-tunnel, global).
+           Connection limits per source IP.
+  
+Threat 6: Resource Exhaustion
+  Attack:  Creating thousands of tunnels to exhaust server resources
+  Defense: Per-account tunnel limits. Per-account bandwidth limits.
+           Connection timeout enforcement.
+           
+Threat 7: Subdomain Squatting
+  Attack:  Claiming valuable subdomains (e.g., "stripe", "github")
+  Defense: Subdomains are not persistent on free tier.
+           Reserved word list. Abuse reporting mechanism.
+
+Threat 8: Local Network Scanning
+  Attack:  Using D-RAP to scan the developer's local network
+  Defense: CLI client ONLY connects to the explicitly specified local address/port.
+           No wildcard local binding. Cannot proxy to arbitrary local addresses.
+           
+Threat 9: Replay Attacks on Auth
+  Attack:  Capturing and replaying auth tokens
+  Defense: TLS prevents capture. Tokens are long-lived but revocable.
+           Future: Add token rotation, session binding.
+
+Threat 10: Data Exfiltration via Tunnel
+  Attack:  Malicious insider uses tunnel to exfiltrate data
+  Defense: Outside D-RAP's scope (same as any internet connection).
+           Audit logging of tunnel creation. Bandwidth monitoring.
+```
+
+### 11.2 Security Defaults
+
+```
+✅ TLS everywhere (public HTTPS + control connection)
+✅ Auth tokens required (no anonymous tunnel creation)
+✅ Rate limiting enabled by default
+✅ Request body size limits
+✅ Connection count limits per account
+✅ Automatic tunnel expiry (8 hours max on free tier)
+✅ No wildcard local address binding
+✅ HSTS headers on all public responses
+✅ X-Frame-Options: DENY on dashboard
+✅ CSP headers on dashboard
+✅ Secrets never logged (tokens, passwords masked in logs)
+```
+
+---
+
+---
+
+## 12. Concurrency Model
+
+### 12.1 Relay Server Concurrency
+
+**The relay server is the performance bottleneck.** It handles:
+- Thousands of tunnel client connections
+- Tens of thousands of public HTTP connections
+- All routing, rate limiting, and inspection
+
+**Model: async/await with tokio (Rust)**
+
+```
+┌─────────────────────────────────────────────┐
+│            tokio Runtime                     │
+│                                              │
+│  Worker threads: num_cpus (e.g., 8)         │
+│  Each thread: work-stealing task scheduler   │
+│                                              │
+│  ┌──────────────────────────────────┐        │
+│  │  Task: TLS Acceptor (port 443)   │        │
+│  │    → Spawns per-connection task   │        │
+│  └──────────────────────────────────┘        │
+│                                              │
+│  ┌──────────────────────────────────┐        │
+│  │  Task: Control Listener (4443)   │        │
+│  │    → Spawns per-client task      │        │
+│  └──────────────────────────────────┘        │
+│                                              │
+│  ┌──────────────────────────────────┐        │
+│  │  Task: TCP Listener (40000-50k)  │        │
+│  │    → Spawns per-connection task   │        │
+│  └──────────────────────────────────┘        │
+│                                              │
+│  Per public HTTP connection:                 │
+│  ┌──────────────────────────────────┐        │
+│  │  Task: HTTP Handler              │        │
+│  │    1. Parse HTTP request          │        │
+│  │    2. Route to tunnel             │        │
+│  │    3. Forward via multiplexer     │        │
+│  │    4. Await response              │        │
+│  │    5. Send HTTP response          │        │
+│  │    Cost: ~2KB stack per task      │        │
+│  └──────────────────────────────────┘        │
+│                                              │
+│  Per tunnel client connection:               │
+│  ┌──────────────────────────────────┐        │
+│  │  Task: Frame Reader               │        │
+│  │    Loop: read frame → dispatch    │        │
+│  ├──────────────────────────────────┤        │
+│  │  Task: Frame Writer               │        │
+│  │    Loop: receive from channel →   │        │
+│  │          write frame to socket    │        │
+│  ├──────────────────────────────────┤        │
+│  │  Task: Heartbeat                  │        │
+│  │    Loop: sleep 30s → send ping    │        │
+│  └──────────────────────────────────┘        │
+│                                              │
+│  Shared state (lock-free where possible):    │
+│  ┌──────────────────────────────────┐        │
+│  │  DashMap<Subdomain, TunnelRef>   │ Routing│
+│  │  DashMap<TunnelId, TunnelState>  │ State  │
+│  │  AtomicU64 global_request_count  │ Metrics│
+│  │  mpsc channels for frame passing │ Comms  │
+│  └──────────────────────────────────┘        │
+│                                              │
+└─────────────────────────────────────────────┘
+```
+
+**Why this works for 10,000+ concurrent connections:**
+
+- tokio tasks are ~2KB of stack (vs 8MB for OS threads)
+- 10,000 tasks = ~20MB memory just for task stacks
+- Work-stealing scheduler balances load across CPU cores
+- `io_uring` backend on Linux for minimal syscall overhead
+- No garbage collection pauses (Rust)
+- Lock-free routing table (DashMap uses sharded locks, effectively lock-free for reads)
+
+### 12.2 CLI Client Concurrency
+
+```
+tokio Runtime (client):
+  Worker threads: 4 (lighter than server)
+  
+  Tasks:
+  ┌──────────────────────────────┐
+  │ Control Connection Manager   │  1 task
+  │ Frame Reader                 │  1 task
+  │ Frame Writer                 │  1 task
+  │ Heartbeat Responder          │  1 task
+  │ Local Dashboard Server       │  1 task + spawned per HTTP request
+  │ Per-Stream Proxy             │  1 task per active request/connection
+  └──────────────────────────────┘
+  
+  At 100 concurrent proxied requests: ~100 tasks + 5 management tasks
+  Memory: <50MB typical
+```
+
+---
+
+---
+
+## 13. Data Flow Diagrams
+
+### 13.1 HTTP Request — Complete Data Flow
+
+```
+ ┌──────────┐         ┌──────────────────────────────────────────────┐         ┌───────────┐
+ │  Public   │  HTTPS  │              RELAY SERVER                    │  D-RAP   │  D-RAP    │   TCP    ┌──────────┐
+ │  Client   │────────▶│                                              │  Protocol│  CLI      │─────────▶│ Local    │
+ │ (Browser) │         │  ┌─────┐  ┌──────┐  ┌────┐  ┌──────────┐   │─────────▶│  Client   │          │ App      │
+ │           │         │  │ TLS │→│Router│→│Auth│→│Rate Limit│   │          │           │          │ :3000    │
+ │           │◀────────│  │Term.│  │      │  │Gate│  │          │   │◀─────────│           │◀─────────│          │
+ │           │  HTTPS  │  └─────┘  └──────┘  └────┘  └──────────┘   │  D-RAP   │           │   TCP    │          │
+ └──────────┘         │       │                          │            │  Protocol│           │          └──────────┘
+                      │       ▼                          ▼            │         │           │
+                      │  ┌──────────┐            ┌────────────┐      │         │           │
+                      │  │Inspector │            │ Multiplexer│      │         │           │
+                      │  │(capture) │            │(frame/send)│      │         │           │
+                      │  └──────────┘            └────────────┘      │         │           │
+                      │       │                                       │         │           │
+                      │       ▼                                       │         │           │
+                      │  ┌──────────┐                                │         ┌───────────┐
+                      │  │Dashboard │                                │         │Dashboard  │
+                      │  │API notify│                                │         │:4040      │
+                      │  └──────────┘                                │         └───────────┘
+                      └──────────────────────────────────────────────┘
+
+Data transformations at each step:
+
+Step 1: TLS Termination
+  Input:  Encrypted HTTPS bytes
+  Output: Plaintext HTTP request
+
+Step 2: Router
+  Input:  HTTP request with Host header
+  Output: Same request + tunnel reference
+
+Step 3: Auth Gate
+  Input:  HTTP request + tunnel auth config
+  Output: Pass (continue) or Reject (401/403)
+
+Step 4: Rate Limiter
+  Input:  Request + tunnel rate config
+  Output: Pass (continue) or Reject (429)
+
+Step 5: Inspector (async, non-blocking)
+  Input:  Full HTTP request
+  Output: CapturedRequest stored to ring buffer + SQLite
+  Note:   This does NOT block the request flow. It captures a copy.
+
+Step 6: Multiplexer
+  Input:  HTTP request bytes
+  Output: D-RAP DATA frames on assigned stream ID
+
+Step 7: Wire (relay → client)
+  Input:  D-RAP frames
+  Output: Same frames, encrypted via TLS control connection
+
+Step 8: Client Demultiplexer
+  Input:  D-RAP DATA frames
+  Output: HTTP request bytes for specific stream
+
+Step 9: Local Proxy
+  Input:  HTTP request bytes
+  Output: TCP connection to localhost:3000, send bytes
+
+Step 10: Local App Response (reverse flow)
+  Steps 9-1 in reverse
+```
+
+### 13.2 TCP Tunnel — Complete Data Flow
+
+```
+ ┌──────────┐                ┌─────────────────────┐                ┌───────────┐
+ │  Public   │  Raw TCP       │    RELAY SERVER      │   D-RAP       │  D-RAP    │  Raw TCP    ┌──────────┐
+ │  TCP      │───────────────▶│                      │  Protocol     │  CLI      │────────────▶│ Local    │
+ │  Client   │                │  ┌──────────────┐    │──────────────▶│  Client   │             │ PostgreSQL│
+ │ (psql)    │◀───────────────│  │TCP Port Router│   │◀──────────────│           │◀────────────│ :5432    │
+ │           │  Raw TCP       │  │:44301 → tun#3│    │  D-RAP       │           │  Raw TCP    │          │
+ └──────────┘                │  └──────┬───────┘    │  Protocol     └───────────┘             └──────────┘
+                             │         │             │
+                             │         ▼             │
+                             │  ┌──────────────┐     │
+                             │  │Bidirectional  │    │
+                             │  │Byte Copy      │    │
+                             │  │(zero-copy)    │    │
+                             │  └──────────────┘     │
+                             └─────────────────────┘
+
+Note: No TLS termination (public side is raw TCP)
+      No HTTP parsing
+      No inspection (just byte counters)
+      No auth gate (TCP has no standard auth mechanism)
+      Rate limiting: connection count only, not request-based
+```
+
+---
+
+---
+
+## 14. Database Schema
+
+### 14.1 Relay Server — SQLite
+
+```sql
+-- User accounts
+CREATE TABLE users (
+    id              TEXT PRIMARY KEY,           -- UUID
+    email           TEXT UNIQUE NOT NULL,
+    auth_token_hash TEXT NOT NULL,              -- bcrypt hash of drap_tok_...
+    plan            TEXT DEFAULT 'free',        -- free, pro, enterprise
+    max_tunnels     INTEGER DEFAULT 3,
+    max_bandwidth   INTEGER DEFAULT 104857600,  -- 100MB/s
+    created_at      TEXT NOT NULL,              -- ISO 8601
+    last_seen_at    TEXT
+);
+
+-- Tunnel history (persisted after tunnel closes)
+CREATE TABLE tunnel_history (
+    id              TEXT PRIMARY KEY,           -- UUID
+    user_id         TEXT NOT NULL REFERENCES users(id),
+    protocol        TEXT NOT NULL,              -- http, tcp
+    subdomain       TEXT,
+    local_addr      TEXT NOT NULL,              -- localhost:3000
+    public_url      TEXT NOT NULL,
+    started_at      TEXT NOT NULL,
+    ended_at        TEXT,
+    total_requests  INTEGER DEFAULT 0,
+    total_bytes_in  INTEGER DEFAULT 0,
+    total_bytes_out INTEGER DEFAULT 0,
+    close_reason    TEXT                        -- client_disconnect, server_shutdown, timeout, error
+);
+
+CREATE INDEX idx_tunnel_history_user ON tunnel_history(user_id);
+CREATE INDEX idx_tunnel_history_started ON tunnel_history(started_at);
+
+-- Captured requests (for inspection/replay)
+CREATE TABLE captured_requests (
+    id                  TEXT PRIMARY KEY,       -- UUID
+    tunnel_id           TEXT NOT NULL,
+    timestamp           TEXT NOT NULL,
+    
+    -- Request
+    req_method          TEXT,
+    req_path            TEXT,
+    req_headers         TEXT,                   -- JSON
+    req_body            BLOB,                   -- Raw bytes (NULL if too large)
+    req_body_path       TEXT,                   -- File path if body > 1MB
+    req_body_size       INTEGER,
+    req_content_type    TEXT,
+    
+    -- Response
+    res_status_code     INTEGER,
+    res_headers         TEXT,                   -- JSON
+    res_body            BLOB,
+    res_body_path       TEXT,
+    res_body_size       INTEGER,
+    res_content_type    TEXT,
+    
+    -- Timing
+    total_duration_ms   INTEGER,
+    tunnel_rtt_ms       INTEGER,
+    local_duration_ms   INTEGER,
+    
+    -- Meta
+    remote_addr         TEXT,
+    is_replay           INTEGER DEFAULT 0,
+    original_request_id TEXT,                   -- If replayed, points to original
+    
+    created_at          TEXT NOT NULL
+);
+
+CREATE INDEX idx_captured_tunnel ON captured_requests(tunnel_id);
+CREATE INDEX idx_captured_timestamp ON captured_requests(created_at);
+
+-- Auto-cleanup: delete requests older than 24 hours
+-- Triggered by a background task every hour
+```
+
+### 14.2 CLI Client — SQLite (~/.drap/drap.db)
+
+```sql
+-- Local auth
+CREATE TABLE config (
+    key     TEXT PRIMARY KEY,
+    value   TEXT NOT NULL
+);
+-- Stores: authtoken, default_region, last_server_url
+
+-- Request history (local copy for offline viewing)
+CREATE TABLE local_requests (
+    id              TEXT PRIMARY KEY,
+    tunnel_id       TEXT NOT NULL,
+    timestamp       TEXT NOT NULL,
+    method          TEXT,
+    path            TEXT,
+    status_code     INTEGER,
+    duration_ms     INTEGER,
+    req_body_size   INTEGER,
+    res_body_size   INTEGER,
+    created_at      TEXT NOT NULL
+);
+
+CREATE INDEX idx_local_req_tunnel ON local_requests(tunnel_id);
+```
+
+### 14.3 Redis Schema (Relay Server)
+
+```
+# Active tunnel tracking
+SET active_tunnels                          → Set of tunnel IDs
+HASH tunnel:{tunnel_id}                     → { user_id, subdomain, proto, created_at, ... }
+STRING subdomain:{subdomain}                → tunnel_id (for fast lookup)
+
+# Rate limiting
+ZSET rate:tunnel:{tunnel_id}                → Sorted set of request timestamps
+ZSET rate:ip:{tunnel_id}:{ip}              → Sorted set per source IP per tunnel
+STRING rate:global                          → Atomic counter for global rate
+
+# Session management
+HASH session:{session_id}                   → { user_id, connected_at, client_ip, tunnels: [...] }
+EXPIRE session:{session_id} 86400           → Auto-expire after 24h
+
+# Metrics (real-time counters)
+STRING metrics:requests:total               → Atomic counter
+STRING metrics:bytes:in                     → Atomic counter
+STRING metrics:bytes:out                    → Atomic counter
+HASH metrics:status_codes                   → { "200": 14523, "404": 42, "500": 7 }
+
+# Pub/Sub for multi-instance (future)
+CHANNEL drap:events                         → { type: "tunnel_created", ... }
+```
+
+---
+
+---
+
+## 15. API Design
+
+### 15.1 Dashboard REST API (Go, served on :4040)
+
+```
+Base URL: http://127.0.0.1:4040/api
+
+Authentication: None (local only, bound to 127.0.0.1)
+
+═══════════════════════════════════════════════════
+TUNNELS
+═══════════════════════════════════════════════════
+
+GET /api/tunnels
+  Description: List all active tunnels
+  Response 200:
+  {
+    "tunnels": [
+      {
+        "id": "t_abc123",
+        "protocol": "http",
+        "subdomain": "myapp",
+        "public_url": "https://myapp.drap.io",
+        "local_addr": "localhost:3000",
+        "status": "connected",
+        "started_at": "2024-01-15T10:00:00Z",
+        "uptime_seconds": 3600,
+        "total_requests": 247,
+        "total_bytes_in": 1048576,
+        "total_bytes_out": 5242880,
+        "config": {
+          "inspect": true,
+          "auth_enabled": false,
+          "rate_limit": "100/min"
+        }
+      }
+    ]
+  }
+
+GET /api/tunnels/:id
+  Description: Get detailed info for a specific tunnel
+  Response 200: { tunnel: { ...full details... } }
+  Response 404: { "error": "tunnel_not_found" }
+
+═══════════════════════════════════════════════════
+REQUESTS
+═══════════════════════════════════════════════════
+
+GET /api/requests
+  Description: List captured requests
+  Query params:
+    tunnel_id:  Filter by tunnel (optional)
+    method:     Filter by HTTP method (optional)
+    status:     Filter by status code (optional)
+    path:       Filter by path prefix (optional)
+    limit:      Max results (default 50, max 500)
+    offset:     Pagination offset
+    sort:       "newest" (default) or "oldest"
+  Response 200:
+  {
+    "requests": [
+      {
+        "id": "req_550e8400",
+        "tunnel_id": "t_abc123",
+        "timestamp": "2024-01-15T10:30:42.123Z",
+        "method": "POST",
+        "path": "/api/webhook",
+        "status_code": 200,
+        "duration_ms": 17,
+        "req_body_size": 234,
+        "res_body_size": 15,
+        "remote_addr": "54.187.174.169",
+        "is_replay": false
+      }
+    ],
+    "total": 247,
+    "has_more": true
+  }
+
+GET /api/requests/:id
+  Description: Full request detail (headers, body, timing)
+  Response 200:
+  {
+    "request": {
+      "id": "req_550e8400",
+      "tunnel_id": "t_abc123",
+      "timestamp": "2024-01-15T10:30:42.123Z",
+      "request": {
+        "method": "POST",
+        "path": "/api/webhook",
+        "headers": {
+          "Content-Type": "application/json",
+          "Stripe-Signature": "t=1699...,v1=abc..."
+        },
+        "body": "{\"type\":\"payment_intent.succeeded\",...}",
+        "body_size": 234,
+        "content_type": "application/json"
+      },
+      "response": {
+        "status_code": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"received\":true}",
+        "body_size": 15,
+        "content_type": "application/json"
+      },
+      "timing": {
+        "tls_ms": 1.2,
+        "routing_ms": 0.1,
+        "tunnel_rtt_ms": 3.4,
+        "local_processing_ms": 12.8,
+        "total_ms": 17.5
+      },
+      "remote_addr": "54.187.174.169",
+      "is_replay": false,
+      "original_request_id": null
+    }
+  }
+
+POST /api/requests/:id/replay
+  Description: Replay a captured request
+  Request body (optional):
+  {
+    "modified_headers": { "X-Custom": "value" },
+    "modified_body": "...",
+    "modified_path": "/api/webhook-v2"
+  }
+  Response 200:
+  {
+    "replay": {
+      "original_request_id": "req_550e8400",
+      "replay_request_id": "req_661f9511",
+      "response": {
+        "status_code": 200,
+        "headers": { ... },
+        "body": "...",
+        "duration_ms": 14
+      }
+    }
+  }
+
+DELETE /api/requests
+  Description: Clear all captured requests
+  Query params:
+    tunnel_id: Clear only for specific tunnel (optional)
+  Response 204: No content
+
+═══════════════════════════════════════════════════
+METRICS
+═══════════════════════════════════════════════════
+
+GET /api/metrics
+  Description: Current metrics snapshot
+  Response 200:
+  {
+    "uptime_seconds": 3600,
+    "tunnels_active": 2,
+    "connections_active": 14,
+    "requests": {
+      "total": 1247,
+      "per_minute": 12.3,
+      "per_second": 0.21
+    },
+    "bandwidth": {
+      "bytes_in": 1048576,
+      "bytes_out": 5242880,
+      "mbps_in": 0.23,
+      "mbps_out": 1.17
+    },
+    "status_codes": {
+      "2xx": 1180,
+      "3xx": 22,
+      "4xx": 38,
+      "5xx": 7
+    },
+    "latency": {
+      "avg_ms": 15.2,
+      "p50_ms": 12.0,
+      "p95_ms": 34.0,
+      "p99_ms": 89.0
+    }
+  }
+
+═══════════════════════════════════════════════════
+WEBSOCKET (Real-time events)
+═══════════════════════════════════════════════════
+
+WS /api/ws
+  Description: Live event stream
+  Events (JSON messages):
+  
+  { "type": "request",
+    "data": { ...same as GET /api/requests/:id... } }
+    → Fired on every request through any tunnel
+  
+  { "type": "tunnel_connected",
+    "data": { "id": "t_abc123", "url": "https://myapp.drap.io" } }
+    → Fired when a new tunnel comes online
+  
+  { "type": "tunnel_disconnected",
+    "data": { "id": "t_abc123", "reason": "client_disconnect" } }
+    → Fired when a tunnel goes offline
+  
+  { "type": "metrics",
+    "data": { ...same as GET /api/metrics... } }
+    → Fired every 5 seconds with updated metrics
+  
+  { "type": "error",
+    "data": { "tunnel_id": "t_abc123", "error": "local_connect_refused" } }
+    → Fired on proxy errors
+```
+
+### 15.2 Internal Control API (between relay server components)
+
+```
+This is NOT exposed externally. It's the communication channel
+between the relay server's Rust core and the Go dashboard API.
+
+Option A: Unix Domain Socket
+  The Rust server exposes a UDS at /tmp/drap-control.sock
+  The Go API connects as a client
+  Protocol: Simple JSON-over-newline
+
+Option B: Shared SQLite + File-based Events  
+  Both processes read/write to the same SQLite database
+  Events communicated via inotify on a shared event log file
+
+Option C: gRPC (internal)
+  Rust server runs a gRPC server on localhost:4041
+  Go API is a gRPC client
+
+Chosen: Option A (Unix Domain Socket)
+  Simplest, no additional dependencies, fast enough for local IPC
+```
+
+---
+
+---
+
+## 16. CLI Design
+
+### 16.1 Command Structure
+
+```
+drap — Dynamic Relay Access Point
+
+USAGE:
+    drap <COMMAND> [OPTIONS]
+
+COMMANDS:
+    http        Start an HTTP tunnel
+    tcp         Start a TCP tunnel
+    start       Start tunnels from config file
+    authtoken   Set or view auth token
+    status      Show active tunnels
+    version     Show version info
+    help        Show help
+
+═══════════════════════════════════════════════════
+
+drap http <PORT> [OPTIONS]
+
+  Start an HTTP tunnel to local port
+
+  ARGS:
+    <PORT>                    Local port to tunnel (e.g., 3000)
+
+  OPTIONS:
+    -s, --subdomain <NAME>    Request custom subdomain
+    --host-header <HOST>      Rewrite Host header (default: localhost:<PORT>)
+    --local-https             Local server uses HTTPS
+    --inspect                 Enable request inspection (default: true)
+    --no-inspect              Disable request inspection
+    --auth <USER:PASS>        Require HTTP Basic Auth on tunnel
+    --auth-token <TOKEN>      Require Bearer token on tunnel
+    --allow-ip <CIDRS>        Comma-separated IP/CIDR whitelist
+    --rate-limit <SPEC>       Rate limit (e.g., "100/min", "10/sec")
+    --bind <ADDR>             Local bind address (default: localhost)
+    --region <REGION>         Relay server region (default: us-east-1)
+    --log-level <LEVEL>       Log level: error, warn, info, debug, trace
+
+  EXAMPLES:
+    drap http 3000
+    drap http 8080 --subdomain=myapp --auth="admin:secret"
+    drap http 3000 --rate-limit=100/min --allow-ip="10.0.0.0/8"
+
+═══════════════════════════════════════════════════
+
+drap tcp <PORT> [OPTIONS]
+
+  Start a TCP tunnel to local port
+
+  ARGS:
+    <PORT>                    Local TCP port to tunnel (e.g., 5432)
+
+  OPTIONS:
+    --remote-port <PORT>      Request specific public port
+    --allow-ip <CIDRS>        IP whitelist
+    --region <REGION>         Relay server region
+    --log-level <LEVEL>       Log level
+
+  EXAMPLES:
+    drap tcp 5432
+    drap tcp 22 --remote-port=2222
+
+═══════════════════════════════════════════════════
+
+drap start [OPTIONS]
+
+  Start tunnels defined in config file
+
+  OPTIONS:
+    -c, --config <PATH>       Config file path (default: ./drap.yml)
+    --log-level <LEVEL>       Log level
+
+═══════════════════════════════════════════════════
+
+drap authtoken <TOKEN>
+
+  Set the auth token for this machine
+
+  ARGS:
+    <TOKEN>                   Your D-RAP auth token
+
+  The token is stored in ~/.drap/authtoken
+  Obtain a token at: https://dashboard.drap.io/tokens
+```
+
+### 16.2 Terminal Output Design
+
+```
+$ drap http 3000 --subdomain=myapp --inspect
+
+  ╔══════════════════════════════════════════════════╗
+  ║                                                  ║
+  ║   D-RAP   v1.0.0                                ║
+  ║   Dynamic Relay Access Point                     ║
+  ║                                                  ║
+  ╠══════════════════════════════════════════════════╣
+  ║                                                  ║
+  ║   Status:      ● online                          ║
+  ║   Account:     dev@axiom.io                      ║
+  ║   Region:      us-east-1                         ║
+  ║                                                  ║
+  ║   Forwarding:                                    ║
+  ```
+  ║     https://myapp.drap.io → http://localhost:3000║
+  ║                                                  ║
+  ║   Inspection:  enabled                           ║
+  ║   Dashboard:   http://127.0.0.1:4040             ║
+  ║                                                  ║
+  ║   Auth:        none                              ║
+  ║   Rate Limit:  none                              ║
+  ║                                                  ║
+  ╠══════════════════════════════════════════════════╣
+  ║                                                  ║
+  ║   Connections: ttl=0 opn=0 rt1=0.00 rt5=0.00    ║
+  ║                                                  ║
+  ╠══════════════════════════════════════════════════╣
+  ║                                                  ║
+  ║   HTTP Requests                                  ║
+  ║   ─────────────────────────────────────────────  ║
+  ║                                                  ║
+  ║   POST /api/webhook             200 OK    14ms   ║
+  ║   GET  /api/users               200 OK     6ms   ║
+  ║   POST /api/orders              201 Created 23ms ║
+  ║   GET  /health                  200 OK     2ms   ║
+  ║   POST /api/webhook             500 ISE   45ms   ║ ← red
+  ║                                                  ║
+  ╚══════════════════════════════════════════════════╝
+
+  Ctrl+C to quit
+```
+
+### 16.3 Config File Format (drap.yml)
+
+```yaml
+# ~/.drap/drap.yml or ./drap.yml
+
+# Authentication
+authtoken: drap_tok_abc123xyz789def456
+
+# Global defaults
+region: us-east-1
+log_level: info
+inspect: true
+
+# Tunnel definitions
+tunnels:
+  # HTTP tunnel — frontend app
+  frontend:
+    proto: http
+    addr: 3000
+    subdomain: my-frontend
+    inspect: true
+    host_header: myapp.local
+    
+  # HTTP tunnel — API with auth and rate limiting
+  api:
+    proto: http
+    addr: 8080
+    subdomain: my-api
+    inspect: true
+    auth: "admin:supersecret"
+    rate_limit: "100/min"
+    allow_ip:
+      - "10.0.0.0/8"
+      - "203.0.113.42"
+    
+  # TCP tunnel — PostgreSQL
+  database:
+    proto: tcp
+    addr: 5432
+    remote_port: 54320
+    
+  # TCP tunnel — Redis
+  cache:
+    proto: tcp
+    addr: 6379
+    
+  # HTTP tunnel — local HTTPS server
+  secure-app:
+    proto: http
+    addr: 8443
+    local_https: true
+    subdomain: my-secure-app
+    auth_token: "bearer-token-12345"
+```
+
+**Config file resolution order:**
+1. CLI arguments (highest priority)
+2. `./drap.yml` (project-level)
+3. `~/.drap/drap.yml` (user-level)
+4. Built-in defaults (lowest priority)
+
+**Merging rules:**
+- CLI args override config file
+- Project config overrides user config
+- `authtoken` from any source is accepted
+- Tunnel definitions from config file are additive
+
+---
+
+---
+
+## 17. Dashboard UI Design
+
+### 17.1 Technology & Approach
+
+```
+Framework:     Svelte (compiled, no runtime overhead)
+Styling:       Tailwind CSS (utility-first, small bundle)
+Charts:        Chart.js (lightweight) or D3.js (powerful)
+WebSocket:     Native browser WebSocket API
+Build tool:    Vite
+Bundle target: ES2020 (modern browsers)
+
+The compiled dashboard is embedded into the Rust CLI binary.
+When user runs `drap http 3000`, the local server on :4040
+serves the dashboard HTML/JS/CSS from memory.
+
+Total bundle size target: <200KB gzipped
+```
+
+### 17.2 Page Layouts
+
+**Page 1: Overview Dashboard**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  ┌──────┐                                                               │
+│  │ D-RAP│  Dashboard                           Connected ● │ v1.0.0    │
+│  └──────┘                                                               │
+├───────────┬─────────────────────────────────────────────────────────────┤
+│           │                                                             │
+│  Overview │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
+│           │   │ Active   │  │ Total    │  │ Avg      │  │ Errors   │  │
+│  Tunnels  │   │ Tunnels  │  │ Requests │  │ Latency  │  │ (5xx)    │  │
+│           │   │    2     │  │  1,247   │  │  15ms    │  │    7     │  │
+│  Requests │   └──────────┘  └──────────┘  └──────────┘  └──────────┘  │
+│           │                                                             │
+│  Settings │   ┌─────────────────────────────────────────────────────┐   │
+│           │   │  Requests per Minute (Live)                         │   │
+│           │   │                                                      │   │
+│           │   │  30 ┤                                                │   │
+│           │   │     │          ╭─╮                                   │   │
+│           │   │  20 ┤    ╭────╯  ╰──╮                               │   │
+│           │   │     │   ╭╯           ╰──╮    ╭──╮                   │   │
+│           │   │  10 ┤──╯                ╰────╯   ╰──╮               │   │
+│           │   │     │                                ╰──            │   │
+│           │   │   0 ┤────────────────────────────────────           │   │
+│           │   │     └─────────────────────────────────→ time        │   │
+│           │   └─────────────────────────────────────────────────────┘   │
+│           │                                                             │
+│           │   ACTIVE TUNNELS                                            │
+│           │   ┌────────┬───────────────────────────┬───────┬────────┐  │
+│           │   │ Status │ URL                       │ Proto │  Reqs  │  │
+│           │   ├────────┼───────────────────────────┼───────┼────────┤  │
+│           │   │   🟢   │ https://myapp.drap.io     │ HTTP  │   891  │  │
+│           │   │   🟢   │ https://my-api.drap.io    │ HTTP  │   356  │  │
+│           │   │   🟢   │ tcp://....drap.io:44301   │ TCP   │    —   │  │
+│           │   └────────┴───────────────────────────┴───────┴────────┘  │
+│           │                                                             │
+│           │   STATUS CODE DISTRIBUTION              BANDWIDTH          │
+│           │   ┌───────────────────────┐   ┌───────────────────────┐    │
+│           │   │    ┌─────┐            │   │  IN:  0.23 MB/s       │    │
+│           │   │    │ 2xx │ 94.6%      │   │  OUT: 1.17 MB/s       │    │
+│           │   │    │     │            │   │                       │    │
+│           │   │    ├─────┤            │   │  Total IN:  15.2 MB   │    │
+│           │   │    │ 4xx │  3.0%      │   │  Total OUT: 72.8 MB   │    │
+│           │   │    ├─────┤            │   │                       │    │
+│           │   │    │ 3xx │  1.8%      │   └───────────────────────┘    │
+│           │   │    ├─────┤            │                                │
+│           │   │    │ 5xx │  0.6%      │                                │
+│           │   │    └─────┘            │                                │
+│           │   └───────────────────────┘                                │
+│           │                                                             │
+└───────────┴─────────────────────────────────────────────────────────────┘
+```
+
+**Page 2: Request Inspector**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  D-RAP Dashboard                                        Connected ●    │
+├───────────┬─────────────────────────────────────────────────────────────┤
+│           │                                                             │
+│  Overview │  REQUEST INSPECTOR                                          │
+│           │                                                             │
+│ >Requests │  ┌─────────────────────────────────────────────────────┐    │
+│           │  │ Tunnel: [All ▼]  Method: [All ▼]  Status: [All ▼] │    │
+│  Settings │  │ Search: [___________________________] [🔍]  [Clear]│    │
+│           │  └─────────────────────────────────────────────────────┘    │
+│           │                                                             │
+│           │  ┌──────┬────────┬────────────────────┬──────┬──────┬───┐  │
+│           │  │ Time │ Method │ Path               │Status│  ms  │ ↻ │  │
+│           │  ├──────┼────────┼────────────────────┼──────┼──────┼───┤  │
+│           │  │  3s  │ POST   │ /api/webhook       │  200 │   14 │ ▶ │  │
+│           │  │  8s  │ GET    │ /api/users         │  200 │    6 │ ▶ │  │
+│           │  │ 12s  │ POST   │ /api/orders        │  201 │   23 │ ▶ │  │
+│           │  │ 15s  │ GET    │ /health            │  200 │    2 │ ▶ │  │
+│           │  │ 22s  │ POST   │ /api/webhook       │  500 │   45 │ ▶ │← Red
+│           │  │ 28s  │ GET    │ /static/style.css  │  304 │    1 │ ▶ │  │
+│           │  │ 31s  │ POST   │ /api/payment       │  200 │   67 │ ▶ │  │
+│           │  └──────┴────────┴────────────────────┴──────┴──────┴───┘  │
+│           │                                                             │
+│           │  ▼ EXPANDED: POST /api/webhook (req_550e8400)              │
+│           │  ┌─────────────────────────────────────────────────────┐    │
+│           │  │                                                     │    │
+│           │  │  [Request ▼] [Response] [Timing] [Replay]          │    │
+│           │  │                                                     │    │
+│           │  │  ┌─── Request Headers ───────────────────────────┐ │    │
+│           │  │  │ POST /api/webhook HTTP/1.1                    │ │    │
+│           │  │  │ Host: myapp.drap.io                           │ │    │
+│           │  │  │ Content-Type: application/json                │ │    │
+│           │  │  │ Content-Length: 234                           │ │    │
+│           │  │  │ Stripe-Signature: t=1699999,v1=abc123...     │ │    │
+│           │  │  │ User-Agent: Stripe/1.0                       │ │    │
+│           │  │  │ X-Forwarded-For: 54.187.174.169              │ │    │
+│           │  │  └──────────────────────────────────────────────┘ │    │
+│           │  │                                                     │    │
+│           │  │  ┌─── Request Body (JSON, 234 bytes) ────────────┐ │    │
+│           │  │  │ {                                              │ │    │
+│           │  │  │   "id": "evt_1OaGk2CjPM",                    │ │    │
+│           │  │  │   "type": "payment_intent.succeeded",         │ │    │
+│           │  │  │   "data": {                                   │ │    │
+│           │  │  │     "object": {                               │ │    │
+│           │  │  │       "id": "pi_3OaGk2CjPM",                 │ │    │
+│           │  │  │       "amount": 2000,                         │ │    │
+│           │  │  │       "currency": "usd",                      │ │    │
+│           │  │  │       "status": "succeeded"                   │ │    │
+│           │  │  │     }                                         │ │    │
+│           │  │  │   }                                           │ │    │
+│           │  │  │ }                                              │ │    │
+│           │  │  └──────────────────────────────────────────────┘ │    │
+│           │  │                                                     │    │
+│           │  │  [🔄 Replay] [📋 Copy as cURL] [📥 Export JSON]   │    │
+│           │  │                                                     │    │
+│           │  └─────────────────────────────────────────────────────┘    │
+│           │                                                             │
+└───────────┴─────────────────────────────────────────────────────────────┘
+```
+
+**Page 3: Replay View**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  D-RAP Dashboard > Request Inspector > Replay                          │
+├───────────┬─────────────────────────────────────────────────────────────┤
+│           │                                                             │
+│  Overview │  REPLAY REQUEST                                             │
+│           │                                                             │
+│ >Requests │  Original: req_550e8400 (POST /api/webhook, 22s ago)       │
+│           │                                                             │
+│  Settings │  ┌─────────────────────────────────────────────────────┐    │
+│           │  │  Method: [POST ▼]  Path: [/api/webhook          ]  │    │
+│           │  │                                                     │    │
+│           │  │  Headers: (editable)                                │    │
+│           │  │  ┌──────────────────────────────────────────────┐   │    │
+│           │  │  │ Content-Type: application/json               │   │    │
+│           │  │  │ Stripe-Signature: t=1699999,v1=abc123...    │   │    │
+│           │  │  │ [+ Add Header]                               │   │    │
+│           │  │  └──────────────────────────────────────────────┘   │    │
+│           │  │                                                     │    │
+│           │  │  Body: (editable)                                   │    │
+│           │  │  ┌──────────────────────────────────────────────┐   │    │
+│           │  │  │ {                                            │   │    │
+│           │  │  │   "type": "payment_intent.succeeded",       │   │    │
+│           │  │  │   "data": { ... }                           │   │    │
+│           │  │  │ }                                            │   │    │
+│           │  │  └──────────────────────────────────────────────┘   │    │
+│           │  │                                                     │    │
+│           │  │                          [🔄 Send Replay]           │    │
+│           │  └─────────────────────────────────────────────────────┘    │
+│           │                                                             │
+│           │  COMPARISON (after replay)                                   │
+│           │  ┌────────────────────────┬────────────────────────┐        │
+│           │  │     ORIGINAL           │     REPLAY             │        │
+│           │  ├────────────────────────┼────────────────────────┤        │
+│           │  │ Status: 500 ISE        │ Status: 200 OK         │        │
+│           │  │ Time: 45ms             │ Time: 12ms             │        │
+│           │  │                        │                        │        │
+│           │  │ Response Body:         │ Response Body:         │        │
+│           │  │ {                      │ {                      │        │
+│           │  │   "error": "handler    │   "received": true     │        │
+│           │  │    not found"          │ }                      │        │
+│           │  │ }                      │                        │        │
+│           │  │                        │                        │        │
+│           │  │  ← Bug was here        │  ← Fixed! ✓           │        │
+│           │  └────────────────────────┴────────────────────────┘        │
+│           │                                                             │
+└───────────┴─────────────────────────────────────────────────────────────┘
+```
+
+### 17.3 UI Component Architecture (Svelte)
+
+```
+src/
+├── App.svelte                    # Root component, router
+├── lib/
+│   ├── api.js                    # REST API client
+│   ├── websocket.js              # WebSocket connection manager
+│   ├── stores/
+│   │   ├── tunnels.js            # Svelte store: active tunnels
+│   │   ├── requests.js           # Svelte store: captured requests
+│   │   ├── metrics.js            # Svelte store: live metrics
+│   │   └── connection.js         # Svelte store: WS connection state
+│   └── utils/
+│       ├── format.js             # Format bytes, duration, timestamps
+│       ├── syntax-highlight.js   # JSON/XML syntax highlighting
+│       └── debounce.js           # Search debouncing
+├── pages/
+│   ├── Overview.svelte           # Main dashboard page
+│   ├── Requests.svelte           # Request inspector page
+│   ├── RequestDetail.svelte      # Single request detail + replay
+│   ├── TunnelDetail.svelte       # Single tunnel detail
+│   └── Settings.svelte           # Configuration page
+├── components/
+│   ├── Sidebar.svelte            # Navigation sidebar
+│   ├── StatusBadge.svelte        # Online/offline indicator
+│   ├── TunnelCard.svelte         # Tunnel summary card
+│   ├── RequestRow.svelte         # Single request in table
+│   ├── RequestExpanded.svelte    # Expanded request details
+│   ├── HeadersTable.svelte       # HTTP headers display
+│   ├── BodyViewer.svelte         # Request/response body with formatting
+│   ├── TimingBar.svelte          # Request timing waterfall
+│   ├── ReplayForm.svelte         # Editable replay form
+│   ├── ComparisonView.svelte     # Side-by-side original vs replay
+│   ├── LiveChart.svelte          # Real-time line chart
+│   ├── StatusCodePie.svelte      # Status code distribution
+│   ├── MetricCard.svelte         # Single metric display
+│   └── SearchBar.svelte          # Filterable search input
+└── styles/
+    └── app.css                   # Tailwind imports + custom styles
+```
+
+---
+
+---
+
+## 18. Deployment Architecture
+
+### 18.1 CLI Client Distribution
+
+```
+Distribution: Single static binary per platform
+
+Platforms:
+  - Linux x86_64    (primary)
+  - Linux aarch64   (ARM servers, Raspberry Pi)
+  - macOS x86_64    (Intel Macs)
+  - macOS aarch64   (Apple Silicon)
+  - Windows x86_64  (via MSVC or GNU toolchain)
+
+Build: Cross-compilation using cross-rs or cargo-zigbuild
+
+Installation methods:
+
+  1. Direct download:
+     $ curl -sSL https://install.drap.io | sh
+     
+  2. Homebrew (macOS/Linux):
+     $ brew install drap
+     
+  3. Cargo:
+     $ cargo install drap
+     
+  4. APT (Debian/Ubuntu):
+     $ sudo apt install drap
+     
+  5. Docker (for CI environments):
+     $ docker run --rm -it --net=host drap/drap http 3000
+     
+  6. npm (for Node.js developers):
+     $ npx drap http 3000
+
+Binary size target: <15MB (stripped, with embedded dashboard)
+```
+
+### 18.2 Relay Server Deployment
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                     DEPLOYMENT ARCHITECTURE                     │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                    DNS (Cloudflare)                       │   │
+│  │  *.drap.io → relay server IP                             │   │
+│  │  drap.io   → marketing site / dashboard                  │   │
+│  └─────────────────────────┬───────────────────────────────┘   │
+│                            │                                    │
+│  ┌─────────────────────────▼───────────────────────────────┐   │
+│  │              RELAY SERVER (VPS / Bare Metal)              │   │
+│  │              e.g., Hetzner, OVH, DigitalOcean             │   │
+│  │                                                           │   │
+│  │  Specs: 8 vCPU, 16GB RAM, 1Gbps network                  │   │
+│  │  OS: Ubuntu 22.04 LTS                                     │   │
+│  │                                                           │   │
+│  │  ┌─────────────────────────────────────────────────┐     │   │
+│  │  │  Docker Compose                                  │     │   │
+│  │  │                                                  │     │   │
+│  │  │  ┌──────────────────────┐                       │     │   │
+│  │  │  │ drap-server (Rust)   │                       │     │   │
+│  │  │  │ Ports: 443, 4443,   │                       │     │   │
+│  │  │  │        40000-50000   │                       │     │   │
+│  │  │  │ Volumes: /certs,    │                       │     │   │
+│  │  │  │          /data      │                       │     │   │
+│  │  │  └──────────┬───────────┘                       │     │   │
+│  │  │             │ UDS                               │     │   │
+│  │  │  ┌──────────▼───────────┐                       │     │   │
+│  │  │  │ drap-dashboard (Go) │                       │     │   │
+│  │  │  │ Internal port: 4040 │                       │     │   │
+│  │  │  └──────────────────────┘                       │     │   │
+│  │  │                                                  │     │   │
+│  │  │  ┌──────────────────────┐                       │     │   │
+│  │  │  │ Redis                │                       │     │   │
+│  │  │  │ Port: 6379 (internal)│                       │     │   │
+│  │  │  └──────────────────────┘                       │     │   │
+│  │  │                                                  │     │   │
+│  │  │  ┌──────────────────────┐                       │     │   │
+│  │  │  │ Prometheus (metrics) │                       │     │   │
+│  │  │  │ Port: 9090 (internal)│                       │     │   │
+│  │  │  └──────────────────────┘                       │     │   │
+│  │  │                                                  │     │   │
+│  │  │  ┌──────────────────────┐                       │     │   │
+│  │  │  │ Grafana (monitoring) │                       │     │   │
+│  │  │  │ Port: 3000 (internal)│                       │     │   │
+│  │  │  └──────────────────────┘                       │     │   │
+│  │  │                                                  │     │   │
+│  │  └──────────────────────────────────────────────────┘     │   │
+│  │                                                           │   │
+│  │  System-level:                                            │   │
+│  │  ┌──────────────────────────────────────────────────┐     │   │
+│  │  │ UFW Firewall Rules:                               │     │   │
+│  │  │   ALLOW 443/tcp (HTTPS)                           │     │   │
+│  │  │   ALLOW 4443/tcp (D-RAP control)                  │     │   │
+│  │  │   ALLOW 40000:50000/tcp (TCP tunnels)             │     │   │
+│  │  │   ALLOW 22/tcp (SSH admin)                        │     │   │
+│  │  │   DENY everything else                            │     │   │
+│  │  └──────────────────────────────────────────────────┘     │   │
+│  │                                                           │   │
+│  │  ┌──────────────────────────────────────────────────┐     │   │
+│  │  │ Kernel tuning (/etc/sysctl.conf):                │     │   │
+│  │  │   net.core.somaxconn = 65535                      │     │   │
+│  │  │   net.ipv4.tcp_max_syn_backlog = 65535            │     │   │
+│  │  │   net.ipv4.ip_local_port_range = 1024 65535       │     │   │
+│  │  │   net.ipv4.tcp_tw_reuse = 1                       │     │   │
+│  │  │   net.ipv4.tcp_fin_timeout = 15                   │     │   │
+│  │  │   net.core.netdev_max_backlog = 65535             │     │   │
+│  │  │   net.ipv4.tcp_keepalive_time = 300               │     │   │
+│  │  │   net.ipv4.tcp_keepalive_probes = 5               │     │   │
+│  │  │   net.ipv4.tcp_keepalive_intvl = 15               │     │   │
+│  │  │   fs.file-max = 1000000                           │     │   │
+│  │  │   fs.nr_open = 1000000                            │     │   │
+│  │  └──────────────────────────────────────────────────┘     │   │
+│  │                                                           │   │
+│  │  ┌──────────────────────────────────────────────────┐     │   │
+│  │  │ Systemd service: drap-relay.service               │     │   │
+│  │  │   Restart=always                                  │     │   │
+│  │  │   LimitNOFILE=1000000                             │     │   │
+│  │  │   WatchdogSec=60                                  │     │   │
+│  │  └──────────────────────────────────────────────────┘     │   │
+│  │                                                           │   │
+│  └───────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  FUTURE: Multi-region deployment                                │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐       │
+│  │ us-east-1│  │ eu-west-1│  │ ap-south-1│  │ us-west-2│       │
+│  │ Virginia │  │ Ireland  │  │ Mumbai   │  │ Oregon   │       │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘       │
+│  Connected via Redis Cluster for shared state                   │
+│  GeoDNS routes clients to nearest region                        │
+│                                                                 │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### 18.3 Docker Compose (Relay Server)
+
+```yaml
+# docker-compose.yml for relay server deployment
+
+version: '3.8'
+
+services:
+  drap-server:
+    build:
+      context: ./drap-server
+      dockerfile: Dockerfile
+    container_name: drap-server
+    restart: always
+    ports:
+      - "443:443"           # Public HTTPS
+      - "4443:4443"         # D-RAP control
+      - "40000-50000:40000-50000"  # TCP tunnels
+    volumes:
+      - ./certs:/etc/drap/certs:ro
+      - ./data:/var/lib/drap
+      - /tmp/drap-control.sock:/tmp/drap-control.sock
+    environment:
+      - DRAP_DOMAIN=drap.io
+      - DRAP_TLS_CERT=/etc/drap/certs/fullchain.pem
+      - DRAP_TLS_KEY=/etc/drap/certs/privkey.pem
+      - DRAP_REDIS_URL=redis://redis:6379
+      - DRAP_DB_PATH=/var/lib/drap/drap.db
+      - DRAP_LOG_LEVEL=info
+      - DRAP_MAX_TUNNELS_PER_USER=5
+      - DRAP_MAX_CONNECTIONS=50000
+      - RUST_LOG=drap_server=info
+    depends_on:
+      - redis
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1000000
+
+  drap-dashboard:
+    build:
+      context: ./drap-dashboard-api
+      dockerfile: Dockerfile
+    container_name: drap-dashboard
+    restart: always
+    volumes:
+      - /tmp/drap-control.sock:/tmp/drap-control.sock
+      - ./data:/var/lib/drap:ro
+    environment:
+      - DRAP_CONTROL_SOCKET=/tmp/drap-control.sock
+      - DRAP_DB_PATH=/var/lib/drap/drap.db
+      - DRAP_LISTEN_ADDR=0.0.0.0:4040
+
+  redis:
+    image: redis:7-alpine
+    container_name: drap-redis
+    restart: always
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: drap-prometheus
+    restart: always
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: drap-grafana
+    restart: always
+    ports:
+      - "3001:3000"   # Admin access only, not public
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+
+volumes:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+```
+
+---
+
+---
+
+## 19. Performance Targets & Benchmarks
+
+### 19.1 Key Performance Indicators
+
+```
+┌───────────────────────────────────────────────┬────────────────┬──────────────┐
+│ Metric                                        │ Target         │ Stretch Goal │
+├───────────────────────────────────────────────┼────────────────┼──────────────┤
+│ Added latency (relay overhead)                │ <5ms p50       │ <2ms p50     │
+│ Added latency (tunnel overhead)               │ <10ms p50      │ <5ms p50     │
+│ Concurrent tunnels per server                 │ 5,000          │ 50,000       │
+│ Concurrent HTTP requests per server           │ 10,000         │ 100,000      │
+│ Throughput per tunnel (HTTP)                   │ 50 MB/s        │ 200 MB/s     │
+│ Throughput per tunnel (TCP)                    │ 100 MB/s       │ 500 MB/s     │
+│ Tunnel establishment time                     │ <100ms         │ <50ms        │
+│ Client binary startup time                    │ <500ms         │ <200ms       │
+│ Client memory usage (idle, 1 tunnel)          │ <30MB          │ <15MB        │
+│ Client memory usage (active, 100 req/s)       │ <100MB         │ <50MB        │
+│ Server memory usage (1000 tunnels, idle)      │ <500MB         │ <200MB       │
+│ Server CPU usage (1000 req/s total)           │ <25% (8 core)  │ <10%         │
+│ Dashboard load time                           │ <1s            │ <500ms       │
+│ Dashboard bundle size (gzipped)               │ <200KB         │ <100KB       │
+│ Request inspection overhead                   │ <1ms           │ <0.5ms       │
+│ Rate limiting check overhead                  │ <0.5ms         │ <0.1ms       │
+│ Reconnection time after disconnect            │ <3s            │ <1s          │
+│ Zero-downtime server restart                  │ Supported      │ —            │
+└───────────────────────────────────────────────┴────────────────┴──────────────┘
+```
+
+### 19.2 Benchmark Suite
+
+```
+Benchmark 1: Raw Tunnel Throughput
+  Tool: iperf3 through D-RAP TCP tunnel
+  Measure: MB/s in both directions
+  Compare: Direct connection vs D-RAP tunnel
+  Target: <10% throughput reduction
+
+Benchmark 2: HTTP Request Latency
+  Tool: wrk2 (constant throughput load generator)
+  Setup: wrk2 → D-RAP tunnel → simple HTTP server (return 200 OK)
+  Measure: p50, p95, p99, p99.9 latency
+  Load levels: 100, 500, 1000, 5000, 10000 req/s
+  Target: p99 <20ms at 1000 req/s
+
+Benchmark 3: Concurrent Tunnels
+  Tool: Custom script that creates N tunnels
+  Measure: Memory usage, CPU usage, tunnel creation time
+  Levels: 100, 500, 1000, 5000, 10000 tunnels
+  Target: 5000 tunnels in <2GB memory
+
+Benchmark 4: Connection Storm
+  Tool: Custom script that creates 10000 TCP connections simultaneously
+  Measure: Accept rate, time to establish all, error rate
+  Target: 0% error rate, <5s to accept all 10000
+
+Benchmark 5: Long-Running Stability
+  Tool: 24-hour stress test with varying load
+  Measure: Memory leaks, latency degradation, connection failures
+  Target: No memory growth, stable latency, 0 unrecoverable failures
+
+Benchmark 6: Dashboard Performance
+  Tool: Lighthouse, custom WebSocket stress test
+  Measure: Load time, FPS with 100 req/s streaming, memory usage
+  Target: 60 FPS, <300MB browser memory after 1 hour
+```
+
+### 19.3 Optimization Strategies
+
+```
+Strategy 1: Zero-Copy I/O
+  Where: Relay server TCP proxy, data frame forwarding
+  How: Use bytes::Bytes (reference-counted byte buffers)
+       Avoid copying request/response bodies
+       Use splice() / sendfile() syscalls where possible
+  Impact: Major throughput improvement for large payloads
+
+Strategy 2: io_uring (Linux)
+  Where: Relay server socket I/O
+  How: tokio-uring or io-uring crate for async I/O
+       Reduces syscall overhead by batching
+  Impact: 10-30% latency reduction at high concurrency
+
+Strategy 3: Object Pooling
+  Where: Frame parsing, byte buffer allocation
+  How: Pre-allocate frame buffers, reuse after processing
+       slab allocator for stream state objects
+  Impact: Reduces allocation pressure, fewer GC-like pauses (even in Rust, allocator contention matters)
+
+Strategy 4: Lock-Free Data Structures
+  Where: Routing table, metrics counters, connection registry
+  How: DashMap (sharded locks), AtomicU64, crossbeam-epoch
+  Impact: Eliminates contention on hot paths
+
+Strategy 5: Connection Reuse
+  Where: Client → local server, Redis connections
+  How: Connection pooling with keep-alive
+  Impact: Eliminates TCP handshake per request
+
+Strategy 6: Efficient Serialization
+  Where: Wire protocol frame parsing
+  How: Zero-copy deserialization (parse header in-place, reference payload slice)
+       No intermediate allocations for frame routing
+  Impact: <1μs per frame parse
+
+Strategy 7: Batch Operations
+  Where: Request inspection storage, metrics updates
+  How: Buffer captured requests, flush to SQLite in batches (every 100ms)
+       Aggregate metrics in memory, flush counters periodically
+  Impact: Reduces I/O operations by 10-100x
+```
+
+---
+
+---
+
+## 20. Testing Strategy
+
+### 20.1 Test Pyramid
+
+```
+                    ╱╲
+                   ╱  ╲
+                  ╱ E2E ╲           ~20 tests
+                 ╱ Tests  ╲         Playwright + custom scripts
+                ╱──────────╲
+               ╱            ╲
+              ╱ Integration   ╲      ~100 tests
+             ╱ Tests           ╲     Real TCP connections, real tunnels
+            ╱───────────────────╲
+           ╱                     ╲
+          ╱   Unit Tests           ╲   ~500 tests
+         ╱                          ╲  Pure logic, no I/O
+        ╱────────────────────────────╲
+```
+
+### 20.2 Unit Tests (Rust + Go)
+
+```
+drap-protocol/
+  - Frame serialization/deserialization for ALL frame types
+  - Frame header parsing edge cases (max length, zero length, invalid type)
+  - Stream state machine transitions (valid and invalid)
+  - Flow control window calculations
+  - Random subdomain generation (uniqueness, format validation)
+  
+drap-client/
+  - Config file parsing (valid, invalid, partial)
+  - Config merging (CLI args + file + defaults)
+  - Auth token validation format
+  - Reconnection backoff calculation
+  - Request capture formatting
+  
+drap-server/
+  - Subdomain routing (exact match, not found, reserved words)
+  - Rate limiting algorithm (allow, deny, window sliding, burst)
+  - Auth validation (Basic Auth parsing, token matching, bcrypt verify)
+  - IP whitelist matching (IPv4, IPv6, CIDR ranges)
+  - Tunnel allocation (port assignment, subdomain collision handling)
+  - HTTP parser (methods, headers, chunked encoding, keep-alive)
+  
+drap-dashboard-api/
+  - API endpoint handlers (request/response format)
+  - Query parameter parsing and validation
+  - Metrics aggregation logic
+```
+
+### 20.3 Integration Tests
+
+```
+Test Category 1: Tunnel Lifecycle
+  - Client connects → authenticates → creates tunnel → closes → disconnects
+  - Client creates multiple tunnels simultaneously
+  - Client with invalid token → rejected
+  - Client requests taken subdomain → denied, retries with random
+  - Server shutdown → client reconnects → tunnels re-established
+  
+Test Category 2: HTTP Proxying
+  - Simple GET request through tunnel → 200 response
+  - POST with JSON body → correctly forwarded and returned
+  - Large response body (10MB) → streamed correctly
+  - Chunked transfer encoding → handled correctly
+  - Request with many headers (50+) → all forwarded
+  - WebSocket upgrade → persistent bidirectional communication
+  - Concurrent requests (100 simultaneous) → all succeed
+  - Local server not running → 502 Bad Gateway
+  - Local server slow (10s) → eventually responds (before 60s timeout)
+  - Local server unreachable after initial connection → appropriate error
+  
+Test Category 3: TCP Proxying
+  - PostgreSQL connection through tunnel → query succeeds
+  - SSH connection through tunnel → interactive session works
+  - Large data transfer (1GB) through TCP tunnel → completes without corruption
+  - Binary data (random bytes) → bit-perfect transfer
+  - Multiple simultaneous TCP connections → all independent
+  - TCP connection close from either side → clean teardown
+  
+Test Category 4: Authentication
+  - Tunnel with Basic Auth → unauthenticated request → 401
+  - Tunnel with Basic Auth → correct credentials → proxied
+  - Tunnel with Bearer Token → correct token → proxied
+  - Tunnel with Bearer Token → wrong token → 403
+  - Tunnel with IP whitelist → allowed IP → proxied
+  - Tunnel with IP whitelist → blocked IP → 403
+  
+Test Category 5: Rate Limiting
+  - Send requests at rate below limit → all succeed
+  - Send requests at rate above limit → excess rejected with 429
+  - Wait for window to expire → requests succeed again
+  - Rate limit headers present in all responses
+  - Per-IP rate limiting independent between IPs
+  
+Test Category 6: Request Inspection
+  - Request captured with correct method, path, headers, body
+  - Response captured with correct status, headers, body
+  - Timing breakdown is reasonable (>0ms, <total)
+  - Request replay sends identical request → response captured
+  - Modified replay sends modified request → response captured
+  - Ring buffer overflow → oldest requests evicted
+  - Large body (>1MB) → stored to file, referenced correctly
+  
+Test Category 7: Connection Resilience
+  - Network interruption (iptables drop) → client reconnects
+  - Slow network (tc netem delay) → tunnel works with higher latency
+  - Packet loss (tc netem loss 5%) → tunnel works with retransmissions
+  - Server restart → client reconnects, tunnels re-established
+  - Client restart → clean tunnel teardown on server
+  
+Test Category 8: Concurrency & Stress
+  - 100 tunnels from 100 clients simultaneously
+  - 1000 concurrent HTTP requests through single tunnel
+  - Sustained 10,000 req/s for 60 seconds → no errors
+  - Memory usage under load → no unbounded growth
+  - CPU usage under load → reasonable (not 100%)
+```
+
+### 20.4 End-to-End Tests
+
+```
+E2E Test 1: Developer Workflow
+  1. Start local Express server on :3000
+  2. Run `drap http 3000 --subdomain=test-e2e`
+  3. Wait for "online" status
+  4. curl https://test-e2e.drap.io → verify response matches local
+  5. Open dashboard at :4040 → verify request appears
+  6. Click replay → verify replayed request appears
+  7. Ctrl+C drap → verify tunnel closes
+  8. curl https://test-e2e.drap.io → verify 404 tunnel not found
+
+E2E Test 2: Webhook Simulation
+  1. Start local webhook handler on :8080
+  2. Run `drap http 8080 --inspect`
+  3. Send simulated Stripe webhook POST
+```
+  4. Verify webhook received by local handler
+  5. Verify request captured in dashboard
+  6. Verify Stripe-Signature header present
+  7. Modify handler to return 500
+  8. Replay webhook from dashboard
+  9. Verify 500 response captured
+  10. Fix handler to return 200
+  11. Replay again → verify 200
+
+E2E Test 3: TCP Database Tunnel
+  1. Start PostgreSQL on :5432
+  2. Run `drap tcp 5432`
+  3. Note assigned public port
+  4. Connect psql to public address
+  5. CREATE TABLE, INSERT, SELECT → verify data integrity
+  6. Close psql → verify stream closes cleanly
+  7. Reconnect → verify new stream works
+
+E2E Test 4: Multi-Tunnel Config File
+  1. Create drap.yml with 3 tunnels (2 HTTP, 1 TCP)
+  2. Start local services on all 3 ports
+  3. Run `drap start --config drap.yml`
+  4. Verify all 3 tunnels online
+  5. Send traffic to each → verify correct routing
+  6. Stop one local service → verify others unaffected
+  7. Restart stopped service → verify requests work again
+
+E2E Test 5: Auth & Rate Limiting
+  1. Run `drap http 3000 --auth="user:pass" --rate-limit=5/min`
+  2. curl without auth → 401
+  3. curl with wrong auth → 403
+  4. curl with correct auth → 200
+  5. Send 5 requests rapidly → all succeed
+  6. Send 6th request → 429 with Retry-After header
+  7. Wait for window reset → next request succeeds
+
+E2E Test 6: Dashboard Real-Time Updates
+  1. Start tunnel with inspect
+  2. Open dashboard in Playwright browser
+  3. Send HTTP request to tunnel
+  4. Verify request appears in dashboard within 1 second (no page refresh)
+  5. Send 10 requests rapidly
+  6. Verify all 10 appear in order
+  7. Verify live chart updates
+  8. Verify metrics counters increment
+
+E2E Test 7: Reconnection
+  1. Start tunnel
+  2. Send traffic → verify working
+  3. Kill relay server process
+  4. Verify client shows "reconnecting" status
+  5. Restart relay server
+  6. Verify client reconnects automatically
+  7. Verify same subdomain is reclaimed
+  8. Send traffic → verify working again
+  9. Total downtime < 5 seconds
+```
+
+### 20.5 Chaos Testing
+
+```
+Chaos Test 1: Network Partition
+  Tool: tc (traffic control) / iptables
+  Scenario: Drop all packets between client and server for 30s
+  Expected: Client detects disconnect, reconnects after partition heals
+  Verify: All in-flight requests get error responses (not hung forever)
+          Tunnel re-establishes within 5s of partition healing
+
+Chaos Test 2: Memory Pressure
+  Tool: stress-ng --vm 4 --vm-bytes 90%
+  Scenario: Consume 90% of server memory
+  Expected: Server remains responsive (might be slower)
+            OOM killer does not kill drap-server
+            Graceful rejection of new tunnels if memory critically low
+
+Chaos Test 3: CPU Starvation
+  Tool: stress-ng --cpu 8
+  Scenario: Consume all CPU cores
+  Expected: Latency increases but no dropped connections
+            Heartbeats still sent (tokio scheduler is fair)
+            Requests eventually complete (increased timeout tolerance)
+
+Chaos Test 4: Disk Full
+  Tool: dd if=/dev/zero of=/tmp/fill bs=1M
+  Scenario: Fill disk where SQLite database lives
+  Expected: Request inspection gracefully degrades (stops capturing)
+            Tunnel proxying continues unaffected (doesn't require disk)
+            Error logged, alert raised
+
+Chaos Test 5: Redis Down
+  Tool: docker stop drap-redis
+  Scenario: Redis becomes unavailable
+  Expected: Rate limiting falls back to in-memory (less accurate)
+            Session tracking degrades gracefully
+            Tunnels continue to function
+            Automatic reconnection to Redis when it recovers
+
+Chaos Test 6: Slow Client
+  Tool: Custom client that reads tunnel data at 1 byte/s
+  Scenario: Client cannot keep up with incoming traffic
+  Expected: Flow control kicks in (WINDOW_UPDATE not sent)
+            Server buffers up to limit, then back-pressures public clients
+            Public clients get 503 or delayed responses
+            Other tunnels on same server are unaffected
+
+Chaos Test 7: Malicious Frames
+  Tool: Custom script sending garbage D-RAP frames
+  Scenario: Invalid frame types, oversized payloads, invalid stream IDs
+  Expected: Server rejects each invalid frame with appropriate error
+            Connection closed with GOAWAY if protocol violation is severe
+            Server does not crash, panic, or leak memory
+            Other clients completely unaffected
+```
+
+---
+
+---
+
+## 21. Development Phases & Timeline
+
+### Phase 0: Foundation (Week 1-2)
+
+```
+Goal: Project setup, protocol library, basic TCP communication
+
+Tasks:
+  □ Repository structure (Cargo workspace for Rust, Go module, Svelte project)
+  □ CI/CD pipeline (GitHub Actions: build, test, lint for all components)
+  □ D-RAP wire protocol library (drap-protocol crate)
+    □ Frame struct definitions
+    □ Frame serializer (struct → bytes)
+    □ Frame deserializer (bytes → struct)
+    □ Frame type constants and flags
+    □ Unit tests for all frame types (round-trip serialization)
+  □ Basic TCP server that accepts connections
+  □ Basic TCP client that connects
+  □ Send/receive frames over TCP
+  □ Integration test: client connects, sends AUTH_REQ, server responds AUTH_OK
+
+Deliverable: Two binaries that can connect and exchange D-RAP protocol frames.
+```
+
+### Phase 1: Basic HTTP Tunnel (Week 3-5)
+
+```
+Goal: The core product — tunnel an HTTP request from public URL to localhost
+
+Tasks:
+  □ TLS integration (rustls) on both control and public connections
+  □ Wildcard certificate loading
+  □ Stream multiplexing implementation
+    □ Stream ID assignment
+    □ Stream state machine
+    □ Concurrent stream handling
+  □ Subdomain routing
+    □ Host header parsing
+    □ Routing table (DashMap)
+    □ Random subdomain generation
+  □ HTTP request parsing (from raw bytes)
+    □ Request line parsing
+    □ Header parsing
+    □ Body reading (Content-Length and chunked)
+  □ HTTP response construction
+    □ Status line, headers, body
+    □ Error pages (502, 504, 404)
+  □ Tunnel lifecycle
+    □ TUNNEL_REQ → TUNNEL_CREATED flow
+    □ TUNNEL_CLOSE → TUNNEL_CLOSED_ACK flow
+    □ Clean teardown of all streams on tunnel close
+  □ Client-side local proxy
+    □ Connect to localhost
+    □ Forward request bytes
+    □ Read response bytes
+    □ Return via tunnel
+  □ CLI interface (clap)
+    □ `drap http <PORT>` command
+    □ `--subdomain` option
+    □ Terminal output with URL display
+  □ Heartbeat mechanism (PING/PONG)
+  □ Integration tests: full HTTP request lifecycle
+
+Deliverable: `drap http 3000` gives you a public URL that works.
+             This is the MVP. Everything after this is features.
+```
+
+### Phase 2: TCP Tunnel + Connection Resilience (Week 6-7)
+
+```
+Goal: TCP tunneling support and robust connection handling
+
+Tasks:
+  □ TCP tunnel implementation
+    □ TCP port allocator (40000-50000 range)
+    □ TCP listener per allocated port
+    □ Bidirectional byte copy (public ↔ tunnel ↔ local)
+    □ Stream lifecycle for TCP (connection-scoped)
+    □ `drap tcp <PORT>` CLI command
+  □ Connection resilience
+    □ Auto-reconnection with exponential backoff + jitter
+    □ Tunnel re-establishment after reconnect
+    □ Graceful handling of network interruptions
+    □ Connection state machine (CONNECTING → CONNECTED → RECONNECTING → ...)
+  □ Flow control
+    □ WINDOW_UPDATE frame handling
+    □ Per-stream window tracking
+    □ Back-pressure propagation
+  □ SETTINGS frame exchange during handshake
+  □ GOAWAY frame for graceful shutdown
+  □ Integration tests: TCP tunnel, reconnection scenarios
+
+Deliverable: TCP tunneling works. Tunnels survive brief network interruptions.
+```
+
+### Phase 3: Security Features (Week 8-9)
+
+```
+Goal: Authentication, rate limiting, and access control on tunnels
+
+Tasks:
+  □ Client authentication
+    □ Auth token generation (server-side)
+    □ Token storage (~/.drap/authtoken)
+    □ AUTH_REQ/AUTH_OK/AUTH_FAIL flow
+    □ `drap authtoken <TOKEN>` command
+  □ Tunnel authentication
+    □ HTTP Basic Auth (--auth="user:pass")
+      □ WWW-Authenticate response
+      □ Authorization header parsing
+      □ Credential validation (bcrypt)
+    □ Bearer token (--auth-token="TOKEN")
+      □ Authorization: Bearer header parsing
+      □ ?token= query parameter fallback
+    □ Header stripping (don't forward auth headers to local service)
+  □ IP whitelisting
+    □ CIDR parsing and matching
+    □ IPv4 and IPv6 support
+    □ --allow-ip CLI option
+  □ Rate limiting
+    □ Redis integration
+    □ Sliding window algorithm
+    □ Per-tunnel rate limiting
+    □ Per-IP rate limiting
+    □ Rate limit response headers
+    □ 429 response with Retry-After
+    □ --rate-limit CLI option
+  □ X-Forwarded headers injection
+  □ HSTS headers on all responses
+  □ Security-related unit and integration tests
+
+Deliverable: Tunnels can be locked down with auth, rate limiting, and IP restrictions.
+```
+
+### Phase 4: Request Inspection & Replay (Week 10-12)
+
+```
+Goal: Full request/response capture, dashboard API, and replay
+
+Tasks:
+  □ Request capture system
+    □ Capture request (method, path, headers, body)
+    □ Capture response (status, headers, body)
+    □ Timing breakdown (TLS, routing, tunnel RTT, local processing)
+    □ In-memory ring buffer (last 500 per tunnel)
+    □ SQLite persistence (last 24 hours)
+    □ Large body handling (file storage for >1MB)
+    □ Binary body detection and handling
+  □ Dashboard REST API (Go)
+    □ GET /api/tunnels
+    □ GET /api/tunnels/:id
+    □ GET /api/requests (with filtering, pagination)
+    □ GET /api/requests/:id (full detail)
+    □ POST /api/requests/:id/replay
+    □ DELETE /api/requests
+    □ GET /api/metrics
+  □ Dashboard WebSocket API
+    □ WS /api/ws
+    □ Real-time request events
+    □ Tunnel status events
+    □ Metrics update events (every 5s)
+  □ Internal communication (Rust server ↔ Go API via Unix Domain Socket)
+  □ Replay engine
+    □ Load original request from storage
+    □ Apply modifications
+    □ Send through tunnel as new stream
+    □ Capture replay response
+    □ Link replay to original request
+  □ --inspect / --no-inspect CLI options
+  □ Integration tests: capture, storage, retrieval, replay
+
+Deliverable: Full request inspection and replay working via API.
+             Ready for the dashboard UI to consume.
+```
+
+### Phase 5: Dashboard UI (Week 13-15)
+
+```
+Goal: Beautiful, real-time web dashboard
+
+Tasks:
+  □ Svelte project setup with Vite and Tailwind
+  □ WebSocket connection manager (auto-reconnect)
+  □ Svelte stores for reactive state management
+  □ Overview page
+    □ Metric cards (tunnels, requests, latency, errors)
+    □ Live request rate chart (Chart.js)
+    □ Active tunnel list
+    □ Status code distribution
+    □ Bandwidth display
+  □ Request inspector page
+    □ Filterable request table
+    □ Real-time updates (new rows appear at top)
+    □ Expandable request detail
+    □ Headers display (formatted table)
+    □ Body viewer (JSON syntax highlighting, XML formatting, hex for binary)
+    □ Timing waterfall bar
+    □ "Copy as cURL" button
+    □ "Export as JSON" button
+  □ Replay page
+    □ Pre-populated form from original request
+    □ Editable method, path, headers, body
+    □ Send button
+    □ Side-by-side comparison view
+  □ Tunnel detail page
+    □ Status, uptime, URL
+    □ Config display
+    □ Per-tunnel request chart
+    □ Per-tunnel metrics
+  □ Settings page
+    □ Current configuration display
+    □ Connection info
+  □ Embed compiled dashboard into Rust binary
+  □ Local HTTP server on :4040 serves dashboard
+  □ E2E tests with Playwright
+
+Deliverable: Full dashboard accessible at http://127.0.0.1:4040
+```
+
+### Phase 6: Config File & Multi-Tunnel (Week 16-17)
+
+```
+Goal: Config file support, multiple simultaneous tunnels
+
+Tasks:
+  □ YAML config file parser (drap.yml)
+  □ Config file resolution (project → user → defaults)
+  □ Config merging with CLI arguments
+  □ `drap start --config drap.yml` command
+  □ Multiple tunnel management
+    □ Multiple TUNNEL_REQ over single control connection
+    □ Terminal display showing all tunnel URLs
+    □ Dashboard showing all tunnels
+  □ Per-tunnel configuration (different auth, rate limits per tunnel)
+  □ Graceful multi-tunnel shutdown
+  □ Integration tests: config file parsing, multi-tunnel operation
+
+Deliverable: Define multiple tunnels in a config file, start them all with one command.
+```
+
+### Phase 7: Polish & Production Readiness (Week 18-20)
+
+```
+Goal: Performance optimization, documentation, distribution
+
+Tasks:
+  □ Performance optimization
+    □ Benchmarks (wrk2, iperf3, custom load tools)
+    □ Profile with perf / flamegraph
+    □ Optimize hot paths based on profiling results
+    □ Zero-copy I/O implementation
+    □ Connection pool tuning
+  □ Binary distribution
+    □ Cross-compilation for all platforms
+    □ GitHub Releases with pre-built binaries
+    □ Install script (curl | sh)
+    □ Homebrew formula
+    □ Docker image for relay server
+  □ Documentation
+    □ README with quick start
+    □ Architecture document (this document, refined)
+    □ CLI reference (auto-generated from clap)
+    □ API reference
+    □ Protocol specification
+    □ Deployment guide
+    □ Contributing guide
+  □ Monitoring
+    □ Prometheus metrics endpoint on relay server
+    □ Grafana dashboard templates
+    □ Health check endpoint
+  □ Logging
+    □ Structured logging (JSON format)
+    □ Log levels properly used
+    □ Sensitive data redaction
+  □ Error messages
+    □ User-friendly error messages for all failure modes
+    □ Actionable suggestions ("Is your auth token correct?")
+    □ Debug mode with verbose output
+  □ Chaos testing suite (as defined in Section 20.5)
+  □ Load testing (sustained stress for 24 hours)
+  □ Security audit (manual review of all auth/crypto code)
+
+Deliverable: Production-ready, distributable, documented tunnel platform.
+```
+
+### Timeline Summary
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│  WEEK  │ 1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20│
+├────────┼──────────────────────────────────────────────────────────┤
+│Phase 0 │ ██                                                       │
+│Phase 1 │    █████                                                 │
+│Phase 2 │          ████                                            │
+│Phase 3 │              ████                                        │
+│Phase 4 │                  ██████                                  │
+│Phase 5 │                        ██████                            │
+│Phase 6 │                              ████                        │
+│Phase 7 │                                  ██████                  │
+├────────┼──────────────────────────────────────────────────────────┤
+│TOTAL   │ ████████████████████████████████████████ (20 weeks)      │
+└────────┴──────────────────────────────────────────────────────────┘
+
+MVP (usable product): Week 5 (basic HTTP tunnel)
+Feature-complete:     Week 17 (all features implemented)
+Production-ready:     Week 20 (optimized, tested, documented)
+```
+
+---
+
+---
+
+## 22. Repository Structure
+
+```
+drap/
+├── README.md                          # Project overview, quick start
+├── LICENSE                            # MIT
+├── ARCHITECTURE.md                    # This document
+├── PROTOCOL.md                        # Wire protocol specification
+├── CONTRIBUTING.md                    # How to contribute
+├── CHANGELOG.md                       # Version history
+├── Makefile                           # Build, test, lint, release commands
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml                     # Build + test on every push
+│   │   ├── release.yml                # Build binaries + Docker on tag
+│   │   └── nightly.yml                # Nightly stress tests
+│   └── ISSUE_TEMPLATE/
+│       ├── bug_report.md
+│       └── feature_request.md
+│
+├── Cargo.toml                         # Rust workspace root
+├── Cargo.lock
+│
+├── crates/
+│   ├── drap-protocol/                 # Shared wire protocol library
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── frame.rs               # Frame struct, serialization
+│   │       ├── frame_type.rs          # Frame type enum
+│   │       ├── frame_flags.rs         # Flag constants
+│   │       ├── stream.rs              # Stream state machine
+│   │       ├── settings.rs            # SETTINGS frame payload
+│   │       ├── error_codes.rs         # Error code constants
+│   │       └── tests/
+│   │           ├── frame_tests.rs
+│   │           ├── stream_tests.rs
+│   │           └── roundtrip_tests.rs
+│   │
+│   ├── drap-common/                   # Shared types, utilities
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── tunnel_id.rs           # TunnelId newtype
+│   │       ├── stream_id.rs           # StreamId newtype
+│   │       ├── subdomain.rs           # Subdomain validation + generation
+│   │       ├── auth.rs                # Token types, password hashing
+│   │       ├── config.rs              # Shared config types
+│   │       └── error.rs              # Common error types
+│   │
+│   ├── drap-client/                   # CLI client binary
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── main.rs
+│   │       ├── cli.rs                 # clap definitions
+│   │       ├── config/
+│   │       │   ├── mod.rs
+│   │       │   ├── cli_args.rs
+│   │       │   ├── file_config.rs
+│   │       │   └── merged.rs
+│   │       ├── connection/
+│   │       │   ├── mod.rs
+│   │       │   ├── control.rs         # Control connection to relay
+│   │       │   ├── multiplexer.rs     # Stream mux/demux
+│   │       │   ├── reconnector.rs     # Auto-reconnect logic
+│   │       │   └── heartbeat.rs       # Ping/pong handler
+│   │       ├── tunnel/
+│   │       │   ├── mod.rs
+│   │       │   ├── manager.rs         # Tunnel lifecycle
+│   │       │   ├── http.rs            # HTTP-specific tunnel
+│   │       │   └── tcp.rs             # TCP-specific tunnel
+│   │       ├── proxy/
+│   │       │   ├── mod.rs
+│   │       │   ├── local.rs           # Connect to local service
+│   │       │   ├── http_proxy.rs      # HTTP forwarding
+│   │       │   ├── tcp_proxy.rs       # TCP byte forwarding
+│   │       │   └── pool.rs            # Connection pool
+│   │       ├── inspector/
+│   │       │   ├── mod.rs
+│   │       │   ├── capture.rs
+│   │       │   └── storage.rs
+│   │       ├── dashboard/
+│   │       │   ├── mod.rs
+│   │       │   ├── server.rs          # Local :4040 HTTP server
+│   │       │   ├── websocket.rs       # WS handler
+│   │       │   └── assets.rs          # Embedded UI
+│   │       └── display/
+│   │           ├── mod.rs
+│   │           └── terminal.rs        # Pretty terminal output
+│   │
+│   └── drap-server/                   # Relay server binary
+│       ├── Cargo.toml
+│       └── src/
+│           ├── main.rs
+│           ├── config.rs
+│           ├── listener/
+│           │   ├── mod.rs
+│           │   ├── tls.rs             # TLS acceptor
+│           │   ├── http.rs            # Public HTTPS listener
+│           │   ├── tcp.rs             # Public TCP listener
+│           │   └── control.rs         # Client control listener
+│           ├── router/
+│           │   ├── mod.rs
+│           │   ├── subdomain.rs       # Subdomain → tunnel mapping
+│           │   ├── tcp_port.rs        # Port → tunnel mapping
+│           │   └── table.rs           # Thread-safe routing table
+│           ├── tunnel/
+│           │   ├── mod.rs
+│           │   ├── registry.rs        # Active tunnel registry
+│           │   ├── session.rs         # Per-client session state
+│           │   └── allocator.rs       # Subdomain + port allocation
+│           ├── proxy/
+│           │   ├── mod.rs
+│           │   ├── http.rs            # HTTP proxy logic
+│           │   ├── tcp.rs             # TCP proxy logic
+│           │   └── copy.rs            # Bidirectional copy
+│           ├── connection/
+│           │   ├── mod.rs
+│           │   ├── handler.rs         # D-RAP protocol handler
+│           │   ├── multiplexer.rs     # Server-side mux
+│           │   └── pool.rs            # Internal connection pool
+│           ├── security/
+│           │   ├── mod.rs
+│           │   ├── auth_gate.rs
+│           │   ├── rate_limiter.rs
+│           │   ├── ip_whitelist.rs
+│           │   └── token_validator.rs
+│           ├── inspector/
+│           │   ├── mod.rs
+│           │   ├── capture.rs
+│           │   ├── storage.rs
+│           │   └── replay.rs
+│           ├── metrics/
+│           │   ├── mod.rs
+│           │   ├── counters.rs
+│           │   ├── latency.rs
+│           │   └── exporter.rs
+│           └── ipc/
+│               ├── mod.rs
+│               └── uds_server.rs      # Unix domain socket for dashboard API
+│
+├── dashboard-api/                     # Go dashboard API
+│   ├── go.mod
+│   ├── go.sum
+│   ├── main.go
+│   ├── handlers/
+│   │   ├── tunnels.go
+│   │   ├── requests.go
+│   │   ├── metrics.go
+│   │   ├── replay.go
+│   │   └── websocket.go
+│   ├── ipc/
+│   │   └── uds_client.go             # Connect to Rust server via UDS
+│   ├── models/
+│   │   ├── tunnel.go
+│   │   ├── request.go
+│   │   └── metrics.go
+│   └── store/
+│       ├── sqlite.go
+│       └── memory.go
+│
+├── dashboard-ui/                      # Svelte dashboard
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── tailwind.config.js
+│   ├── svelte.config.js
+│   ├── src/
+│   │   ├── App.svelte
+│   │   ├── main.js
+│   │   ├── lib/
+│   │   │   ├── api.js
+│   │   │   ├── websocket.js
+│   │   │   ├── stores/
+│   │   │   │   ├── tunnels.js
+│   │   │   │   ├── requests.js
+│   │   │   │   └── metrics.js
+│   │   │   └── utils/
+│   │   │       ├── format.js
+│   │   │       └── highlight.js
+│   │   ├── pages/
+│   │   │   ├── Overview.svelte
+│   │   │   ├── Requests.svelte
+│   │   │   ├── RequestDetail.svelte
+│   │   │   ├── TunnelDetail.svelte
+│   │   │   └── Settings.svelte
+│   │   └── components/
+│   │       ├── Sidebar.svelte
+│   │       ├── TunnelCard.svelte
+│   │       ├── RequestRow.svelte
+│   │       ├── BodyViewer.svelte
+│   │       ├── TimingBar.svelte
+│   │       ├── LiveChart.svelte
+│   │       ├── ReplayForm.svelte
+│   │       └── ComparisonView.svelte
+│   └── public/
+│       └── favicon.ico
+│
+├── tests/                             # Cross-component integration tests
+│   ├── integration/
+│   │   ├── http_tunnel_test.rs
+│   │   ├── tcp_tunnel_test.rs
+│   │   ├── auth_test.rs
+│   │   ├── rate_limit_test.rs
+│   │   ├── inspection_test.rs
+│   │   ├── reconnection_test.rs
+│   │   └── multi_tunnel_test.rs
+│   ├── e2e/
+│   │   ├── developer_workflow.sh
+│   │   ├── webhook_simulation.sh
+│   │   ├── tcp_database.sh
+│   │   └── dashboard.spec.js          # Playwright
+│   ├── chaos/
+│   │   ├── network_partition.sh
+│   │   ├── memory_pressure.sh
+│   │   ├── redis_failure.sh
+│   │   └── malicious_frames.rs
+│   ├── benchmarks/
+│   │   ├── throughput_bench.rs
+│   │   ├── latency_bench.rs
+│   │   ├── concurrency_bench.rs
+│   │   └── connection_storm.rs
+│   └── fixtures/
+│       ├── test_cert.pem
+│       ├── test_key.pem
+│       └── sample_requests.json
+│
+├── deploy/
+│   ├── docker-compose.yml
+│   ├── Dockerfile.server
+│   ├── Dockerfile.dashboard-api
+│   ├── install.sh                     # curl | sh installer
+│   ├── drap.service                   # systemd unit file
+│   └── monitoring/
+│       ├── prometheus.yml
+│       └── grafana/
+│           ├── dashboards/
+│           │   └── drap-overview.json
+│           └── datasources/
+│               └── prometheus.yml
+│
+├── docs/
+│   ├── quick-start.md
+│   ├── cli-reference.md
+│   ├── api-reference.md
+│   ├── protocol-spec.md
+│   ├── deployment-guide.md
+│   ├── architecture.md
+│   ├── security.md
+│   └── troubleshooting.md
+│
+└── scripts/
+    ├── build-all.sh                   # Build all components
+    ├── test-all.sh                    # Run all tests
+    ├── cross-compile.sh               # Build for all platforms
+    ├── generate-certs.sh              # Generate test TLS certs
+    └── benchmark.sh                   # Run benchmark suite
+```
+
+---
+
+---
+
+## 23. Risk Assessment & Mitigation
+
+```
+┌─────────────────────────────┬─────────┬──────────────────────────────────────────┐
+│ Risk                        │ Level   │ Mitigation                               │
+├─────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ Scope creep — too many      │ HIGH    │ Strict phase gates. MVP (HTTP tunnel)    │
+│ features, never finish      │         │ is usable alone. Ship incrementally.     │
+│                             │         │ Cut P2/P3 features if behind schedule.   │
+├─────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ Multiplexing bugs —         │ HIGH    │ Exhaustive unit tests for stream state   │
+│ stream state machine is     │         │ machine. Fuzzing frame parser. Reference │
+│ complex, easy to get wrong  │         │ HTTP/2 implementations for correctness.  │
+├─────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ TLS complexity — cert       │ MEDIUM  │ Use rustls (well-audited). Start with    │
+│ management, handshake       │         │ self-signed certs for dev. Use Let's     │
+│ failures, ALPN negotiation  │         │ Encrypt for prod. Extensive TLS testing. │
+├─────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ Performance not meeting     │ MEDIUM  │ Benchmark early (Phase 1). Profile with  │
+│ targets at high concurrency │         │ flamegraph. Optimize hot paths. Reduce   │
+│                             │         │ allocations. Consider io_uring.          │
+├─────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ Cross-platform issues —     │ MEDIUM  │ CI builds + tests on all platforms.      │
+│ different behavior on       │         │ Use cross-rs for compilation. Test on    │
+│ Linux/macOS/Windows         │         │ real macOS and Windows machines.          │
+├─────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ Rust learning curve —       │ MEDIUM  │ Start with simpler components (protocol  │
+│ async Rust is hard,         │         │ lib). Read tokio docs thoroughly. Don't  │
+│ lifetimes in async contexts │         │ fight the borrow checker, redesign.      │
+├─────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ Security vulnerabilities —  │ MEDIUM  │ No unsafe code unless absolutely needed. │
+│ proxy handling untrusted     │         │ Input validation on all frame fields.    │
+│ input                       │         │ Fuzzing with cargo-fuzz. Manual security │
+│                             │         │ review before any public deployment.     │
+├─────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ DNS/Certificate setup —     │ LOW     │ Document setup clearly. Provide helper   │
+│ wildcard DNS and certs      │         │ scripts. Use Cloudflare API for DNS.     │
+│ require domain ownership    │         │ Let's Encrypt wildcard via DNS-01.       │
+├─────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ Go + Rust IPC complexity —  │ LOW     │ Unix domain socket is simple. Fallback:  │
+│ two languages communicating │         │ merge dashboard API into Rust server     │
+│                             │         │ using warp/axum if IPC proves too complex│
+├─────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ Svelte dashboard becoming   │ LOW     │ Keep dashboard simple. Use stores for    │
+│ too complex for real-time   │         │ state. Limit to 500 requests in memory.  │
+│ updates                     │         │ Virtual scrolling for long lists.        │
+└─────────────────────────────┴─────────┴──────────────────────────────────────────┘
+```
+
+### Contingency Plans
+
+```
+If behind schedule by >2 weeks:
+  → Cut request replay feature (P1 becomes P2)
+  → Cut config file support (use CLI only)
+  → Ship dashboard with read-only inspection (no replay)
+  → Skip Windows support initially
+
+If multiplexing proves too complex:
+  → Fall back to one-connection-per-stream model
+  → Less efficient but much simpler
+  → Optimize later once basic flow works
+
+If Rust async is too painful:
+  → Port to Go (second choice language)
+  → Sacrifice some performance for development speed
+  → Still proves the same networking concepts
+
+If performance targets aren't met:
+  → Profile and fix obvious bottlenecks first
+  → Lower targets to "good enough" (e.g., <10ms instead of <5ms)
+  → Document what would need to change for better performance
+  → This is a portfolio project, not a production SaaS
+
+If Go dashboard API adds too much complexity:
+  → Write dashboard API in Rust (same binary as relay server)
+  → Use warp or axum for the REST + WebSocket server
+  → Eliminates IPC entirely
+  → Single binary for entire relay server + dashboard
+```
+
+---
+
+---
+
+## 24. Future Roadmap
+
+### Version 1.1 — Enhanced Protocol Support
+
+```
+□ HTTP/2 tunnel support
+  - HPACK header compression
+  - Server push passthrough
+  - Full HTTP/2 multiplexing within tunnel stream
+
+□ gRPC tunneling
+  - HTTP/2 based, should work with HTTP/2 support
+  - Bidirectional streaming
+  - Protobuf-aware inspection (decode messages in dashboard)
+
+□ WebSocket-first tunneling
+  - Option to use WebSocket as transport instead of raw TCP
+  - Works through corporate proxies that block non-HTTP traffic
+  - `drap http 3000 --transport=ws`
+```
+
+### Version 1.2 — Multi-Region & Scalability
+
+```
+□ Multi-region relay servers
+  - us-east, eu-west, ap-south
+  - GeoDNS routes to nearest region
+  - `drap http 3000 --region=eu-west-1`
+
+□ Relay server clustering
+  - Redis Cluster for shared state
+  - Consistent hashing for tunnel assignment
+  - Cross-region tunnel migration on failover
+
+□ Horizontal scaling
+  - Multiple relay server instances behind L4 load balancer
+  - Sticky sessions based on tunnel ID
+  - Shared routing table via Redis
+```
+
+### Version 1.3 — Developer Experience
+
+```
+□ Plugin system
+  - Custom request/response transformers
+  - Pre-built plugins: CORS headers, response delay, mock responses
+  - Plugin written in WASM for safety and portability
+
+□ Team features
+  - Shared tunnels visible to team members
+  - Persistent subdomains for teams
+  - Audit logging
+
+□ IDE integrations
+  - VS Code extension: start/stop tunnels from editor
+  - JetBrains plugin
+  - Dashboard embedded in IDE panel
+```
+
+### Version 1.4 — Advanced Networking
+
+```
+□ UDP tunneling
+  - DNS server exposure
+  - Game server tunneling
+  - VoIP/WebRTC relay
+
+□ QUIC transport
+  - Replace TCP tunnel transport with QUIC
+  - Eliminates head-of-line blocking
+  - Better performance on lossy networks
+  - 0-RTT connection establishment
+
+□ P2P mode
+  - Direct peer-to-peer tunnel (no relay server)
+  - STUN/TURN for NAT traversal
+  - Relay as fallback only
+  - Lower latency, no bandwidth limits
+```
+
+### Version 2.0 — Platform
+
+```
+□ D-RAP Cloud (hosted service)
+  - Free tier: 1 tunnel, 100 req/min, random subdomain
+  - Pro tier: 10 tunnels, unlimited requests, custom subdomains
+  - Enterprise: self-hosted relay server + management UI
+
+□ API & Integrations
+  - REST API for programmatic tunnel management
+  - Terraform provider
+  - GitHub Actions integration
+  - Slack notifications for tunnel events
+
+□ Analytics
+  - Request analytics per tunnel
+  - Error rate monitoring
+  - Latency percentile tracking
+  - Usage-based billing
+```
+
+---
+
+---
+
+## 25. Why This Project Matters
+
+### 25.1 For Hiring Managers
+
+```
+What a normal fresher builds:
+  "I used Express.js to make a REST API that talks to MongoDB"
+
+What this project demonstrates:
+  ┌───────────────────────────────────────────────────────────────────┐
+  │                                                                   │
+  │  ✓ Custom TCP/IP networking from raw sockets                     │
+  │  ✓ Binary protocol design (own wire format)                      │
+  │  ✓ TLS termination and certificate management                   │
+  │  ✓ Connection multiplexing (HTTP/2-style)                       │
+  │  ✓ NAT traversal and reverse tunneling                          │
+  │  ✓ High-concurrency architecture (10K+ connections)             │
+  │  ✓ HTTP parser built from scratch                               │
+  │  ✓ Rate limiting algorithms (sliding window, token bucket)       │
+  │  ✓ Authentication system (Basic Auth, Bearer, bcrypt)           │
+  │  ✓ Real-time WebSocket dashboard                                │
+  │  ✓ CLI tool design with excellent DX                            │
+  │  ✓ Multi-language project (Rust + Go + Svelte)                  │
+  │  ✓ Systems programming (zero-copy I/O, memory efficiency)       │
+  │  ✓ Database design (SQLite schema, Redis data modeling)          │
+  │  ✓ DevOps (Docker, systemd, kernel tuning, monitoring)          │
+  │  ✓ Security engineering (threat modeling, defense in depth)      │
+  │  ✓ Performance engineering (benchmarking, profiling, optimization)│
+  │  ✓ Testing at all levels (unit, integration, E2E, chaos)        │
+  │  ✓ Technical documentation and architecture design               │
+  │  ✓ Building a real tool that real developers would actually use  │
+  │                                                                   │
+  └───────────────────────────────────────────────────────────────────┘
+```
+
+### 25.2 Skills Proven by Each Component
+
+```
+┌────────────────────────┬──────────────────────────────────────────────┐
+│ Component              │ Skills Demonstrated                          │
+├────────────────────────┼──────────────────────────────────────────────┤
+│ Wire Protocol          │ Protocol design, binary parsing, state       │
+│                        │ machines, backward compatibility thinking    │
+├────────────────────────┼──────────────────────────────────────────────┤
+│ Multiplexer            │ Concurrency, flow control, scheduling,      │
+│                        │ resource management, HTTP/2 understanding   │
+├────────────────────────┼──────────────────────────────────────────────┤
+│ TLS Layer              │ Cryptography (applied), PKI, certificate    │
+│                        │ management, security architecture            │
+├────────────────────────┼──────────────────────────────────────────────┤
+│ Subdomain Router       │ DNS understanding, high-performance         │
+│                        │ hash maps, lock-free data structures        │
+├────────────────────────┼──────────────────────────────────────────────┤
+│ Rate Limiter           │ Distributed systems, Redis, algorithm       │
+│                        │ design, API design (rate limit headers)     │
+├────────────────────────┼──────────────────────────────────────────────┤
+│ Request Inspector      │ HTTP deep understanding, storage strategy,  │
+│                        │ ring buffers, async non-blocking design     │
+├────────────────────────┼──────────────────────────────────────────────┤
+│ Replay Engine          │ Full-stack thinking, UX design,             │
+│                        │ complex state management                    │
+├────────────────────────┼──────────────────────────────────────────────┤
+│ CLI Client             │ Developer experience, single-binary         │
+│                        │ distribution, cross-platform development    │
+├────────────────────────┼──────────────────────────────────────────────┤
+│ Dashboard              │ Full-stack development, real-time UI,       │
+│                        │ WebSocket, modern frontend frameworks       │
+├────────────────────────┼──────────────────────────────────────────────┤
+│ Relay Server           │ High-performance server design, async I/O,  │
+│                        │ resource limits, production operations      │
+├────────────────────────┼──────────────────────────────────────────────┤
+│ Deployment             │ Docker, Linux administration, kernel        │
+│                        │ tuning, monitoring, CI/CD                   │
+├────────────────────────┼──────────────────────────────────────────────┤
+│ Testing                │ Testing methodology, chaos engineering,     │
+│                        │ performance benchmarking, quality mindset   │
+└────────────────────────┴──────────────────────────────────────────────┘
+```
+
+### 25.3 What Sets This Apart
+
+```
+1. IT'S A REAL PRODUCT
+   Not a tutorial project. Not a TODO app. Not a CRUD API.
+   This is a tool that developers actually use every day.
+   ngrok has 5 million+ users. This is that, built from scratch.
+
+2. IT'S NETWORKING, NOT CRUD
+   99% of portfolio projects are "React frontend talks to Express backend
+   talks to MongoDB." This project operates at the TCP/IP level.
+   It proves understanding that most developers never achieve.
+
+3. IT'S SYSTEMS PROGRAMMING
+   Custom binary protocol. Zero-copy I/O. Connection multiplexing.
+   This is the kind of work that powers the infrastructure
+   everyone else builds on top of.
+
+4. IT COMBINES BREADTH AND DEPTH
+   Protocol design + CLI tooling + web dashboard + deployment.
+   Low-level networking + high-level UX. Rust + Go + Svelte.
+   Proves versatility without sacrificing depth.
+
+5. IT HAS MEASURABLE QUALITY
+   Not "I built it and it works." 
+   It has benchmark targets. It has chaos tests. It has a threat model.
+   It proves engineering maturity, not just coding ability.
+
+6. THE DOCUMENTATION PROVES THE THINKING
+   This document itself demonstrates:
+   - System design ability
+   - Technical decision-making with clear rationale
+   - Understanding of tradeoffs
+   - Long-term thinking (roadmap, scalability)
+   - Attention to detail
+   - Communication skills
+
+   Most freshers can't explain WHY they made technical decisions.
+   This document explains every single one.
+```
+
+### 25.4 The One-Line Resume Entry
+
+```
+D-RAP — Built a full tunneling platform (like ngrok) from scratch:
+custom binary protocol, TCP/TLS proxy, connection multiplexing,
+NAT traversal, subdomain routing, rate limiting, request inspection
+& replay, real-time dashboard. Rust + Go + Svelte. 20K+ LOC.
+Handles 10K+ concurrent connections with <5ms proxy overhead.
+```
+
+---
+
+---
+
+## Final Note
+
+This document is approximately **25,000 words** of pure architecture and design — before a single line of code is written. It covers every component, every data flow, every protocol frame, every error case, every benchmark target, every deployment consideration, and every security threat.
+
+**The next step is to open the editor and start building.**
+
+Phase 0, Task 1: `cargo new --lib drap-protocol`
+
+The wire protocol library. Frame by frame. Byte by byte.
+
+Let's go. 🚀
+
+---
+
+*D-RAP — Dynamic Relay Access Point*
+*"Like ngrok, but you built it."*
+
+
+

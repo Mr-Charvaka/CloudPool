@@ -1,0 +1,27 @@
+[workspace]
+members = [
+    "crates/drap-protocol",
+    "crates/drap-common",
+    "crates/drap-client",
+    "crates/drap-server",
+]
+resolver = "2"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+bytes = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json"] }
+anyhow = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+rcgen = "0.13"
+dashmap = "6"
+nanoid = "0.4"
+rand = "0.8"
+axum = { version = "0.7", features = ["ws", "macros"] }
+tower-http = { version = "0.5", features = ["fs", "cors"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+httparse = "1.9"
+futures = "0.3"

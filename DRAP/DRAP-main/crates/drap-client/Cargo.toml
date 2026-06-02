@@ -1,0 +1,26 @@
+[package]
+name = "drap-client"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { workspace = true }
+tokio-rustls = { version = "0.26", features = ["ring"] }
+rustls = "0.23"
+rustls-pemfile = "2"
+drap-protocol = { path = "../drap-protocol" }
+drap-common = { path = "../drap-common" }
+bytes = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+clap = { version = "4.5", features = ["derive"] }
+directories = "5.0"
+reqwest = { version = "0.11", features = ["json"] }
+ratatui = "0.26"
+crossterm = { version = "0.27", features = ["event-stream"] }
+tracing.workspace = true
+tracing-subscriber = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
+futures = { workspace = true }
+anyhow.workspace = true

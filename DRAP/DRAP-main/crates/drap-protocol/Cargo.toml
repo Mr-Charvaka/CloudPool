@@ -1,0 +1,14 @@
+[package]
+name = "drap-protocol"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bytes.workspace = true
+thiserror = "1"
+tracing.workspace = true
+tokio-util = { workspace = true, features = ["codec"] }
+rand = "0.8"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }

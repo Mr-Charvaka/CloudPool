@@ -1,0 +1,39 @@
+[package]
+name = "drap-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { workspace = true }
+tokio-rustls = { version = "0.26", features = ["ring"] }
+rustls-pemfile = "2"
+drap-protocol = { path = "../drap-protocol" }
+drap-common = { path = "../drap-common" }
+bytes = { workspace = true }
+rcgen = { workspace = true }
+dashmap = { workspace = true }
+nanoid = { workspace = true }
+rand = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "chrono", "uuid"] }
+httparse = "1.9"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+tracing.workspace = true
+tracing-subscriber = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
+futures = { workspace = true }
+rust-embed = { version = "8", features = ["interpolate-folder-path"] }
+mime_guess = "2"
+redis = { version = "0.25", features = ["tokio-comp"] }
+anyhow.workspace = true
+
+[[bin]]
+name = "drap-server"
+path = "src/main.rs"
+
+[[bin]]
+name = "gen-certs"
+path = "src/bin/gen_certs.rs"

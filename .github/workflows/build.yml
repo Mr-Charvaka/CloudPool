@@ -6,8 +6,52 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+permissions:
+  contents: read
+
 jobs:
-  build:
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'npm'
+        cache-dependency-path: |
+          sdk/javascript/package-lock.json
+          frontend/react-dashboard/package-lock.json
+          DRAP/dashboard/ui/package-lock.json
+          DRAP/DRAP-main/dashboard/ui/package-lock.json
+      continue-on-error: true
+
+    - name: Build JS SDK
+      working-directory: sdk/javascript
+      run: |
+        npm install
+        npm run build
+
+    - name: Build React Dashboard
+      working-directory: frontend/react-dashboard
+      run: |
+        npm install
+        npm run build
+
+    - name: Build Svelte UI (DRAP)
+      working-directory: DRAP/dashboard/ui
+      run: |
+        npm install
+        npm run build
+
+    - name: Build Svelte UI (DRAP-main)
+      working-directory: DRAP/DRAP-main/dashboard/ui
+      run: |
+        npm install
+        npm run build
+
+  backend-build:
     runs-on: ubuntu-latest
 
     services:
@@ -18,7 +62,7 @@ jobs:
           POSTGRES_USER: cloudpool
           POSTGRES_PASSWORD: password
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U cloudpool -d cloudpool_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -38,7 +82,7 @@ jobs:
       rabbitmq:
         image: rabbitmq:3-alpine
         options: >-
-          --health-cmd "rabbitmq-diagnostics ping"
+          --health-cmd "rabbitmq-diagnostics -q ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -54,6 +98,16 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         cache: maven
+
+    - name: Set up Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Build Rust native library
+      run: cargo build --release --manifest-path backend/rust/Cargo.toml
+
+    - name: Run JNI Bridge Verification
+      working-directory: backend/spring-boot
+      run: mvn exec:java -Dexec.mainClass="com.cloudpool.util.JniTest"
 
     - name: Run tests
       working-directory: backend/spring-boot
@@ -78,16 +132,19 @@ jobs:
       uses: codecov/codecov-action@v4
       with:
         files: backend/spring-boot/target/site/jacoco/jacoco.xml
-      continue-on-error: true   # Don't fail if Codecov token not configured
+      continue-on-error: true
 
     - name: Build Docker image
       run: docker build -t cloudpool:${{ github.sha }} .
 
     - name: Push to Docker Registry
       if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKER_USERNAME != ''
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       run: |
-        echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-        docker tag cloudpool:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/cloudpool:${{ github.sha }}
-        docker tag cloudpool:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/cloudpool:latest
-        docker push ${{ secrets.DOCKER_USERNAME }}/cloudpool:${{ github.sha }}
-        docker push ${{ secrets.DOCKER_USERNAME }}/cloudpool:latest
+        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+        docker tag cloudpool:${{ github.sha }} "$DOCKER_USERNAME/cloudpool:${{ github.sha }}"
+        docker tag cloudpool:${{ github.sha }} "$DOCKER_USERNAME/cloudpool:latest"
+        docker push "$DOCKER_USERNAME/cloudpool:${{ github.sha }}"
+        docker push "$DOCKER_USERNAME/cloudpool:latest"

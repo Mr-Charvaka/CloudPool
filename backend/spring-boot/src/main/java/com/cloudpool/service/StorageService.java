@@ -82,7 +82,10 @@ public class StorageService {
 
                 String sanitized = fileUploadValidator.sanitizeFilename(originalFilename);
                 name = UUID.randomUUID().toString() + "_" + sanitized;
-                Path targetLocation = uploadPath.resolve(name);
+                Path targetLocation = uploadPath.resolve(name).normalize();
+                if (!targetLocation.startsWith(uploadPath)) {
+                    throw new SecurityException("Invalid target file path (path traversal attempt)");
+                }
                 Files.copy(file.getInputStream(), targetLocation);
                 driveLocation = targetLocation.toString();
             }
