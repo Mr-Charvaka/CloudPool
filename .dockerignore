@@ -1,0 +1,13 @@
+.git
+.github
+DRAP/
+docs/
+frontend/react-dashboard/node_modules/
+backend/spring-boot/target/
+backend/rust/target/
+backend/spring-boot/logs/
+backend/spring-boot/storage/
+*.md
+*.tex
+idea.md
+apache-maven-*/
