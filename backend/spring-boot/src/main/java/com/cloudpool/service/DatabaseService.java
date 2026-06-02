@@ -42,13 +42,20 @@ public class DatabaseService {
         if (activeConnOpt.isPresent() && activeConnOpt.get().isActive()) {
             try {
                 org.springframework.jdbc.datasource.DriverManagerDataSource dataSource = new org.springframework.jdbc.datasource.DriverManagerDataSource();
-                dataSource.setDriverClassName("org.postgresql.Driver");
-                dataSource.setUrl("jdbc:postgresql://" + activeConnOpt.get().getHost() + ":" + activeConnOpt.get().getPort() + "/" + activeConnOpt.get().getDatabaseName());
+                String host = activeConnOpt.get().getHost();
+                String dbName = activeConnOpt.get().getDatabaseName();
+                if (dbName.toLowerCase().contains("h2") || dbName.toLowerCase().contains("cloudpooldb")) {
+                    dataSource.setDriverClassName("org.h2.Driver");
+                    dataSource.setUrl("jdbc:h2:" + dbName);
+                } else {
+                    dataSource.setDriverClassName("org.postgresql.Driver");
+                    dataSource.setUrl("jdbc:postgresql://" + host + ":" + activeConnOpt.get().getPort() + "/" + dbName);
+                }
                 dataSource.setUsername(activeConnOpt.get().getUsername());
                 dataSource.setPassword(activeConnOpt.get().getPassword());
                 return new JdbcTemplate(dataSource);
             } catch (Exception e) {
-                log.error("Failed to construct dynamic PostgreSQL connection: {}", e.getMessage());
+                log.error("Failed to construct dynamic PostgreSQL/H2 connection: {}", e.getMessage());
             }
         }
         return jdbcTemplate;

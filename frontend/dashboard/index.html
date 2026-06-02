@@ -948,10 +948,11 @@ let name = parsed.name || 'Anonymous Developer';
     </div>
 
     <!-- ANALYTICS -->
+    <!-- ANALYTICS -->
     <div class="page" id="page-analytics">
       <div>
-        <div class="page-title">API KEY USAGE ANALYTICS</div>
-        <div class="page-sub">Real-time metrics, status distributions, and route analytics for API key authentication.</div>
+        <div class="page-title">REQUEST TRAFFIC ANALYTICS</div>
+        <div class="page-sub">Real-time telemetry, status code distributions, and route metrics for all project API traffic.</div>
       </div>
       
       <!-- Stats Cards -->
@@ -961,8 +962,8 @@ let name = parsed.name || 'Anonymous Developer';
           <div id="analyticsTotalRequests" style="font-size:20px;font-weight:700;margin-top:6px;font-family:'JetBrains Mono',monospace;">0</div>
         </div>
         <div class="panel" style="padding:14px;background:linear-gradient(135deg, #1e1e1e 0%, #121212 100%);color:#fff;border-color:#333;">
-          <div style="font-size:8px;color:#888;letter-spacing:.08em;font-weight:700;">ACTIVE KEYS</div>
-          <div id="analyticsActiveKeys" style="font-size:20px;font-weight:700;margin-top:6px;font-family:'JetBrains Mono',monospace;">0</div>
+          <div style="font-size:8px;color:#888;letter-spacing:.08em;font-weight:700;">AVERAGE LATENCY</div>
+          <div id="analyticsAverageLatency" style="font-size:20px;font-weight:700;margin-top:6px;font-family:'JetBrains Mono',monospace;">0 ms</div>
         </div>
         <div class="panel" style="padding:14px;background:linear-gradient(135deg, #1e1e1e 0%, #121212 100%);color:#fff;border-color:#333;">
           <div style="font-size:8px;color:#888;letter-spacing:.08em;font-weight:700;">SUCCESS RATE</div>
@@ -978,17 +979,17 @@ let name = parsed.name || 'Anonymous Developer';
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0;overflow:hidden;">
         <!-- Left Panel: Lists and statistics -->
         <div style="display:flex;flex-direction:column;gap:12px;overflow-y:auto;height:100%;">
-          <!-- Hits By Key -->
+          <!-- Hits By Key (Repurposed for Status Codes) -->
           <div class="panel" style="flex:1;display:flex;flex-direction:column;min-height:120px;">
-            <div class="panel-header"><div class="panel-title">REQUESTS BY API KEY</div></div>
+            <div class="panel-header"><div class="panel-title">REQUESTS BY STATUS CODE</div></div>
             <div class="panel-body" style="padding:0;overflow-y:auto;flex:1;" id="analyticsByKeyList">
               <!-- Filled dynamically -->
             </div>
           </div>
           
-          <!-- Hits By Endpoint -->
+          <!-- Hits By Endpoint (Repurposed for Paths) -->
           <div class="panel" style="flex:1;display:flex;flex-direction:column;min-height:120px;">
-            <div class="panel-header"><div class="panel-title">REQUESTS BY ENDPOINT</div></div>
+            <div class="panel-header"><div class="panel-title">REQUESTS BY PATH</div></div>
             <div class="panel-body" style="padding:0;overflow-y:auto;flex:1;" id="analyticsByEndpointList">
               <!-- Filled dynamically -->
             </div>
@@ -998,7 +999,7 @@ let name = parsed.name || 'Anonymous Developer';
         <!-- Right Panel: Live Activity Logs -->
         <div class="panel" style="height:100%;display:flex;flex-direction:column;">
           <div class="panel-header">
-            <div class="panel-title">LIVE KEY USAGE STREAM</div>
+            <div class="panel-title">LIVE REQUEST METRIC STREAM</div>
             <div class="panel-badge">REAL-TIME</div>
           </div>
           <div class="panel-body" style="flex:1;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:9px;display:flex;flex-direction:column;gap:4px;" id="analyticsLogsStream">
@@ -1712,45 +1713,30 @@ let name = parsed.name || 'Anonymous Developer';
 
   async function loadApiKeyAnalytics() {
     try {
-      // 1. Fetch total keys list to determine active count
-      const keysRes = await fetch(`${API_BASE}/api/keys`, { headers: getHeaders() });
-      let activeKeysCount = 0;
-      if (keysRes.ok) {
-        const keys = await keysRes.json();
-        activeKeysCount = keys.filter(k => k.active).length;
-      }
-      document.getElementById("analyticsActiveKeys").innerText = activeKeysCount;
-
-      // 2. Fetch logs
-      const logsRes = await fetch(`${API_BASE}/api/keys/analytics/logs`, { headers: getHeaders() });
-      if (!logsRes.ok) return;
-      const logs = await logsRes.json();
+      // 1. Fetch summary from the general request analytics API
+      const summaryRes = await fetch(`${API_BASE}/api/analytics/summary`, { headers: getHeaders() });
+      if (!summaryRes.ok) return;
+      const summary = await summaryRes.json();
 
       // Render stats card metrics
-      const totalRequests = logs.length;
-      document.getElementById("analyticsTotalRequests").innerText = totalRequests;
+      document.getElementById("analyticsTotalRequests").innerText = summary.totalRequests || 0;
+      document.getElementById("analyticsAverageLatency").innerText = Math.round(summary.averageLatencyMs || 0) + " ms";
+      document.getElementById("analyticsSuccessRate").innerText = Math.round(summary.successRate || 0) + "%";
+      document.getElementById("analyticsErrorRate").innerText = summary.errorCount || 0;
 
-      let successRequests = 0;
-      let serverErrors = 0;
-      logs.forEach(log => {
-        if (log.statusCode >= 200 && log.statusCode < 400) {
-          successRequests++;
-        } else if (log.statusCode >= 500) {
-          serverErrors++;
-        }
-      });
-      const successRate = totalRequests > 0 ? Math.round((successRequests / totalRequests) * 100) : 100;
-      document.getElementById("analyticsSuccessRate").innerText = successRate + "%";
-      document.getElementById("analyticsErrorRate").innerText = serverErrors;
+      // 2. Fetch logs from the general request analytics API
+      const logsRes = await fetch(`${API_BASE}/api/analytics/logs`, { headers: getHeaders() });
+      if (!logsRes.ok) return;
+      const logs = await logsRes.json();
 
       // Fill logs stream
       const logsStream = document.getElementById("analyticsLogsStream");
       logsStream.innerHTML = "";
-      if (logs.length === 0) {
-        logsStream.innerHTML = `<div style="color:var(--muted);padding:10px;text-align:center">No API key usage logs recorded yet.</div>`;
+      if (!logs || logs.length === 0) {
+        logsStream.innerHTML = `<div style="color:var(--muted);padding:10px;text-align:center">No request logs recorded yet.</div>`;
       } else {
         logs.forEach(l => {
-          const timeStr = new Date(l.createdAt).toLocaleTimeString();
+          const timeStr = new Date(l.timestamp).toLocaleTimeString();
           const row = document.createElement("div");
           row.style.borderBottom = "1px solid var(--border2)";
           row.style.padding = "6px 8px";
@@ -1758,17 +1744,18 @@ let name = parsed.name || 'Anonymous Developer';
           row.style.justifyContent = "space-between";
           row.style.alignItems = "center";
           
-          let statusColor = "#66bb6a"; // green for 2xx
+          let statusColor = "#66bb6a"; // green for 2xx/3xx
           if (l.statusCode >= 400 && l.statusCode < 500) statusColor = "#ffa726"; // orange
           if (l.statusCode >= 500) statusColor = "#ef5350"; // red
 
           row.innerHTML = `
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-weight:700;color:${l.method === 'GET' ? '#42a5f5' : '#ab47bc'};width:40px;">${l.method}</span>
-              <span style="color:var(--text);word-break:break-all;">${l.endpoint}</span>
+            <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
+              <span style="font-weight:700;color:${l.requestMethod === 'GET' ? '#42a5f5' : '#ab47bc'};width:40px;flex-shrink:0;">${l.requestMethod}</span>
+              <span style="color:var(--text);word-break:break-all;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;" title="${escapeHTML(l.requestPath)}">${escapeHTML(l.requestPath)}</span>
             </div>
-            <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
-              <span style="color:var(--muted);font-size:8px;">[${l.apiKeyName}]</span>
+            <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;margin-left:8px;">
+              <span style="color:var(--muted);font-size:8px;">${l.durationMs}ms</span>
+              <span style="color:var(--muted);font-size:8px;">${escapeHTML(l.ipAddress || 'local')}</span>
               <span style="background:${statusColor};color:#fff;padding:1px 4px;font-size:8px;font-weight:700;">${l.statusCode}</span>
               <span style="color:var(--label);font-size:8px;">${timeStr}</span>
             </div>
@@ -1777,56 +1764,48 @@ let name = parsed.name || 'Anonymous Developer';
         });
       }
 
-      // 3. Fetch usage by key
-      const byKeyRes = await fetch(`${API_BASE}/api/keys/analytics/by-key`, { headers: getHeaders() });
-      if (byKeyRes.ok) {
-        const byKey = await byKeyRes.json();
-        const byKeyList = document.getElementById("analyticsByKeyList");
-        byKeyList.innerHTML = "";
-        if (byKey.length === 0) {
-          byKeyList.innerHTML = `<div style="color:var(--muted);padding:10px;text-align:center">No metrics available.</div>`;
-        } else {
-          byKey.forEach(bk => {
-            const row = document.createElement("div");
-            row.style.display = "flex";
-            row.style.justifyContent = "space-between";
-            row.style.padding = "8px 12px";
-            row.style.borderBottom = "1px solid var(--border2)";
-            row.innerHTML = `
-              <div style="font-weight:700;">${bk.keyName || 'Unknown Key'}</div>
-              <div style="font-family:'JetBrains Mono';font-weight:700;">${bk.count} hits</div>
-            `;
-            byKeyList.appendChild(row);
-          });
-        }
+      // 3. Render Status Code Distribution in "Requests by Status Code" panel
+      const byKeyList = document.getElementById("analyticsByKeyList");
+      byKeyList.innerHTML = "";
+      if (!summary.statusDistribution || Object.keys(summary.statusDistribution).length === 0) {
+        byKeyList.innerHTML = `<div style="color:var(--muted);padding:10px;text-align:center">No metrics available.</div>`;
+      } else {
+        Object.entries(summary.statusDistribution).forEach(([status, count]) => {
+          const row = document.createElement("div");
+          row.style.display = "flex";
+          row.style.justifyContent = "space-between";
+          row.style.padding = "8px 12px";
+          row.style.borderBottom = "1px solid var(--border2)";
+          row.innerHTML = `
+            <div style="font-weight:700;">${status}</div>
+            <div style="font-family:'JetBrains Mono';font-weight:700;">${count} hits</div>
+          `;
+          byKeyList.appendChild(row);
+        });
       }
 
-      // 4. Fetch usage by endpoint
-      const byEndRes = await fetch(`${API_BASE}/api/keys/analytics/by-endpoint`, { headers: getHeaders() });
-      if (byEndRes.ok) {
-        const byEnd = await byEndRes.json();
-        const byEndList = document.getElementById("analyticsByEndpointList");
-        byEndList.innerHTML = "";
-        if (byEnd.length === 0) {
-          byEndList.innerHTML = `<div style="color:var(--muted);padding:10px;text-align:center">No metrics available.</div>`;
-        } else {
-          byEnd.forEach(be => {
-            const row = document.createElement("div");
-            row.style.display = "flex";
-            row.style.justifyContent = "space-between";
-            row.style.padding = "8px 12px";
-            row.style.borderBottom = "1px solid var(--border2)";
-            row.innerHTML = `
-              <div style="font-family:'JetBrains Mono';color:var(--muted);">${be.endpoint}</div>
-              <div style="font-weight:700;">${be.count} hits</div>
-            `;
-            byEndList.appendChild(row);
-          });
-        }
+      // 4. Render Requests by Path in "Requests by Path" panel
+      const byEndList = document.getElementById("analyticsByEndpointList");
+      byEndList.innerHTML = "";
+      if (!summary.topPaths || summary.topPaths.length === 0) {
+        byEndList.innerHTML = `<div style="color:var(--muted);padding:10px;text-align:center">No metrics available.</div>`;
+      } else {
+        summary.topPaths.forEach(tp => {
+          const row = document.createElement("div");
+          row.style.display = "flex";
+          row.style.justifyContent = "space-between";
+          row.style.padding = "8px 12px";
+          row.style.borderBottom = "1px solid var(--border2)";
+          row.innerHTML = `
+            <div style="font-family:'JetBrains Mono';color:var(--muted);word-break:break-all;max-width:70%;" title="${escapeHTML(tp.path)}">${escapeHTML(tp.path)}</div>
+            <div style="font-weight:700;flex-shrink:0;">${tp.count} hits</div>
+          `;
+          byEndList.appendChild(row);
+        });
       }
 
     } catch(e) {
-      console.error("Failed to load API key analytics:", e);
+      console.error("Failed to load request analytics:", e);
     }
   }
 

@@ -28,6 +28,18 @@ public class ProjectService {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
+    @org.springframework.beans.factory.annotation.Value("${spring.datasource.url:jdbc:h2:file:./data/cloudpooldb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}")
+    private String datasourceUrl;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.datasource.username:sa}")
+    private String datasourceUsername;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.datasource.password:password}")
+    private String datasourcePassword;
+
+    @org.springframework.beans.factory.annotation.Value("${cloudpool.allow-local-connections:true}")
+    private boolean allowLocalConnections;
+
     @Transactional
     public Project createProject(UUID userId, String name, String description) {
         Project project = Project.builder()
@@ -37,7 +49,13 @@ public class ProjectService {
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
-        return projectRepository.save(project);
+        Project saved = projectRepository.save(project);
+        try {
+            provisionProjectDatabase(saved.getId(), userId);
+        } catch (Exception e) {
+            log.error("Failed to auto-provision database schema for project {}: {}", saved.getId(), e.getMessage());
+        }
+        return saved;
     }
 
     @Transactional
@@ -141,9 +159,12 @@ public class ProjectService {
         if (host == null || host.trim().isEmpty()) {
             throw new IllegalArgumentException("Host cannot be empty");
         }
+        if (allowLocalConnections && (host.trim().equalsIgnoreCase("localhost") || host.trim().equals("127.0.0.1"))) {
+            return;
+        }
         try {
             java.net.InetAddress addr = java.net.InetAddress.getByName(host.trim());
-            if (addr.isLoopbackAddress() || addr.isAnyLocalAddress() || addr.isLinkLocalAddress() || addr.isSiteLocalAddress()) {
+            if (!allowLocalConnections && (addr.isLoopbackAddress() || addr.isAnyLocalAddress() || addr.isLinkLocalAddress() || addr.isSiteLocalAddress())) {
                 throw new SecurityException("Access to internal, loopback, or link-local address is denied");
             }
         } catch (java.net.UnknownHostException e) {
@@ -215,6 +236,79 @@ public class ProjectService {
                     .build();
         }
         return databaseConnectionRepository.save(conn);
+    }
+
+    @Transactional
+    public DatabaseConnection provisionProjectDatabase(UUID projectId, UUID userId) {
+        Project project = getProject(projectId, userId);
+        String schemaName = "cp_schema_" + projectId.toString().replace("-", "_").toLowerCase();
+
+        // 1. Create schema
+        jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + schemaName);
+        log.info("Auto-provisioned schema {} for project {}", schemaName, projectId);
+
+        // 2. Parse connection details
+        String host = "localhost";
+        int port = 5432;
+        String dbName = "cloudpool";
+        String username = datasourceUsername;
+        String password = datasourcePassword;
+
+        boolean isH2 = datasourceUrl != null && datasourceUrl.contains("h2");
+        if (isH2) {
+            host = "localhost";
+            port = 0;
+            String baseFile = "./data/cloudpooldb";
+            if (datasourceUrl.startsWith("jdbc:h2:")) {
+                String cleanUrl = datasourceUrl.substring("jdbc:h2:".length());
+                int semiIdx = cleanUrl.indexOf(';');
+                baseFile = semiIdx != -1 ? cleanUrl.substring(0, semiIdx) : cleanUrl;
+            }
+            dbName = baseFile + ";SCHEMA=" + schemaName;
+            username = "sa";
+            password = "password";
+        } else {
+            try {
+                if (datasourceUrl != null && datasourceUrl.startsWith("jdbc:postgresql://")) {
+                    String cleanUrl = datasourceUrl.substring("jdbc:postgresql://".length());
+                    int slashIdx = cleanUrl.indexOf('/');
+                    if (slashIdx != -1) {
+                        String hostPortStr = cleanUrl.substring(0, slashIdx);
+                        dbName = cleanUrl.substring(slashIdx + 1);
+                        int queryIdx = dbName.indexOf('?');
+                        if (queryIdx != -1) {
+                            dbName = dbName.substring(0, queryIdx);
+                        }
+                        int colonIdx = hostPortStr.indexOf(':');
+                        if (colonIdx != -1) {
+                            host = hostPortStr.substring(0, colonIdx);
+                            port = Integer.parseInt(hostPortStr.substring(colonIdx + 1));
+                        } else {
+                            host = hostPortStr;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse PostgreSQL url {}, using defaults: {}", datasourceUrl, e.getMessage());
+            }
+            dbName = dbName + "?currentSchema=" + schemaName;
+        }
+
+        // 3. Save connection
+        DatabaseConnection conn = saveConnection(
+                projectId,
+                "POSTGRESQL",
+                host,
+                port,
+                dbName,
+                username,
+                password,
+                true,
+                userId
+        );
+
+        log.info("Registered auto-provisioned DatabaseConnection {} for project {}", conn.getId(), projectId);
+        return conn;
     }
 
     @Transactional
