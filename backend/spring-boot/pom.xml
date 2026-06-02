@@ -133,6 +133,13 @@
             <version>${rabbitmq-amqp-client.version}</version>
         </dependency>
 
+        <!-- Embedded SMTP Receiver -->
+        <dependency>
+            <groupId>com.github.davidmoten</groupId>
+            <artifactId>subethasmtp</artifactId>
+            <version>7.1.1</version>
+        </dependency>
+
         <!-- JWT -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
