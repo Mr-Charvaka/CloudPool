@@ -229,14 +229,36 @@ flowchart LR
 
 # Getting Started
 
-## Prerequisites
+## Option A — Docker (recommended)
 
-Install the following dependencies:
+The fastest way to run the full stack. Requires only Docker Desktop.
+
+```bash
+git clone https://github.com/Mr-Charvaka/CloudPool.git
+cd CloudPool
+
+docker compose -f docker/docker-compose.yml up --build
+```
+
+Docker Compose will:
+1. Start PostgreSQL, Redis, RabbitMQ, and Weaviate
+2. Compile the Rust native library (`libcloudpool_rust.so`)
+3. Build and launch the Spring Boot application
+
+Once all containers are healthy the API is available at `http://localhost:8080`.
+
+---
+
+## Option B — Local (manual)
+
+### Prerequisites
 
 * Java JDK 17 or 21
 * Rust 1.70+
 * Cargo
-* Maven
+* Maven 3.9+
+* PostgreSQL 15, Redis 7, RabbitMQ 3, and Weaviate 1.21 running locally
+  (start them with `docker compose -f docker/docker-compose.yml up postgres redis rabbitmq weaviate`)
 
 ---
 
@@ -277,10 +299,9 @@ Examples:
 ## 3. Validate JNI Integration
 
 ```bash
-cd ../spring-boot
+cd backend/spring-boot
 
-../../apache-maven-3.9.6/bin/mvn exec:java \
--Dexec.mainClass="com.cloudpool.util.JniTest"
+mvn exec:java -Dexec.mainClass="com.cloudpool.util.JniTest"
 ```
 
 ---
@@ -288,19 +309,18 @@ cd ../spring-boot
 ## 4. Start CloudPool
 
 ```bash
-../../apache-maven-3.9.6/bin/mvn spring-boot:run \
--Dspring-boot.run.profiles=local
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 ---
 
 # Local Development Environment
 
-The default `local` profile enables:
+The `dev` profile connects to locally running infrastructure services and enables:
 
-* Embedded H2 databases
-* Local vector indexing
-* Standalone storage fallback
+* PostgreSQL database with Flyway migrations
+* Redis cache
+* RabbitMQ messaging
 * Development GraphQL playground
 
 ---
