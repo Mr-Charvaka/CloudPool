@@ -287,6 +287,10 @@
       <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,7 3,4 5,5.5 7,2.5 9,3.5"/></svg>
       ANALYTICS
     </div>
+    <div class="nav-item" data-page="emails" onclick="goTo('emails',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="2" width="8" height="6" rx="1"/><path d="M1 2l4 3.5L9 2"/></svg>
+      EMAIL SANDBOX
+    </div>
     <div class="nav-item" data-page="settings" onclick="goTo('settings',this)">
       <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="5" r="1.5"/><path d="M5 1v1.5M5 7.5V9M1 5h1.5M7.5 5H9M2.1 2.1l1.1 1.1M6.8 6.8l1.1 1.1M7.9 2.1L6.8 3.2M3.2 6.8L2.1 7.9"/></svg>
       SETTINGS
@@ -1009,6 +1013,59 @@ let name = parsed.name || 'Anonymous Developer';
       </div>
     </div>
 
+    <!-- EMAIL SANDBOX -->
+    <div class="page" id="page-emails">
+      <div>
+        <div class="page-title">LOCAL EMAIL SANDBOX</div>
+        <div class="page-sub">Monitor and audit emails dispatched by CloudPool. In Sandbox mode, emails are stored locally instead of sent to external SMTP servers.</div>
+      </div>
+      <div class="panels">
+        <!-- Outbox/Inbox list panel -->
+        <div class="panel panel-left" style="display:flex; flex-direction:column;">
+          <div class="panel-header" style="padding: 0 12px; display: flex; align-items: stretch; height: 32px; flex-shrink:0;">
+            <div style="display: flex; gap: 16px; align-items: stretch;">
+              <div class="email-tab active" id="email-tab-outbox" onclick="switchEmailTab('outbox')" style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; display: flex; align-items: center; border-bottom: 2px solid #000; cursor: pointer; padding: 0 4px; user-select: none;">DISPATCHED OUTBOX</div>
+              <div class="email-tab" id="email-tab-inbox" onclick="switchEmailTab('inbox')" style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; display: flex; align-items: center; border-bottom: 2px solid transparent; cursor: pointer; padding: 0 4px; user-select: none; color: var(--muted);">RECEIVED INBOX</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button class="btn btn-outline" id="clearOutboxBtn" style="padding:2px 8px; font-size:8px" onclick="clearEmailOutbox()">CLEAR OUTBOX</button>
+              <button class="btn btn-outline" id="clearInboxBtn" style="padding:2px 8px; font-size:8px; display: none;" onclick="clearEmailInbox()">CLEAR INBOX</button>
+              <button class="btn" id="refreshInboxBtn" style="padding:2px 8px; font-size:8px; display: none;" onclick="loadEmailInbox()">🔄 RELOAD</button>
+            </div>
+          </div>
+          <div class="panel-body" style="padding:0; overflow-y:auto; flex:1;" id="emailsOutboxList">
+            <!-- Loaded dynamically -->
+          </div>
+          <div class="panel-body" style="padding:0; overflow-y:auto; flex:1; display:none;" id="emailsInboxList">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
+
+        <!-- Send test email panel -->
+        <div class="panel panel-right">
+          <div class="panel-header">
+            <div class="panel-title">TRIGGER TEST EMAIL</div>
+            <div class="panel-badge">LOCAL/SMTP</div>
+          </div>
+          <div class="panel-body">
+            <div class="field">
+              <div class="field-label">RECIPIENT EMAIL ADDRESS</div>
+              <input type="text" id="testEmailTo" placeholder="receiver@example.com" />
+            </div>
+            <div class="field">
+              <div class="field-label">EMAIL SUBJECT</div>
+              <input type="text" id="testEmailSubject" placeholder="Welcome to CloudPool!" />
+            </div>
+            <div class="field">
+              <div class="field-label">EMAIL BODY (PLAIN TEXT)</div>
+              <textarea id="testEmailBody" style="height:120px;" placeholder="This is a test notification from your self-hosted CloudPool instance."></textarea>
+            </div>
+            <button class="btn" onclick="sendTestEmail()">⚡ SEND TEST EMAIL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- SETTINGS -->
     <div class="page" id="page-settings">
       <div>
@@ -1176,6 +1233,8 @@ let name = parsed.name || 'Anonymous Developer';
       loadApiKeyAnalytics();
     } else if (id === 'compute') {
       loadComputeData();
+    } else if (id === 'emails') {
+      loadActiveEmailTab();
     }
   }
 
@@ -3166,6 +3225,210 @@ ${data.executionOutput}
     if (containerLogTimer) {
       clearInterval(containerLogTimer);
       containerLogTimer = null;
+    }
+  }
+
+  /* ── EMAIL SANDBOX SYSTEM ── */
+  let currentEmailTab = 'outbox';
+
+  function switchEmailTab(tab) {
+    currentEmailTab = tab;
+    const outboxTab = document.getElementById("email-tab-outbox");
+    const inboxTab = document.getElementById("email-tab-inbox");
+    const outboxList = document.getElementById("emailsOutboxList");
+    const inboxList = document.getElementById("emailsInboxList");
+    const clearOutboxBtn = document.getElementById("clearOutboxBtn");
+    const clearInboxBtn = document.getElementById("clearInboxBtn");
+    const refreshInboxBtn = document.getElementById("refreshInboxBtn");
+
+    if (tab === 'outbox') {
+      outboxTab.classList.add("active");
+      outboxTab.style.borderColor = "#000";
+      outboxTab.style.color = "#000";
+      inboxTab.classList.remove("active");
+      inboxTab.style.borderColor = "transparent";
+      inboxTab.style.color = "var(--muted)";
+
+      outboxList.style.display = "flex";
+      inboxList.style.display = "none";
+
+      clearOutboxBtn.style.display = "inline-flex";
+      clearInboxBtn.style.display = "none";
+      refreshInboxBtn.style.display = "none";
+
+      loadEmailOutbox();
+    } else {
+      inboxTab.classList.add("active");
+      inboxTab.style.borderColor = "#000";
+      inboxTab.style.color = "#000";
+      outboxTab.classList.remove("active");
+      outboxTab.style.borderColor = "transparent";
+      outboxTab.style.color = "var(--muted)";
+
+      inboxList.style.display = "flex";
+      outboxList.style.display = "none";
+
+      clearOutboxBtn.style.display = "none";
+      clearInboxBtn.style.display = "inline-flex";
+      refreshInboxBtn.style.display = "inline-flex";
+
+      loadEmailInbox();
+    }
+  }
+
+  function loadActiveEmailTab() {
+    if (currentEmailTab === 'outbox') {
+      loadEmailOutbox();
+    } else {
+      loadEmailInbox();
+    }
+  }
+
+  async function loadEmailOutbox() {
+    try {
+      const res = await fetch(`${API_BASE}/api/dev/emails`, { headers: getHeaders() });
+      if (res.status === 401 || res.status === 403) { logout(); return; }
+      const emails = await res.json();
+      
+      const container = document.getElementById("emailsOutboxList");
+      container.innerHTML = "";
+      
+      if (!Array.isArray(emails) || emails.length === 0) {
+        container.innerHTML = `<div style="color:var(--muted);padding:14px;text-align:center">No emails in the sandbox outbox log yet.</div>`;
+        return;
+      }
+
+      emails.forEach(email => {
+        const item = document.createElement("div");
+        item.style.borderBottom = "1px solid var(--border2)";
+        item.style.padding = "10px 12px";
+        item.style.display = "flex";
+        item.style.flexDirection = "column";
+        item.style.gap = "4px";
+
+        let statusBg = "#66bb6a"; // green
+        if (email.status === 'FAILED') statusBg = "#ef5350"; // red
+        if (email.status === 'QUEUED') statusBg = "#ffa726"; // orange
+
+        item.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:700; font-size:10px;">TO: ${escapeHTML(email.toAddress)}</div>
+            <span style="background:${statusBg}; color:#fff; padding:1px 6px; font-size:8px; font-weight:700;">${email.status}</span>
+          </div>
+          <div style="font-weight:600; font-size:9px; color:var(--text);">SUBJECT: ${escapeHTML(email.subject)}</div>
+          <div style="font-size:9px; color:var(--muted); white-space:pre-wrap; background:#f9f9f9; padding:6px; border:1px solid #eee; margin-top:2px;">${escapeHTML(email.body)}</div>
+          ${email.errorMessage ? `<div style="font-size:8px; color:#ef5350; font-weight:700; margin-top:2px;">ERROR: ${escapeHTML(email.errorMessage)}</div>` : ''}
+          <div style="font-size:8px; color:var(--label); text-align:right; margin-top:2px;">DISPATCHED AT: ${new Date(email.sentAt).toLocaleString()}</div>
+        `;
+        container.appendChild(item);
+      });
+    } catch (e) {
+      console.error("Error loading email outbox", e);
+    }
+  }
+
+  async function clearEmailOutbox() {
+    if (!confirm("Are you sure you want to clear all emails in the sandbox outbox log?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/dev/emails`, {
+        method: "DELETE",
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        clog('consoleBox', '[INFO] Sandbox email outbox log cleared', 'info');
+        loadEmailOutbox();
+      } else {
+        alert("Failed to clear outbox");
+      }
+    } catch(e) {
+      alert("Error: " + e.message);
+    }
+  }
+
+  async function loadEmailInbox() {
+    try {
+      const res = await fetch(`${API_BASE}/api/dev/emails/inbox`, { headers: getHeaders() });
+      if (res.status === 401 || res.status === 403) { logout(); return; }
+      const emails = await res.json();
+      
+      const container = document.getElementById("emailsInboxList");
+      container.innerHTML = "";
+      
+      if (!Array.isArray(emails) || emails.length === 0) {
+        container.innerHTML = `<div style="color:var(--muted);padding:14px;text-align:center">No emails in the self-hosted local inbox yet. Connect a client or SMTP sender to port 2525.</div>`;
+        return;
+      }
+
+      emails.forEach(email => {
+        const item = document.createElement("div");
+        item.style.borderBottom = "1px solid var(--border2)";
+        item.style.padding = "10px 12px";
+        item.style.display = "flex";
+        item.style.flexDirection = "column";
+        item.style.gap = "4px";
+
+        item.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:700; font-size:10px;">FROM: ${escapeHTML(email.fromAddress)}</div>
+            <div style="font-weight:700; font-size:10px; color:var(--muted)">TO: ${escapeHTML(email.toAddress)}</div>
+          </div>
+          <div style="font-weight:600; font-size:9px; color:var(--text);">SUBJECT: ${escapeHTML(email.subject)}</div>
+          <div style="font-size:9px; color:var(--muted); white-space:pre-wrap; background:#f9f9f9; padding:6px; border:1px solid #eee; margin-top:2px;">${escapeHTML(email.body)}</div>
+          <div style="font-size:8px; color:var(--label); text-align:right; margin-top:2px;">RECEIVED AT: ${new Date(email.receivedAt).toLocaleString()}</div>
+        `;
+        container.appendChild(item);
+      });
+    } catch (e) {
+      console.error("Error loading email inbox", e);
+    }
+  }
+
+  async function clearEmailInbox() {
+    if (!confirm("Are you sure you want to clear all emails in the local inbox?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/dev/emails/inbox`, {
+        method: "DELETE",
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        clog('consoleBox', '[INFO] Self-hosted local email inbox cleared', 'info');
+        loadEmailInbox();
+      } else {
+        alert("Failed to clear inbox");
+      }
+    } catch(e) {
+      alert("Error: " + e.message);
+    }
+  }
+
+  async function sendTestEmail() {
+    const to = document.getElementById("testEmailTo").value.trim();
+    const subject = document.getElementById("testEmailSubject").value.trim();
+    const body = document.getElementById("testEmailBody").value.trim();
+
+    if (!to) {
+      alert("Recipient email address is required");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/dev/emails/send-test`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ to, subject, body })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert("Failed to send test email: " + (data.error || "Server error"));
+        return;
+      }
+      alert("Test email triggered successfully!");
+      document.getElementById("testEmailTo").value = "";
+      document.getElementById("testEmailSubject").value = "";
+      document.getElementById("testEmailBody").value = "";
+      loadActiveEmailTab();
+    } catch(e) {
+      alert("Error triggering test email: " + e.message);
     }
   }
 

@@ -1,0 +1,1 @@
+I can do something like AWS as backend storage for hardcore organizations or individual developers who can pay money, then we can do local tunneling features for students ,researchers developers testing so that they can easily see how things will work at production level. about the Decentraliation part we can keep it but not so corely focused over it !

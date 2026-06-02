@@ -105,6 +105,9 @@ cloudpool:
     smtp-password: ${CLOUDPOOL_EMAIL_SMTP_PASSWORD:securepassword}
     smtp-from: ${CLOUDPOOL_EMAIL_SMTP_FROM:noreply@cloudpool-email.com}
     sandbox-mode: ${CLOUDPOOL_EMAIL_SANDBOX:true}
+    embedded-smtp:
+      enabled: ${CLOUDPOOL_EMBEDDED_SMTP_ENABLED:true}
+      port: ${CLOUDPOOL_EMBEDDED_SMTP_PORT:2525}
   
   google-drive:
     client-id: ${GOOGLE_DRIVE_CLIENT_ID:your-google-client-id}

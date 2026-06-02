@@ -287,6 +287,10 @@
       <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="2" width="8" height="6" rx="1"/><path d="M1 2l4 3.5L9 2"/></svg>
       EMAIL SANDBOX
     </div>
+    <div class="nav-item" data-page="payments" onclick="goTo('payments',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="2" width="8" height="6" rx=".5"/><path d="M1 4.5h8M3.5 6.5h1"/></svg>
+      PAYMENTS
+    </div>
     <div class="nav-item" data-page="settings" onclick="goTo('settings',this)">
       <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="5" r="1.5"/><path d="M5 1v1.5M5 7.5V9M1 5h1.5M7.5 5H9M2.1 2.1l1.1 1.1M6.8 6.8l1.1 1.1M7.9 2.1L6.8 3.2M3.2 6.8L2.1 7.9"/></svg>
       SETTINGS
@@ -815,13 +819,23 @@
         <div class="page-sub">Monitor and audit emails dispatched by CloudPool. In Sandbox mode, emails are stored locally instead of sent to external SMTP servers.</div>
       </div>
       <div class="panels">
-        <!-- Outbox list panel -->
+        <!-- Outbox/Inbox list panel -->
         <div class="panel panel-left" style="display:flex; flex-direction:column;">
-          <div class="panel-header">
-            <div class="panel-title">DISPATCHED OUTBOX LOGS</div>
-            <button class="btn btn-outline" style="padding:2px 8px; font-size:8px" onclick="clearEmailOutbox()">CLEAR OUTBOX</button>
+          <div class="panel-header" style="padding: 0 12px; display: flex; align-items: stretch; height: 32px; flex-shrink:0;">
+            <div style="display: flex; gap: 16px; align-items: stretch;">
+              <div class="email-tab active" id="email-tab-outbox" onclick="switchEmailTab('outbox')" style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; display: flex; align-items: center; border-bottom: 2px solid #000; cursor: pointer; padding: 0 4px; user-select: none;">DISPATCHED OUTBOX</div>
+              <div class="email-tab" id="email-tab-inbox" onclick="switchEmailTab('inbox')" style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; display: flex; align-items: center; border-bottom: 2px solid transparent; cursor: pointer; padding: 0 4px; user-select: none; color: var(--muted);">RECEIVED INBOX</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button class="btn btn-outline" id="clearOutboxBtn" style="padding:2px 8px; font-size:8px" onclick="clearEmailOutbox()">CLEAR OUTBOX</button>
+              <button class="btn btn-outline" id="clearInboxBtn" style="padding:2px 8px; font-size:8px; display: none;" onclick="clearEmailInbox()">CLEAR INBOX</button>
+              <button class="btn" id="refreshInboxBtn" style="padding:2px 8px; font-size:8px; display: none;" onclick="loadEmailInbox()">🔄 RELOAD</button>
+            </div>
           </div>
           <div class="panel-body" style="padding:0; overflow-y:auto; flex:1;" id="emailsOutboxList">
+            <!-- Loaded dynamically -->
+          </div>
+          <div class="panel-body" style="padding:0; overflow-y:auto; flex:1; display:none;" id="emailsInboxList">
             <!-- Loaded dynamically -->
           </div>
         </div>
@@ -846,6 +860,129 @@
               <textarea id="testEmailBody" style="height:120px;" placeholder="This is a test notification from your self-hosted CloudPool instance."></textarea>
             </div>
             <button class="btn" onclick="sendTestEmail()">⚡ SEND TEST EMAIL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAYMENTS -->
+    <div class="page" id="page-payments">
+      <div>
+        <div class="page-title">PAYMENT GATEWAYS</div>
+        <div class="page-sub">Register your own Stripe, Razorpay, or custom payment gateway API keys. All credentials are encrypted at rest. Create charges and monitor per-gateway dashboards.</div>
+      </div>
+      <div class="panels" style="min-height:0;flex:1">
+
+        <!-- LEFT: Register Gateway + Gateway List -->
+        <div class="panel" style="flex:.85;display:flex;flex-direction:column">
+          <div class="panel-header">
+            <span class="panel-title">REGISTERED GATEWAYS</span>
+            <button class="btn" style="padding:3px 10px;font-size:8px" onclick="showGatewayForm(true)">+ ADD</button>
+          </div>
+
+          <!-- Registration form (hidden by default) -->
+          <div id="gatewayForm" style="display:none;padding:14px 12px;border-bottom:1px solid var(--border2);background:#f9f9f9">
+            <div class="field-label">PROVIDER</div>
+            <select id="gwProvider" style="margin-bottom:8px" onchange="updateGatewayFormFields()">
+              <option value="STRIPE">Stripe</option>
+              <option value="RAZORPAY">Razorpay</option>
+              <option value="CUSTOM">Custom Provider</option>
+            </select>
+            <div class="field-row">
+              <div class="field">
+                <div class="field-label">DISPLAY NAME</div>
+                <input type="text" id="gwDisplayName" placeholder="My Stripe Gateway" />
+              </div>
+              <div class="field">
+                <div class="field-label">MODE</div>
+                <select id="gwMode"><option value="TEST">Test</option><option value="LIVE">Live</option></select>
+              </div>
+            </div>
+            <div style="margin-top:8px">
+              <div class="field-label" id="gwApiKeyLabel">PUBLISHABLE KEY / API KEY</div>
+              <input type="password" id="gwApiKey" placeholder="pk_test_... or rzp_test_..." />
+            </div>
+            <div style="margin-top:8px">
+              <div class="field-label" id="gwSecretKeyLabel">SECRET KEY</div>
+              <input type="password" id="gwSecretKey" placeholder="sk_test_..." />
+            </div>
+            <div style="margin-top:8px">
+              <div class="field-label">WEBHOOK SECRET (optional)</div>
+              <input type="password" id="gwWebhookSecret" placeholder="whsec_..." />
+            </div>
+            <div style="margin-top:8px" id="gwCustomUrlWrap">
+              <div class="field-label">CUSTOM PROVIDER BASE URL</div>
+              <input type="text" id="gwCustomUrl" placeholder="https://api.yourpayment.com/v1" />
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button class="btn" onclick="saveGateway()">REGISTER</button>
+              <button class="btn btn-outline" onclick="showGatewayForm(false)">CANCEL</button>
+            </div>
+          </div>
+
+          <!-- Gateway cards -->
+          <div id="gatewayList" style="flex:1;overflow-y:auto">
+            <div style="color:var(--muted);padding:20px;text-align:center;font-size:10px">Loading gateways...</div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Selected Gateway Dashboard -->
+        <div class="panel" style="flex:1.15;display:flex;flex-direction:column;min-height:0">
+          <div class="panel-header">
+            <span class="panel-title" id="gwDashTitle">SELECT A GATEWAY</span>
+            <span class="panel-badge" id="gwDashMode"></span>
+          </div>
+
+          <div id="gwDashEmpty" style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:10px">
+            Select a gateway from the list to view its dashboard.
+          </div>
+
+          <div id="gwDashContent" style="display:none;flex:1;flex-direction:column;min-height:0;overflow-y:auto">
+            <!-- Stats strip -->
+            <div class="metric-strip" id="gwStatStrip" style="flex-shrink:0">
+              <div class="metric-cell"><div class="m-val" id="gwStatTotal">—</div><div class="m-lbl">TOTAL TXN</div></div>
+              <div class="metric-cell"><div class="m-val" id="gwStatSuccess">—</div><div class="m-lbl">SUCCESS RATE</div></div>
+              <div class="metric-cell"><div class="m-val" id="gwStatVolume">—</div><div class="m-lbl">VOLUME (SUCCESS)</div></div>
+              <div class="metric-cell"><div class="m-val" id="gwStatFailed">—</div><div class="m-lbl">FAILED</div></div>
+            </div>
+
+            <!-- Create Charge -->
+            <div style="padding:12px;border-bottom:1px solid var(--border2);flex-shrink:0">
+              <div style="font-size:9px;letter-spacing:.1em;color:var(--label);margin-bottom:8px">CREATE CHARGE</div>
+              <div class="field-row">
+                <div class="field">
+                  <div class="field-label">AMOUNT</div>
+                  <input type="number" id="chargeAmount" placeholder="10.00" step="0.01" min="0.01" />
+                </div>
+                <div class="field">
+                  <div class="field-label">CURRENCY</div>
+                  <select id="chargeCurrency">
+                    <option>USD</option><option>INR</option><option>EUR</option><option>GBP</option><option>AUD</option>
+                  </select>
+                </div>
+              </div>
+              <div style="margin-top:8px">
+                <div class="field-label">DESCRIPTION (optional)</div>
+                <input type="text" id="chargeDescription" placeholder="Order #1234 — Product purchase" />
+              </div>
+              <button class="btn" style="margin-top:10px;width:100%" onclick="createCharge()">CHARGE</button>
+              <div id="chargeResult" style="margin-top:8px;font-size:9px;color:var(--muted)"></div>
+            </div>
+
+            <!-- Transaction log -->
+            <div style="padding:12px 12px 0;flex-shrink:0">
+              <div style="font-size:9px;letter-spacing:.1em;color:var(--label);margin-bottom:6px">TRANSACTION LOG</div>
+            </div>
+            <div style="flex:1;overflow-y:auto;min-height:0">
+              <table class="tbl">
+                <thead><tr>
+                  <th>AMOUNT</th><th>CURRENCY</th><th>STATUS</th><th>PROVIDER ID</th><th>DATE</th>
+                </tr></thead>
+                <tbody id="txnTableBody">
+                  <tr><td colspan="5" style="text-align:center;color:var(--muted)">No transactions yet.</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -1002,7 +1139,9 @@
     } else if (id === 'analytics') {
       loadApiKeyAnalytics();
     } else if (id === 'emails') {
-      loadEmailOutbox();
+      loadActiveEmailTab();
+    } else if (id === 'payments') {
+      loadGateways();
     }
   }
 
@@ -1636,7 +1775,62 @@
     }
   }
 
-  /* ── EMAIL OUTBOX SANDBOX ── */
+  /* ── EMAIL SANDBOX SYSTEM ── */
+  let currentEmailTab = 'outbox';
+
+  function switchEmailTab(tab) {
+    currentEmailTab = tab;
+    const outboxTab = document.getElementById("email-tab-outbox");
+    const inboxTab = document.getElementById("email-tab-inbox");
+    const outboxList = document.getElementById("emailsOutboxList");
+    const inboxList = document.getElementById("emailsInboxList");
+    const clearOutboxBtn = document.getElementById("clearOutboxBtn");
+    const clearInboxBtn = document.getElementById("clearInboxBtn");
+    const refreshInboxBtn = document.getElementById("refreshInboxBtn");
+
+    if (tab === 'outbox') {
+      outboxTab.classList.add("active");
+      outboxTab.style.borderColor = "#000";
+      outboxTab.style.color = "#000";
+      inboxTab.classList.remove("active");
+      inboxTab.style.borderColor = "transparent";
+      inboxTab.style.color = "var(--muted)";
+
+      outboxList.style.display = "flex";
+      inboxList.style.display = "none";
+
+      clearOutboxBtn.style.display = "inline-flex";
+      clearInboxBtn.style.display = "none";
+      refreshInboxBtn.style.display = "none";
+
+      loadEmailOutbox();
+    } else {
+      inboxTab.classList.add("active");
+      inboxTab.style.borderColor = "#000";
+      inboxTab.style.color = "#000";
+      outboxTab.classList.remove("active");
+      outboxTab.style.borderColor = "transparent";
+      outboxTab.style.color = "var(--muted)";
+
+      inboxList.style.display = "flex";
+      outboxList.style.display = "none";
+
+      clearOutboxBtn.style.display = "none";
+      clearInboxBtn.style.display = "inline-flex";
+      refreshInboxBtn.style.display = "inline-flex";
+
+      loadEmailInbox();
+    }
+  }
+
+  function loadActiveEmailTab() {
+    if (currentEmailTab === 'outbox') {
+      loadEmailOutbox();
+    } else {
+      loadEmailInbox();
+    }
+  }
+
   async function loadEmailOutbox() {
     try {
       const res = await fetch(`${API_BASE}/api/dev/emails`, { headers: getHeaders() });
@@ -1698,6 +1892,62 @@
     }
   }
 
+  async function loadEmailInbox() {
+    try {
+      const res = await fetch(`${API_BASE}/api/dev/emails/inbox`, { headers: getHeaders() });
+      if (res.status === 401 || res.status === 403) { logout(); return; }
+      const emails = await res.json();
+      
+      const container = document.getElementById("emailsInboxList");
+      container.innerHTML = "";
+      
+      if (!Array.isArray(emails) || emails.length === 0) {
+        container.innerHTML = `<div style="color:var(--muted);padding:14px;text-align:center">No emails in the self-hosted local inbox yet. Connect a client or SMTP sender to port 2525.</div>`;
+        return;
+      }
+
+      emails.forEach(email => {
+        const item = document.createElement("div");
+        item.style.borderBottom = "1px solid var(--border2)";
+        item.style.padding = "10px 12px";
+        item.style.display = "flex";
+        item.style.flexDirection = "column";
+        item.style.gap = "4px";
+
+        item.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:700; font-size:10px;">FROM: ${escapeHTML(email.fromAddress)}</div>
+            <div style="font-weight:700; font-size:10px; color:var(--muted)">TO: ${escapeHTML(email.toAddress)}</div>
+          </div>
+          <div style="font-weight:600; font-size:9px; color:var(--text);">SUBJECT: ${escapeHTML(email.subject)}</div>
+          <div style="font-size:9px; color:var(--muted); white-space:pre-wrap; background:#f9f9f9; padding:6px; border:1px solid #eee; margin-top:2px;">${escapeHTML(email.body)}</div>
+          <div style="font-size:8px; color:var(--label); text-align:right; margin-top:2px;">RECEIVED AT: ${new Date(email.receivedAt).toLocaleString()}</div>
+        `;
+        container.appendChild(item);
+      });
+    } catch (e) {
+      console.error("Error loading email inbox", e);
+    }
+  }
+
+  async function clearEmailInbox() {
+    if (!confirm("Are you sure you want to clear all emails in the local inbox?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/dev/emails/inbox`, {
+        method: "DELETE",
+        headers: getHeaders()
+      });
+      if (res.ok) {
+        clog('consoleBox', '[INFO] Self-hosted local email inbox cleared', 'info');
+        loadEmailInbox();
+      } else {
+        alert("Failed to clear inbox");
+      }
+    } catch(e) {
+      alert("Error: " + e.message);
+    }
+  }
+
   async function sendTestEmail() {
     const to = document.getElementById("testEmailTo").value.trim();
     const subject = document.getElementById("testEmailSubject").value.trim();
@@ -1723,7 +1973,7 @@
       document.getElementById("testEmailTo").value = "";
       document.getElementById("testEmailSubject").value = "";
       document.getElementById("testEmailBody").value = "";
-      loadEmailOutbox();
+      loadActiveEmailTab();
     } catch(e) {
       alert("Error triggering test email: " + e.message);
     }
@@ -2583,6 +2833,203 @@
   } else if (urlParams.get("gdrive") === "error") {
     alert("Failed to link Google Drive: " + urlParams.get("message"));
     window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  //  PAYMENT GATEWAYS
+  // ═══════════════════════════════════════════════════════
+
+  let selectedGatewayId = null;
+
+  function showGatewayForm(show) {
+    document.getElementById('gatewayForm').style.display = show ? 'block' : 'none';
+    if (show) updateGatewayFormFields();
+  }
+
+  function updateGatewayFormFields() {
+    const provider = document.getElementById('gwProvider').value;
+    const customWrap = document.getElementById('gwCustomUrlWrap');
+    const apiKeyLabel = document.getElementById('gwApiKeyLabel');
+    const secretKeyLabel = document.getElementById('gwSecretKeyLabel');
+    customWrap.style.display = provider === 'CUSTOM' ? 'block' : 'none';
+    if (provider === 'STRIPE') {
+      apiKeyLabel.textContent = 'PUBLISHABLE KEY';
+      secretKeyLabel.textContent = 'SECRET KEY';
+      document.getElementById('gwApiKey').placeholder = 'pk_test_...';
+      document.getElementById('gwSecretKey').placeholder = 'sk_test_...';
+    } else if (provider === 'RAZORPAY') {
+      apiKeyLabel.textContent = 'KEY ID';
+      secretKeyLabel.textContent = 'KEY SECRET';
+      document.getElementById('gwApiKey').placeholder = 'rzp_test_...';
+      document.getElementById('gwSecretKey').placeholder = 'your_razorpay_key_secret';
+    } else {
+      apiKeyLabel.textContent = 'API KEY';
+      secretKeyLabel.textContent = 'SECRET KEY (if needed)';
+      document.getElementById('gwApiKey').placeholder = 'your-api-key';
+      document.getElementById('gwSecretKey').placeholder = 'your-secret-key';
+    }
+  }
+
+  async function loadGateways() {
+    const container = document.getElementById('gatewayList');
+    try {
+      const res = await fetch(`${API_BASE}/api/dev/payments/gateways`, { headers: getHeaders() });
+      if (!res.ok) { container.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">Error loading gateways.</div>'; return; }
+      const gateways = await res.json();
+      if (!gateways.length) {
+        container.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;font-size:10px">No gateways registered yet. Click + ADD to get started.</div>';
+        return;
+      }
+      container.innerHTML = gateways.map(gw => `
+        <div class="stat-row" style="padding:10px 12px;cursor:pointer;border-left:3px solid ${selectedGatewayId===gw.id?'#000':'transparent'}" onclick="selectGateway('${gw.id}','${gw.displayName}','${gw.mode}')" id="gwCard-${gw.id}">
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:.05em">${gw.displayName}</div>
+            <div style="font-size:9px;color:var(--muted);margin-top:2px">${gw.provider} &nbsp;·&nbsp; <span style="font-size:8px;border:1px solid ${gw.mode==='LIVE'?'#000':'var(--border2)'};padding:0 4px">${gw.mode}</span></div>
+            <div style="font-size:9px;color:var(--label);margin-top:2px">${gw.maskedApiKey}</div>
+          </div>
+          <button class="btn btn-outline" style="font-size:8px;padding:2px 8px" onclick="event.stopPropagation();deleteGateway('${gw.id}')">DELETE</button>
+        </div>`).join('');
+    } catch(e) {
+      container.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center">Failed to load gateways.</div>';
+    }
+  }
+
+  async function saveGateway() {
+    const payload = {
+      displayName:   document.getElementById('gwDisplayName').value.trim(),
+      provider:      document.getElementById('gwProvider').value,
+      mode:          document.getElementById('gwMode').value,
+      apiKey:        document.getElementById('gwApiKey').value.trim(),
+      secretKey:     document.getElementById('gwSecretKey').value.trim(),
+      webhookSecret: document.getElementById('gwWebhookSecret').value.trim(),
+      customBaseUrl: document.getElementById('gwCustomUrl').value.trim()
+    };
+    if (!payload.displayName) { alert('Display name is required'); return; }
+    if (!payload.apiKey)      { alert('API key / Key ID is required'); return; }
+    try {
+      const res = await fetch(`${API_BASE}/api/dev/payments/gateways`, {
+        method: 'POST', headers: getHeaders(), body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) { alert('Failed: ' + (data.error || 'Server error')); return; }
+      showGatewayForm(false);
+      // Clear form
+      ['gwDisplayName','gwApiKey','gwSecretKey','gwWebhookSecret','gwCustomUrl'].forEach(id => document.getElementById(id).value = '');
+      loadGateways();
+      alert('Gateway "' + data.displayName + '" registered successfully!');
+    } catch(e) { alert('Error: ' + e.message); }
+  }
+
+  async function deleteGateway(id) {
+    if (!confirm('Delete this payment gateway and all its transactions?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/dev/payments/gateways/${id}`, {
+        method: 'DELETE', headers: getHeaders()
+      });
+      if (!res.ok) { alert('Failed to delete gateway'); return; }
+      if (selectedGatewayId === id) {
+        selectedGatewayId = null;
+        document.getElementById('gwDashContent').style.display = 'none';
+        document.getElementById('gwDashEmpty').style.display = 'flex';
+        document.getElementById('gwDashTitle').textContent = 'SELECT A GATEWAY';
+        document.getElementById('gwDashMode').textContent = '';
+      }
+      loadGateways();
+    } catch(e) { alert('Error: ' + e.message); }
+  }
+
+  async function selectGateway(id, name, mode) {
+    selectedGatewayId = id;
+    document.getElementById('gwDashTitle').textContent = name.toUpperCase();
+    document.getElementById('gwDashMode').textContent = mode;
+    document.getElementById('gwDashMode').style.background = mode === 'LIVE' ? '#000' : '';
+    document.getElementById('gwDashMode').style.color = mode === 'LIVE' ? '#fff' : '';
+    document.getElementById('gwDashEmpty').style.display = 'none';
+    document.getElementById('gwDashContent').style.display = 'flex';
+    document.getElementById('chargeResult').textContent = '';
+    // Re-highlight selected card
+    document.querySelectorAll('[id^="gwCard-"]').forEach(el => el.style.borderLeftColor = 'transparent');
+    const card = document.getElementById('gwCard-' + id);
+    if (card) card.style.borderLeftColor = '#000';
+    // Load stats and transactions in parallel
+    loadGatewayStats(id);
+    loadTransactions(id);
+  }
+
+  async function loadGatewayStats(id) {
+    try {
+      const res = await fetch(`${API_BASE}/api/dev/payments/gateways/${id}/stats`, { headers: getHeaders() });
+      if (!res.ok) return;
+      const s = await res.json();
+      document.getElementById('gwStatTotal').textContent   = s.totalTransactions ?? '0';
+      document.getElementById('gwStatSuccess').textContent = (s.successRatePct ?? 0) + '%';
+      document.getElementById('gwStatVolume').textContent  = '$' + (parseFloat(s.totalVolumeSuccess) || 0).toFixed(2);
+      document.getElementById('gwStatFailed').textContent  = s.failedCount ?? '0';
+    } catch(e) { /* silent */ }
+  }
+
+  async function loadTransactions(id) {
+    const tbody = document.getElementById('txnTableBody');
+    try {
+      const res = await fetch(`${API_BASE}/api/dev/payments/gateways/${id}/transactions?size=50`, { headers: getHeaders() });
+      if (!res.ok) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted)">Error loading transactions.</td></tr>'; return; }
+      const page = await res.json();
+      const txns = page.content || [];
+      if (!txns.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted)">No transactions yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = txns.map(t => {
+        const statusColor = t.status === 'SUCCESS' ? '#000' : (t.status === 'FAILED' ? '#c00' : '#888');
+        const date = new Date(t.createdAt).toLocaleString();
+        return `<tr>
+          <td style="font-weight:600">${t.amount}</td>
+          <td>${t.currency}</td>
+          <td style="color:${statusColor};font-weight:600;font-size:9px">${t.status}</td>
+          <td style="font-size:8px;color:var(--muted)">${t.providerTransactionId || '—'}</td>
+          <td style="font-size:8px;color:var(--muted)">${date}</td>
+        </tr>`;
+      }).join('');
+    } catch(e) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted)">Failed to load.</td></tr>';
+    }
+  }
+
+  async function createCharge() {
+    if (!selectedGatewayId) { alert('Select a gateway first'); return; }
+    const amount = parseFloat(document.getElementById('chargeAmount').value);
+    const currency = document.getElementById('chargeCurrency').value;
+    const description = document.getElementById('chargeDescription').value.trim();
+    if (!amount || amount <= 0) { alert('Enter a valid amount'); return; }
+    const resultEl = document.getElementById('chargeResult');
+    resultEl.textContent = 'Processing charge...';
+    try {
+      const res = await fetch(`${API_BASE}/api/dev/payments/gateways/${selectedGatewayId}/charge`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ amount, currency, description })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        resultEl.style.color = '#c00';
+        resultEl.textContent = '✗ ' + (data.error || 'Charge failed');
+        return;
+      }
+      const statusColor = data.status === 'SUCCESS' ? '#000' : '#c00';
+      resultEl.style.color = statusColor;
+      resultEl.textContent = (data.status === 'SUCCESS' ? '✓ ' : '✗ ') +
+        `${data.status} — ${data.amount} ${data.currency}` +
+        (data.providerTransactionId ? ` — ID: ${data.providerTransactionId}` : '') +
+        (data.errorMessage ? ` — ${data.errorMessage}` : '');
+      // Refresh stats and transactions
+      loadGatewayStats(selectedGatewayId);
+      loadTransactions(selectedGatewayId);
+      document.getElementById('chargeAmount').value = '';
+      document.getElementById('chargeDescription').value = '';
+    } catch(e) {
+      resultEl.style.color = '#c00';
+      resultEl.textContent = '✗ Error: ' + e.message;
+    }
   }
 
   // Init

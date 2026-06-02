@@ -1,6 +1,7 @@
 package com.cloudpool.controller;
 
 import com.cloudpool.model.OutboxEmail;
+import com.cloudpool.model.ReceivedEmail;
 import com.cloudpool.service.EmailService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,17 @@ public class EmailController {
         return ResponseEntity.ok(emailService.getOutboxEmails());
     }
 
+    @GetMapping("/inbox")
+    public ResponseEntity<List<ReceivedEmail>> getReceivedEmails() {
+        return ResponseEntity.ok(emailService.getReceivedEmails());
+    }
+
+    @DeleteMapping("/inbox")
+    public ResponseEntity<?> clearInbox() {
+        emailService.clearInbox();
+        return ResponseEntity.ok(Map.of("message", "Received emails cleared successfully"));
+    }
+
     @PostMapping("/send-test")
     public ResponseEntity<?> sendTestEmail(@RequestBody TestEmailRequest request) {
         if (request.getTo() == null || request.getTo().trim().isEmpty()) {
@@ -38,6 +50,19 @@ public class EmailController {
     public ResponseEntity<?> clearOutbox() {
         emailService.clearOutbox();
         return ResponseEntity.ok(Map.of("message", "Outbox logs cleared successfully"));
+    }
+
+    @PostMapping("/send-direct")
+    public ResponseEntity<?> sendDirectEmail(@RequestBody TestEmailRequest request) {
+        if (request.getTo() == null || request.getTo().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Recipient email address ('to') is required"));
+        }
+        String subject = request.getSubject() != null ? request.getSubject() : "Hello from CloudPool ☁️";
+        String body = request.getBody() != null ? request.getBody()
+                : "This email was sent directly from a CloudPool self-hosted server via MX record delivery. No third-party API keys were used!";
+
+        OutboxEmail email = emailService.sendDirectEmail(request.getTo(), subject, body);
+        return ResponseEntity.ok(email);
     }
 
     @Data
