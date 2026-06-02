@@ -21,7 +21,7 @@ jobs:
           POSTGRES_USER: cloudpool
           POSTGRES_PASSWORD: password
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U cloudpool -d cloudpool_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -41,7 +41,7 @@ jobs:
       rabbitmq:
         image: rabbitmq:3-alpine
         options: >-
-          --health-cmd "rabbitmq-diagnostics ping"
+          --health-cmd "rabbitmq-diagnostics -q ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -87,7 +87,7 @@ jobs:
       run: docker build -t cloudpool:${{ github.sha }} .
 
     - name: Push to Docker Registry
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.DOCKER_USERNAME != ''
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKER_USERNAME != ''
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
