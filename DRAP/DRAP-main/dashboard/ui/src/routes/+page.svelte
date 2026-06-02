@@ -64,7 +64,7 @@
 		return () => ws.close();
 	});
 
-	async fn replayRequest(id: string) {
+	async function replayRequest(id: string) {
 		const res = await fetch(`http://${window.location.hostname}:4000/api/replay/${id}`, {
 			method: 'POST'
 		});
@@ -350,9 +350,9 @@
 	</main>
 </div>
 
-<style lang="postcss">
+<style>
 	:global(body) {
-		@apply bg-[#0a0a0c];
+		background-color: #0a0a0c;
 		overflow-x: hidden;
 	}
 
@@ -371,6 +371,10 @@
 		background: transparent;
 	}
 	.custom-scrollbar::-webkit-scrollbar-thumb {
-		@apply bg-slate-800 rounded-full hover:bg-slate-700;
+		background-color: #1e293b;
+		border-radius: 9999px;
+	}
+	.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+		background-color: #334155;
 	}
 </style>
