@@ -1,0 +1,22 @@
+{
+  "name": "@cloudpool/cli",
+  "version": "0.1.0",
+  "description": "The official CloudPool command-line interface",
+  "main": "bin/cloudpool.js",
+  "bin": {
+    "cloudpool": "./bin/cloudpool.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.3",
+    "commander": "^9.5.0",
+    "inquirer": "^8.2.5",
+    "ora": "^5.4.1",
+    "ws": "^8.13.0"
+  },
+  "author": "CloudPool Systems",
+  "license": "MIT"
+}
