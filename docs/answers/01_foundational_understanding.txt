@@ -1,0 +1,180 @@
+================================================================================
+CLOUDPOOL TECHNICAL Q&A - CATEGORY 1: FOUNDATIONAL UNDERSTANDING (Q1-60)
+================================================================================
+
+1. What is the official name of the project?
+The official name of the project is CloudPool. It is designed as a developer-focused Backend-as-a-Service (BaaS) and orchestrator platform, providing unified middleware APIs. The project code reflects this identity across directories, submodules, and build configurations (such as the Maven POM files, docker-compose.yml, and Svelte frontend layout configs), all pointing to "cloudpool" or "CloudPool" as the primary application namespace.
+
+2. What problem does it solve?
+CloudPool solves the complexity of building multi-tenant, cloud-scale developer platforms by providing an out-of-the-box infrastructure layer. It handles multi-tenant database scoping, native high-performance computation (via Rust FFI), file storage abstraction (using Google Drive as a pool), dynamic vector databases for semantic search, and real-time messaging, saving developers from manually wiring these complex, distributed services.
+
+3. Who are the primary users/stakeholders?
+The primary users are software developers, system architects, and DevOps engineers building applications that require scalable multi-tenant backends, dynamic storage pools, or semantic document search. Another key stakeholder group includes project administrators who use the built-in Svelte dashboard to configure connection variables, monitor usage quotas, and manage API keys across environments.
+
+4. What makes it unique compared to alternatives?
+CloudPool is unique due to its hybrid Spring Boot and Rust FFI architecture. It bridges enterprise-grade Java web architectures with native Rust libraries using Java Native Interface (JNI) to offload heavy operations like cryptographic checksums, gzip compression, and vector math. This FFI-driven performance boost, combined with Google Drive API-based storage pooling, sets it apart from traditional BaaS solutions.
+
+5. What is the core value proposition?
+The core value proposition is enabling developers to deploy a secure, multi-tenant, and highly optimized BaaS stack instantly. By offloading resource-intensive math to Rust, managing databases automatically using tenant-thread thread-local contexts, and abstracting files and vectors behind a unified GraphQL and REST gateway, CloudPool lets developers focus purely on business logic rather than complex system integration.
+
+6. What are the business objectives?
+The business objectives center around lowering software development costs and shortening time-to-market for multi-tenant applications. By providing a pre-built, high-performance, and fully integrated backend infrastructure, CloudPool aims to reduce operational overhead, optimize compute resource consumption, and allow product teams to build secure, scalable, and feature-rich software quickly.
+
+7. What are the technical objectives?
+The technical objectives are to deliver a modular, multi-service backend with sub-millisecond local execution latencies, native-code offloading, and strict tenant isolation. The platform aims to process files efficiently via Rust-compiled gzip and sha256 binaries, offer low-latency query matching using vector indices, and guarantee security through structured JWT filters and tenant context filters.
+
+8. How does it fit into a larger ecosystem?
+CloudPool fits into the modern cloud-native ecosystem as a central backend gateway. It sits between client-side layers (browsers, CLI, SDKs) and backend databases (PostgreSQL, Redis, Weaviate) or third-party storage APIs (Google Drive). It replaces the need for custom-built microservice orchestration by exposing a single, consistent entry point for all typical backend tasks.
+
+9. What is the project's origin story?
+CloudPool originated from the need to build a modular, high-performance developer framework that combines the ecosystem richness of Spring Boot with the bare-metal performance of Rust. The initial monolithic repository evolved into a modular, microservice-based architecture to isolate core areas like authentication, data processing, serverless compute, and tunnel networking, facilitating cleaner local deployments.
+
+10. What inspired its creation?
+The project was inspired by open-source backend platforms like Supabase, Firebase, and Pocketbase. The creators noticed that existing platforms either lacked native performance extensions for CPU-heavy tasks or did not provide seamless, out-of-the-box tenant isolation. This led to building a JNI-based Rust bridge and a custom Spring thread-local context manager to achieve these goals.
+
+11. What is in scope for this project?
+The project scope includes the multi-module microservice backend (auth, data, compute, network, gateway), a native Rust FFI library for high-speed helper computations, a SvelteKit dashboard UI, a custom CLI, and JavaScript SDKs. It covers user authentication, dynamic H2/PostgreSQL database operations, file storage, vector embedding ingestion, and reverse-proxy cloud tunneling.
+
+12. What is explicitly out of scope?
+Explicitly out of scope are writing proprietary frontend client applications (beyond the management dashboard), custom hosting of public DNS registries, and implementing raw virtual machine hypervisors. CloudPool provides the backing APIs, SDK libraries, and administration dashboard, but it does not act as a consumer product or a raw physical hardware provider.
+
+13. What are the project boundaries?
+The boundaries of CloudPool lie between client request ingestion (exposing REST/GraphQL endpoints at the API Gateway) and the infrastructure storage layer. The system does not manage the underlying host OS directly, except through containerized Docker/Kubernetes boundaries. It relies on standard protocols like HTTP, WebSockets, and AMQP to interface with external systems.
+
+14. Are there planned extensions or phases?
+Planned extensions include expanding the serverless "cloudpool-compute" module to support additional compiler runtimes (e.g., Python or Go edge functions) alongside the static compilation workload. Other planned enhancements focus on scaling the Reverse Proxy "cloudpool-network" tunnel configurations to support dynamic TCP/UDP port mapping on Kubernetes ingress networks.
+
+15. What features are MVP vs. nice-to-have?
+MVP features include JWT auth, tenant-scoped query execution, file uploads via Google Drive API, basic key-value storage, and local vector math simulation. Nice-to-have features include advanced Web Application Firewall (WAF) rule sets, dynamic Stripe/Razorpay payment gateway simulations, cron job schedulers, and distributed tracing visualizations using Grafana, Jaeger, and Prometheus.
+
+16. What are hard constraints?
+Hard constraints include requiring a JDK 17 runtime for compile compatibility, a Rust toolchain (1.70+) to compile the native JNI libraries, and a secure JWT secret key length of at least 64 bytes (512 bits). Locally compiled native libraries must also match the host operating system's binary formats (.dll, .so, or .dylib).
+
+17. What are soft constraints?
+Soft constraints include running under 16 GB of RAM for the full microservice suite (though 8 GB works when databases are shared). Another soft constraint is using the H2 database in mixed mode locally, which is recommended for quick development but is expected to transition to PostgreSQL in production environments.
+
+18. What assumptions underpin the project?
+The system assumes that developers have Docker or Kubernetes installed if they want to run the full cloud-native telemetry and search stack (Weaviate, Jaeger, RabbitMQ). Locally, it assumes a shared filesystem structure where microservice directories can resolve H2 files via parent references (`../data/cloudpooldb`) during standalone development.
+
+19. What are known limitations?
+Known limitations include H2 database file locks if multiple services try to write without mixed-mode (`AUTO_SERVER=TRUE`) configurations enabled. Additionally, the native Rust JNI library must be manually recompiled for the target architecture (e.g., Apple Silicon vs. Intel Windows), as binary FFI cross-compilation is not automated in basic local setups.
+
+20. Are there deprecated features?
+The old monolithic architecture, formerly located in `backend/spring-boot/src`, is fully deprecated. All operational logic has been migrated into the multi-module layout (auth, gateway, data, network, compute, common). Stale files pointing to the monolithic structure in IDE workspaces should be discarded in favor of the submodule configurations.
+
+21. What are the primary goals?
+The primary goals are to establish absolute multi-tenant database security, achieve high compute throughput by offloading mathematical operations to Rust FFI, and maintain a seamless local development experience. The project aims to let developers run the entire stack locally with a single Maven command while ensuring production readiness.
+
+22. What are secondary goals?
+Secondary goals include providing comprehensive operational observability via Prometheus endpoints, Jaeger tracing, and Grafana dashboard templates. Other secondary goals include simulating developer features like Stripe/Razorpay checkouts and Google Drive storage pools locally to avoid costly cloud integrations during early development phases.
+
+23. How do you measure success?
+Success is measured by the build stability of the microservices, the correctness of the multi-tenant query isolation, the execution latency of the FFI bridge, and the zero-vulnerability audit status of the SDK packages. Achieving clean CodeQL scans and fast database response times indicates that the technical platform is healthy.
+
+24. What are key performance indicators (KPIs)?
+Key KPIs include FFI execution latency (must be sub-millisecond for SHA-256 and Gzip compression tasks), gateway routing latency, database connection pool exhaustion rates, vector search recall speed, and message queue processing delays. In production, request throughput and CPU utilization levels serve as standard performance KPIs.
+
+25. What are success criteria?
+Success criteria require that the platform compiles cleanly without errors, registers and authenticates users securely, maps database connections to the unified `cloudpooldb` file locally, forwards tunnel requests accurately, resolves external API calls under SLAs, and registers 0 security alerts in CodeQL and Dependabot scans.
+
+26. How do you define "complete"?
+A feature is complete when it compiles under JDK 17, compiles under Cargo, passes unit and integration verification tests, integrates cleanly with the Svelte dashboard, is documented in the markdown guides, contains zero security warnings in scans, and runs successfully in containerized Kubernetes or Docker Compose environments.
+
+27. What are quality benchmarks?
+Quality benchmarks dictate that unit test coverage remains high, linting rules (via ESLint/Prettier for JS and Maven Checkstyle for Java) are strictly enforced, database operations remain indexed, and no sensitive exception details are returned to the client (to prevent info exposure vulnerabilities).
+
+28. What scalability targets exist?
+Scalability targets include supporting horizontal scaling of the microservices up to dozens of stateless replica pods on Kubernetes, handling hundreds of concurrent WebSocket tunnel connections on the network module, and scaling vector index storage up to millions of embedded document segments.
+
+29. What performance targets exist?
+Performance targets require that the API Gateway routes requests under 5ms, database write-write locks do not occur, search queries resolve under 50ms, and the JNI boundary crossing adds less than 10 microseconds of overhead compared to raw JVM implementation executions.
+
+30. What reliability targets exist?
+Reliability targets demand a 99.9% uptime in deployment environments, zero database corruption incidents under H2 mixed-mode concurrent operations, automated recovery of crashed WebSocket tunnel connections, and automatic dead-letter queue routing for failed RabbitMQ messages.
+
+31. When was the project started?
+The project's active codebase indicates that development has progressed through multiple major milestones, moving from initial conceptualization to monolithic backend builds, followed by local database adjustments, CLI tool design, microservices division, and security hardening.
+
+32. When is it expected to be completed?
+CloudPool is designed as an evolving developer framework rather than a one-time product. Active development continues, with current milestones focusing on finalizing security audits, upgrading vulnerable SDK dependencies (like minimatch), and expanding the serverless compute compilation runtimes.
+
+33. What are major milestones?
+Major milestones include completing the monolithic architecture, creating the Rust FFI library, developing the Svelte backend dashboard, splitting the monolith into five distinct microservices and one API gateway, aligning local database sharing, and resolving high-severity CodeQL security vulnerabilities.
+
+34. What phases has it gone through?
+The project has gone through three main phases: (1) Monolithic prototyping (building core services in a single JAR), (2) Performance optimization (writing the Rust FFI bridge and integrating JNI), and (3) Modularization & Hardening (converting to microservices, database sharing, and security patching).
+
+35. What is the current phase?
+The current phase is stabilization and security verification. Focus has shifted from major feature creation to ensuring the microservice modules run reliably in isolated local environments, implementing dependency updates, fixing CodeQL reports (like CSRF, regex injection, and DOM XSS), and writing production guides.
+
+36. Are there release schedules?
+Release schedules follow a rolling delivery model. Build and verification workflows run on every pull request to main, and deployment releases execute automatically when pull requests merge. Minor version tags are generated based on feature readiness and successful regression tests.
+
+37. What is the versioning strategy?
+The project uses Semantic Versioning (SemVer). The parent Maven POM and Javascript package.json files track versions under the `0.1.0-SNAPSHOT` pattern, indicating the initial pre-release development cycle. Breaking microservice API changes will increment major versions, while security patches increment minor releases.
+
+38. What is the roadmap?
+The roadmap targets integrating OAuth2 flows fully, adding containerized compute runner orchestration inside the compute module, expanding the CLI tool with diagnostics commands, publishing npm packages for the SDK, and writing automated end-to-end integration tests for multi-tenant scenarios.
+
+39. What past decisions shaped the project?
+Key decisions include choosing Spring Cloud Gateway for microservice routing, selecting H2 for local zero-dependency database execution, binding Rust via FFI for cryptographically heavy utilities, and organizing files by microservice modules to support parallel development and independent scalability.
+
+40. What future decisions are pending?
+Pending decisions include choosing whether to fully replace the local H2 DB file storage with a shared Docker-managed PostgreSQL cluster for local development profiles, and deciding on the optimal sandboxing technology (Docker vs. WASM) for running client edge functions in the compute module.
+
+41. Who are all stakeholders?
+Stakeholders include the primary software development team, the operations team running the platform, independent developers who consume the BaaS services, project managers tracking milestones, and database/system administrators monitoring active resource utilization.
+
+42. What role does each stakeholder play?
+Developers write and maintain the microservices, CLI, and SDK. Operators configure deployment files, manage Kubernetes configurations, and respond to alerts. Consumers write apps using the SDKs. Administrators monitor database integrity and system health to prevent service degradations.
+
+43. Who are the end users?
+End users are app developers who write software on top of the CloudPool platform. They use the CLI to initialize projects, integrate the JavaScript SDK in their applications to store data, manage files, or perform search, and access the Svelte dashboard to configure keys.
+
+44. Who are administrators/operators?
+Administrators and operators are infrastructure engineers responsible for keeping CloudPool healthy. They configure `docker-compose.yml` or Kubernetes deployment manifests, check logs, manage access control policies, set database resource allocations, and monitor platform health metrics.
+
+45. Who are developers extending the system?
+These are system developers who contribute directly to the CloudPool codebase. They write new endpoints, optimize the Rust FFI library, add security filters to Spring Boot, extend the Svelte management dashboard, or update the Javascript SDK API bindings.
+
+46. Who are decision-makers?
+Decision-makers are the lead architects and project maintainers. They approve design documents, review pull requests, decide on architectural patterns (like shifting from monolithic to microservices), select third-party integrations, and define the product release roadmap.
+
+47. What is each audience's technical level?
+The developer audience (both system and consumer) possesses high technical capability, comfortable with JVM configurations, Rust compiling, SQL database schemas, and SDK APIs. The administrator audience is highly skilled in container orchestration, network routing, and Unix command-line execution.
+
+48. What is each audience's domain expertise?
+The domain expertise covers backend web engineering, systems programming, and database administration. The core team has deep knowledge of Java web containers, JNI FFI execution, relational SQL database structures, vector search index mechanisms, and secure authorization protocol designs.
+
+50. How do their interests differ or conflict?
+Developers want rapid updates, which can conflict with operator demands for stable, slow-changing runtimes. App developers want completely free storage pools, conflicting with administrator goals to limit resources and prevent database size bloat on local H2 filesystem drives.
+
+51. Who is the primary documentation audience?
+The primary audience is software developers setting up CloudPool for the first time or consuming its APIs. It also targets DevOps engineers deploying the microservices to production and system contributors who need to understand compile requirements (like the Rust Cargo and JDK 17 environments).
+
+52. What are the documentation use cases?
+Use cases include installing dependencies, compiling the FFI library, starting microservices locally, running testing suites, configuring multi-tenant H2 profiles, deploying container architectures, making API queries via GraphQL/REST, and troubleshooting common execution port conflicts.
+
+53. What decisions should documentation enable?
+Documentation should enable choosing the right local execution profile (`local` vs. `default`), choosing between database engines (H2 vs. PostgreSQL), deciding when to scale container instances, and identifying how to securely configure JWT keys and database file paths.
+
+54. What actions should documentation facilitate?
+It should facilitate cloning the repository, running the Cargo build for the JNI DLL/SO library, executing Flyway database migration steps, running the Maven clean compilation command, launching the Spring Boot submodules, and importing the JS SDK inside client applications.
+
+55. What knowledge gaps exist currently?
+A common knowledge gap is understanding the JNI FFI bridge mechanics (e.g., placing the compiled Rust DLL on the Java library path). Another gap is how multi-tenancy dynamically filters SQL queries behind the scenes via SpEL expressions and thread-local variables.
+
+56. What questions do users frequently ask?
+Users frequently ask why their microservices cannot share database data (resolved by setting H2 relative path to `../data/cloudpooldb`), why Redis/RabbitMQ errors flood logs (resolved by using the `local` profile), and how to compile the native Rust FFI library.
+
+57. What misconceptions exist?
+A common misconception is that the project requires active cloud resources to work. In reality, CloudPool can run completely standalone offline using local H2 database files, simulated local vector computations, and mock storage settings, making it highly portable.
+
+58. What skills should readers gain?
+Readers should gain skills in managing multi-module Spring Boot architectures, compiling native Rust libraries for Java integration, configuring Kubernetes ingress rules, utilizing Flyway database migrations, and executing secure client-side DOM updates to prevent XSS.
+
+59. What level of depth is appropriate?
+The depth should be highly technical and precise, targeting working software engineers. It must provide exact code blocks, actual class references (like TenantContextHolder), shell command strings, and configuration mappings without hand-waving or vague explanations.
+
+60. What tone and style are preferred?
+The preferred tone is professional, technical, direct, and factual. The style should be clean, using clear headings, tables for port mapping, code blocks with syntax highlighting, and github-style alerts to call out critical prerequisites and safety warnings.

@@ -1,0 +1,183 @@
+================================================================================
+CLOUDPOOL TECHNICAL Q&A - CATEGORY 8: DOCUMENTATION & KNOWLEDGE (Q501-560)
+================================================================================
+
+501. What documentation exists?
+Documentation includes high-level architecture reviews, development manuals, API references, caching strategy guides, deployment books, and release checklists.
+
+502. How is documentation organized?
+It resides in the `docs/` workspace folder, containing markdown files categorized by domain (setup, endpoints, caching, deploys, answers).
+
+503. What is the documentation structure?
+Files follow a logical structure: System prerequisite checklists, step-by-step installs, routing mappings, security rules, and code verification commands.
+
+504. How is documentation maintained?
+Documentation is updated alongside pull requests. When a feature changes, the developer updates the corresponding markdown files.
+
+505. Who maintains documentation?
+The development team, technical writers, and project contributors maintain documentation to keep it aligned with source code.
+
+506. How is documentation versioned?
+It is versioned directly in the Git repository, allowing developers to trace document revisions alongside code commits.
+
+507. What documentation standards exist?
+Standards require using clear headings, code block highlights, port configuration tables, and GitHub-style alert block callouts.
+
+508. How is documentation reviewed?
+Documentation changes are reviewed during pull request approvals, checking formatting, path links, and correctness of commands.
+
+509. What documentation tools are used?
+Tools include markdown editors, Git version controls, and standard build documentation generators.
+
+510. How is documentation discoverable?
+It is linked in the main repository README.md, providing developers with clear entry routes to all configuration books.
+
+511. What APIs exist?
+APIs include RESTful JSON endpoints (auth, projects, secrets, files, proxy tunnels) and GraphQL schemas for data queries.
+
+512. How are APIs documented?
+APIs are documented in `API.md` and through standard GraphQL schema mappings located in the data service module resources.
+
+513. What are API specifications?
+Specifications define HTTP methods, request headers (JWT, project ID), input JSON formats, response formats, and error structures.
+
+514. How are API changes communicated?
+Changes are documented in Git release notes, pull request details, and version changelogs.
+
+515. What API examples exist?
+Examples include curl commands, PowerShell `Invoke-RestMethod` snippets, and JS SDK integration blocks in markdown guides.
+
+516. How are API errors documented?
+Errors are documented with standard status codes (400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 500 Server Error).
+
+517. What API rate limiting exists?
+Rate limiting is configured at the gateway using custom WebFlux filters, enforcing client limits to prevent server overflows.
+
+518. How are API versions managed?
+Versions are managed using URL path prefixes (such as `/api/v1/projects` and `/api/dev/payments`).
+
+519. What API testing tools are available?
+Tools include GraphiQL Playgrounds, Postman request templates, curl clients, and Jest test files.
+
+520. How is API discoverability ensured?
+Discoverability is managed by listing exposed routes in the gateway configurations and documenting schemas in the API guides.
+
+521. What user guides exist?
+User guides cover setup, running the Svelte dashboard, connecting databases, uploading files, and making search calls.
+
+522. How are user guides structured?
+They are structured as step-by-step cookbooks, starting with logging in and proceeding to workspace configuration.
+
+523. What user tutorials exist?
+Tutorials include initializing staging environments, configuring keys, and calling the JavaScript SDK.
+
+524. How are tutorials organized?
+They are organized sequentially, guiding developers from basic setups to advanced multi-tenant deployments.
+
+525. What FAQs exist?
+FAQs cover resolving H2 database locks, fixing port conflicts, compiling Rust, and configuring JWT secrets.
+
+526. How are troubleshooting guides organized?
+They list common error messages and provide step-by-step commands to debug and resolve them.
+
+527. What getting started guides exist?
+The main repository README.md and `DEVELOPMENT.md` serve as getting started guides for new developers.
+
+528. How are best practices documented?
+Best practices (like using the `local` profile and secure key lengths) are highlighted in alert blocks.
+
+529. What video documentation exists?
+No official videos exist; documentation is primarily text-based markdown files in the repository.
+
+530. How is user documentation kept current?
+It is updated during feature changes, verified by reviewers before pull requests merge.
+
+531. What developer guides exist?
+Guides cover compiling Rust JNI, executing maven commands, running tests, and adding features.
+
+532. How are they organized?
+They are placed in the `docs/` directory under developer-facing names like `DEVELOPMENT.md`.
+
+533. What architecture documentation exists?
+The `ARCHITECTURE.md` file details system topology, component layouts, JNI bridge designs, and database filters.
+
+534. What design documentation exists?
+Design details are recorded in architectural reviews, listing database schemas, model designs, and FFI mappings.
+
+535. How are code examples provided?
+Examples are written as syntax-highlighted code blocks directly inside the markdown guides.
+
+536. What setup documentation exists?
+The development manual lists required runtimes (JDK 17, Rust, Node, Go) and step-by-step install commands.
+
+537. How is development workflow documented?
+It is documented in `DEVELOPMENT.md`, detailing build steps, database migrations, and testing strategies.
+
+538. What contribution guidelines exist?
+Guidelines are listed in `CONTRIBUTING.md`, describing code style, branch naming, and pull request procedures.
+
+539. How is extensibility documented?
+It is documented by showing patterns to add JPA entities, create migrations, and register routes.
+
+540. What is the developer onboarding experience?
+Onboarding requires cloning, installing runtimes, compiling the Rust FFI, running migrations, and launching services locally.
+
+541. What architecture decisions are documented?
+Decisions include choosing microservices over monoliths, using H2 locally, and utilizing JNI for Rust FFI.
+
+542. How are design decisions recorded?
+Decisions are recorded in markdown walkthroughs and git commit descriptions in the repository.
+
+543. What is the ADR (Architecture Decision Record) process?
+Architects propose changes in markdown design files, discuss trade-offs, and commit them as ADR records.
+
+544. How are trade-offs documented?
+Trade-offs (like JNI complexity vs. execution speed) are described in the design manuals.
+
+545. What diagrams exist?
+Diagrams include ASCII system topologies and database entity schemas in the guides.
+
+546. How are diagrams maintained?
+Diagrams are updated as text files in the repository, ensuring they stay current with architecture changes.
+
+547. What sequence diagrams exist?
+Sequence diagrams detail the JWT validation flow and the JNI boundary call sequences.
+
+548. What data flow diagrams exist?
+Data diagrams map incoming requests from the gateway through controllers and database repositories.
+
+549. What component diagrams exist?
+Component diagrams show dependencies between gateway, auth, data, network, and common modules.
+
+550. What deployment diagrams exist?
+Deployment diagrams map container structures, ingress routing, and service boundaries in Kubernetes.
+
+551. How is institutional knowledge captured?
+Knowledge is captured in commit histories, code reviews, and markdown guides.
+
+552. What wikis or knowledge bases exist?
+The `docs/` folder in the repository serves as the primary technical knowledge base.
+
+553. How are lessons learned captured?
+Lessons are recorded in post-incident reviews, walkthrough files, and release documentations.
+
+554. What runbooks exist?
+Runbooks cover database backup recovery, queue clearing, and scaling microservices.
+
+555. How are best practices shared?
+Practices are shared through code reviews, design syncs, and documentation reviews.
+
+556. What training materials exist?
+Materials consist of setup guides and onboarding scripts in the repository.
+
+557. How are onboarding processes documented?
+Processes are detailed in the repository setup section, guiding developers through initial installations.
+
+558. What mentorship exists?
+Mentorship occurs through peer review sessions and collaborative coding workflows.
+
+559. How are knowledge gaps identified?
+Gaps are identified when developers ask setup questions, resolved by updating the guides.
+
+560. How is knowledge retention managed?
+Retention is managed by keeping all technical designs and guides version-controlled in Git.

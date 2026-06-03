@@ -1,0 +1,214 @@
+================================================================================
+CLOUDPOOL TECHNICAL Q&A - CATEGORY 7: TESTING & QUALITY ASSURANCE (Q431-500)
+================================================================================
+
+431. What is the overall testing strategy?
+The overall testing strategy relies on the test pyramid: a broad base of Java unit tests, coupled with native Rust cargo tests for the FFI modules, a middle layer of Spring Boot integration tests verifying controller and database layers, and a top layer of client-side Jest tests for the Javascript SDK.
+
+432. What types of tests exist?
+Tests exist for Java unit execution (JUnit 5), Spring integration (MockMvc and TestEntityManager), Rust memory safety (Cargo test suites), and Javascript SDK functionality (Jest mocks and REST verification tests).
+
+433. What is the test pyramid?
+The test pyramid has unit tests at the base (covering utility classes and helper logic), database integration tests in the middle, and client SDK testing at the top, ensuring fast execution and high test coverage.
+
+434. What is test coverage?
+Test coverage measures the percentage of code lines executed during testing. The target is to cover 80% of business logic classes, repository queries, and JNI bridge mappings.
+
+435. How is coverage measured?
+Coverage is measured using JaCoCo (Java Code Coverage) Maven plugins, Cargo tarpaulin for Rust components, and Jest coverage reports for the SDK directories.
+
+436. What coverage targets exist?
+Targets require 80%+ line coverage on services, 90%+ on common utilities, and 100% on security filter classes (`TenantFilter`, `JwtAuthenticationFilter`) to prevent security regressions.
+
+437. How are coverage gaps identified?
+Gaps are identified by reviewing HTML coverage reports generated in build target folders and using automated checks in CI/CD pipeline steps.
+
+438. What testing tools are used?
+Tools include JUnit 5, Mockito, Spring Boot Test, H2 in-memory databases, Cargo test runner, Jest, and ESLint check rules.
+
+439. How are tests organized?
+Tests are placed in standard directories matching source layouts: `src/test/java/` in Spring submodules, `tests/` in the Rust directory, and `__tests__/` in the SDK folder.
+
+440. What testing best practices are followed?
+Best practices include isolating test databases, mocking external network endpoints, writing descriptive assertion statements, and cleaning up test-state databases after each run.
+
+441. What is unit tested?
+Unit tests cover utility classes (like `EncryptionUtil`), tenant context managers (`TenantContextHolder`), model mappings, and FFI math operations.
+
+442. What unit test coverage exists?
+Unit test coverage averages around 85% across core utility classes, ensuring logical functions operate as expected under extreme parameter limits.
+
+443. What is the unit test framework?
+The unit test framework is JUnit 5 (Jupiter) for Java submodules, Cargo's built-in test runner for Rust files, and Jest for client JavaScript files.
+
+444. How are unit tests written?
+Tests are written as clean methods annotated with `@Test`, following the Arrange-Act-Assert pattern to verify calculations, exceptions, and return objects.
+
+445. What are unit test naming conventions?
+Naming follows the pattern: `MethodName_ScenarioName_ExpectedResult` (e.g. `validateToken_ExpiredToken_ReturnsFalse`), ensuring clear logs if tests fail.
+
+446. How are unit test fixtures managed?
+Fixtures are initialized using JUnit's `@BeforeEach` and `@BeforeAll` setup methods, creating mock user objects and clean test data before execution.
+
+447. What unit test patterns are used?
+Patterns include using mock objects (via Mockito) to isolate services, parameterized tests to verify multiple inputs, and expected exception asserts.
+
+448. How are unit tests maintained?
+Tests are updated alongside feature changes. If a method signature changes, the corresponding unit tests are modified to keep builds green.
+
+449. What are unit test edge cases?
+Edge cases include sending null arguments, validating expired tokens, passing empty strings, and processing negative numbers through math FFI methods.
+
+450. How are unit test failures handled?
+Failures block Maven compilations. Developers inspect IDE error logs, fix code bugs or test assumptions, and rerun packages before pushing.
+
+451. What is integration tested?
+Integration tests verify REST endpoints, database schemas, Flyway migrations, Redis caches, and routing rules in the Gateway module.
+
+452. How are integration tests structured?
+They are annotated with `@SpringBootTest`, using `@AutoConfigureMockMvc` to test controller routing and transaction rollbacks on test databases.
+
+453. What integration test scenarios exist?
+Scenarios include user registration (routing to auth and database), adding project secrets, taking snapshots, and calling search APIs.
+
+454. What are integration test data needs?
+Tests require dynamic user credentials, active project IDs, valid JWT tokens, and temporary files to test upload processes.
+
+455. How are external systems mocked?
+External APIs (like Google Drive or Stripe) are mocked using custom Spring bean configurations and Mockito overrides during testing phases.
+
+456. What integration test tools are used?
+Tools include Spring MockMvc, TestEntityManager, embedded H2 databases, and WebTestClient for reactive Gateway routes testing.
+
+457. How are integration tests run?
+Integration tests are executed using the Maven command: `./mvnw test-compile failsafe:integration-test` or run in IDE modules.
+
+458. What integration test environments exist?
+Tests run inside containerized CI environments during build checks and locally using the default in-memory database configurations.
+
+459. How are integration test failures debugged?
+Failures are debugged by analyzing transaction logs, checking SQL execution traces, and viewing response JSON output in MockMvc results.
+
+460. What integration test maintenance looks like?
+Maintenance includes updating database schemas in mock data, aligning test payloads with API modifications, and resolving port conflicts in tests.
+
+461. What is system tested?
+System tests verify the complete request-response flow from the Svelte dashboard, through the API Gateway, to microservices and databases.
+
+462. What end-to-end scenarios are tested?
+E2E scenarios include complete developer workflows: logging in, creating projects, saving secrets, calling SDK APIs, and verifying data isolation.
+
+463. How are E2E tests structured?
+E2E tests use scripting to trigger UI elements on the Svelte dashboard and verify that backend database records update correctly.
+
+464. What E2E test tools are used?
+Tools include Puppeteer/Playwright for dashboard automation, Jest for SDK integrations, and curl scripts for API endpoints testing.
+
+465. How are E2E tests maintained?
+They are updated when UI layouts change or when core API paths are modified, ensuring that script selectors match active HTML elements.
+
+466. What are E2E test data needs?
+They need clean database states, registered test accounts, and active project credentials to run full verification workflows.
+
+467. How are E2E tests executed?
+They are run automatically in CI pipelines before deployment releases and manually by QA engineers in staging environments.
+
+468. What E2E test environments exist?
+A staging Kubernetes namespace acts as the primary environment, running container instances aligned with production database backups.
+
+469. How are E2E test failures debugged?
+Failures are debugged by checking gateway trace logs, viewing browser console errors, and inspecting database records.
+
+470. What E2E test flakiness exists?
+Flakiness can occur due to network timeouts when calling Google Drive API or slow startup times on test container instances.
+
+471. What performance tests exist?
+Performance tests measure JNI crossover overhead, search retrieval speeds, and API Gateway routing times under load.
+
+472. How are performance benchmarks set?
+Benchmarks require FFI operations to resolve in under 1ms and API Gateway routing to resolve under 5ms.
+
+473. What load testing occurs?
+Load testing simulates hundreds of concurrent client threads calling project APIs to check connection pool limits.
+
+474. What stress testing occurs?
+Stress testing increases requests until connection timeouts occur, identifying memory exhaustion limits.
+
+475. What performance degradation is acceptable?
+Degradation up to 10% is acceptable under peak traffic, provided error rates do not increase.
+
+476. What performance profiling tools are used?
+Tools include JProfiler, VisualVM, and Cargo Flamegraph for native Rust optimizations.
+
+477. How are performance regressions detected?
+Regressions are detected by comparing execution time graphs in Grafana across build runs.
+
+478. What performance test scenarios exist?
+Scenarios include bulk file checksum calculations, concurrent JWT validations, and parallel database writes.
+
+479. How are performance tests maintained?
+They are updated when JNI structures change or when database schemas are optimized.
+
+480. What performance test data needs?
+Tests require large files (for checksum checks) and concurrent threads sending query payloads.
+
+481. What security tests exist?
+Security tests audit JWT parsing libraries, verify tenant scoping, and run vulnerability scans.
+
+482. How is vulnerability scanning done?
+Scanning runs on commits via CodeQL (scanning for injections and XSS) and Dependabot (scanning package dependencies).
+
+483. What penetration testing occurs?
+Penetration tests attempt to access projects with invalid keys or execute SQL injections on input fields.
+
+484. What code analysis tools are used?
+Tools include CodeQL, OWASP Dependency Check, and checkstyle rules.
+
+485. What security test automation exists?
+Automation runs CodeQL and dependency checks on every pull request within GitHub Actions pipelines.
+
+486. How are security issues prioritized?
+Issues are prioritized by severity: High/Critical issues (like regex injection) block deployments until patched.
+
+487. How are security issues fixed?
+Fixes are written in separate branches, compiled, tested, and deployed to production.
+
+488. How are security test results reported?
+Results are posted on the GitHub Security tab, listing active alerts, descriptions, and file paths.
+
+489. What security test tools are used?
+Tools include CodeQL scanning engines, OWASP dependencies analyzers, and custom API validation scripts.
+
+490. How is security testing integrated into CI/CD?
+Security scanners run as build steps in `.github/workflows/build.yml`, failing builds if vulnerabilities are detected.
+
+491. What quality metrics are tracked?
+Metrics include code line counts, test coverage ratios, linting errors, checkstyle warnings, and security alert counts.
+
+492. What code quality standards exist?
+Standards require clean class layouts, descriptive variable naming, no raw innerHTML usage, and transaction isolation.
+
+493. How is code quality measured?
+Quality is measured by compiler checks, linting report summaries, and pull request reviews.
+
+494. What are code quality thresholds?
+Thresholds require 80%+ test coverage, 0 ESLint errors, and 0 security alerts before merge.
+
+495. How is design quality assessed?
+Design is assessed during architectural reviews, checking module separation, coupling, and cohesion.
+
+496. How is documentation quality assessed?
+Quality is assessed by verifying markdown links, file paths, and setup instructions.
+
+497. What quality reviews occur?
+Reviews include peer reviews on pull requests and system design discussions before major changes.
+
+498. How are quality improvements tracked?
+Improvements are added to task backlogs and tracked in markdown plans.
+
+499. What quality dashboards exist?
+Dashboards include GitHub Actions statuses, JaCoCo coverage sheets, and SonarQube dashboards.
+
+500. How is quality culture maintained?
+Culture is maintained by automated linting, pre-commit checks, and code review processes.
+================================================================================

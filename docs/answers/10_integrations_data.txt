@@ -1,0 +1,243 @@
+================================================================================
+CLOUDPOOL TECHNICAL Q&A - CATEGORY 10: EXTERNAL INTERFACES & DATA (Q641-720)
+================================================================================
+
+641. What APIs are exposed?
+Exposed APIs include: REST controllers (managing authentication, projects, secrets, tunnels, payment gateways) and GraphQL schemas (supporting document queries).
+
+642. What is the API design philosophy?
+The philosophy is to offer clean REST resources for configurations, and GraphQL schemas for flexible data fetching.
+
+643. What protocols are used?
+Protocols are HTTP/1.1 and HTTP/2 for API requests, WebSockets (WS/WSS) for client tunnels, and AMQP for events.
+
+644. What data formats are used?
+Formats are primarily JSON for payloads, binary streams for files, and serialized byte buffers for FFI JNI boundaries.
+
+645. How are versions managed?
+Versions are managed using URL path segments, keeping stable routes separated from dev API routes.
+
+646. What authentication is required?
+Requests require JWT Bearer headers for user operations and custom ApiKey headers for SDK calls.
+
+647. What rate limiting exists?
+Rate limiting is configured at the Gateway using custom WebFlux filters, blocking IPs if thresholds are exceeded.
+
+648. What API guarantees exist?
+APIs guarantee consistent JSON error structures and validation of request inputs before database persistence.
+
+649. What error handling exists?
+Exceptions are caught, logged internally, and converted into standard HTTP status codes and JSON error payloads.
+
+650. How are breaking changes handled?
+Breaking changes increment minor versions and are documented in release notes with migration guides.
+
+651. What external systems integrate?
+Integrations include PostgreSQL database servers, Redis caches, RabbitMQ queues, Weaviate engines, and Google APIs.
+
+652. How are integrations implemented?
+Integrations use official client SDK libraries configured with environment connection strings.
+
+653. What is the integration architecture?
+Architecture isolates integrations behind service interfaces, allowing easy mocking during testing phases.
+
+654. What data flows between systems?
+Data includes user configurations, database connection details, uploaded files, and vector embedding requests.
+
+655. How are integration failures handled?
+Failures trigger log warnings, execute retry logic using backoffs, and return fallback states if systems are down.
+
+656. What integration testing occurs?
+Testing runs integration checks against mock servers and local containers in build pipelines.
+
+657. What integration monitoring occurs?
+Monitoring uses Prometheus counters mapping outbound HTTP latencies and queue levels.
+
+658. How are integration issues resolved?
+Issues are resolved by updating connection parameters, adjusting timeouts, or scaling server resources.
+
+659. What integration documentation exists?
+Guides list parameters, credential keys, port bindings, and API endpoints for all external integrations.
+
+660. How are integrations kept in sync?
+Sync is maintained by locking dependency versions and executing automated regression tests on builds.
+
+661. What webhooks exist?
+Webhooks include simulated Stripe and Razorpay checkout event listeners in the payment gateway controllers.
+
+662. How are webhooks triggered?
+They are triggered by external payment processors sending POST requests to registered endpoint URLs.
+
+663. What events are published?
+Events include user registrations, file uploads, embedding generation tasks, and payment checkouts.
+
+664. How is event delivery guaranteed?
+Delivery is guaranteed by RabbitMQ's persistent queue configurations and manual acknowledgement rules.
+
+665. How are retry policies defined?
+Retry policies enforce a 3-try maximum count using exponential backoff intervals between attempts.
+
+666. How are dead letters handled?
+Failed messages are routed to Dead Letter Exchanges (DLX) for operator inspection and log tracing.
+
+667. How is event ordering ensured?
+Event ordering is managed by routing related project tasks through unified queue partitions.
+
+668. What event filtering exists?
+Filtering uses routing keys in RabbitMQ exchanges, directing messages to specific microservice consumers.
+
+669. How are event consumers documented?
+Consumers are documented in service files and AMQP configuration classes in the source directories.
+
+670. What event monitoring exists?
+Monitoring tracks queue lengths, message rates, and processing errors on the RabbitMQ console.
+
+671. What data is stored?
+Stored data includes user profiles, project details, API keys, secrets, database settings, and audit logs.
+
+672. How is data organized?
+Data is organized in relational tables using indexes, foreign keys, and unique constraints.
+
+673. What is the data model?
+The model uses a multi-tenant layout where all tables partition records by project ID keys.
+
+674. How is data classified?
+Data is classified into public assets, user credentials, and encrypted project secrets.
+
+675. What is the data lifecycle?
+Lifecycle spans from creation, update, backup, snapshot replication, to archival and cascade deletion.
+
+676. How is data retention managed?
+Retention is configured via database table scripts, cache TTL values, and log file size limits.
+
+677. How is data deletion handled?
+Deletion executes database cascade rules, purging all associated child records when projects are deleted.
+
+678. What data validation occurs?
+Validation executes regular expressions, non-null constraints, and model parameter checks before database saves.
+
+679. How is data consistency ensured?
+Consistency is ensured by database constraints, transaction controls, and H2 database server settings.
+
+680. What data backup exists?
+Backups include database SQL dumps, local file backups, and volume snapshots of Weaviate.
+
+681. What PII is handled?
+PII is limited to user registration details: email addresses, display names, and hashed passwords.
+
+682. How is PII protected?
+PII is protected using SHA-256 hashing for passwords, SSL/TLS transport encryption, and restricted API access.
+
+683. What is the privacy policy?
+The policy mandates using registration data only for auth, keeping project databases isolated.
+
+684. What is the data retention policy?
+Credentials are saved indefinitely unless deleted. Audit logs are purged after 30 days.
+
+685. How is data consent managed?
+Consent is managed during user registration on the dashboard, requiring agreement to database scopes.
+
+686. What data access controls exist?
+Access is controlled using user roles, project API keys, and JWT authentication tokens.
+
+687. How is data encryption handled?
+Passwords are encrypted using Spring Security crypt; connection parameters are encrypted in database tables.
+
+688. What auditing of data access occurs?
+The audit service logs administrative configurations modifications, user logins, and secret deletions.
+
+689. How are data breaches handled?
+Breaches trigger account locks, key regenerations, log audits, and system security assessments.
+
+690. What privacy frameworks apply?
+The system aligns with standard data protection principles (GDPR/CCPA frameworks) for user data safety.
+
+691. How is data quality ensured?
+Quality is ensured by database model validation rules, constraints, and integration tests.
+
+692. What data quality metrics exist?
+Metrics include invalid record counts, connection failures, validation errors, and database sizes.
+
+693. What data cleansing processes exist?
+Cleansing runs during updates, validating inputs and removing invalid characters before saving.
+
+694. What data validation rules exist?
+Rules require valid emails, non-empty usernames, 64-byte JWT secrets, and valid URLs.
+
+695. How are data anomalies detected?
+Anomalies are detected by application log checks, validation exceptions, and database query monitors.
+
+696. How are data issues resolved?
+Issues are resolved by manual database updates, rolling back settings snapshots, or running scripts.
+
+697. What data quality monitoring exists?
+Monitoring checks database size, connection pool limits, and log files for query errors.
+
+698. What data reconciliation occurs?
+Reconciliation compares active database records with configuration states during system checks.
+
+699. How is data quality improved?
+Quality is improved by adding validation filters, query optimization, and test scenarios.
+
+700. What data quality governance exists?
+Governance is managed by database migrations (Flyway) and schema review requirements on pull requests.
+
+701. Who are the key people?
+Key people include the project maintainer (Mr-Charvaka), backend architects, and community contributors.
+
+702. What are team roles?
+Roles are core backend developer (Java/Rust), frontend developer (Svelte), and DevOps operator.
+
+703. What is the team structure?
+The team is structured as an open-source project, with maintainers reviewing contributions.
+
+704. How many people are on the team?
+The project is maintained by a core contributor, supported by open-source community developers.
+
+705. What teams are involved?
+Teams involved are the core software development team and infrastructure operations group.
+
+706. How do teams interact?
+Interaction occurs via GitHub code reviews, issues discussions, and pull request feedback.
+
+707. What is the organizational structure?
+The organization is flat, centered around open-source repository contributions on GitHub.
+
+708. Who are decision makers?
+The repository owner and core maintainers serve as the primary decision makers.
+
+709. Who are subject matter experts?
+SMEs include the lead Java developer, the Rust FFI systems developer, and the database administrator.
+
+710. What is the team's experience?
+The team possesses deep experience in Spring framework architectures, Rust systems programming, and database design.
+
+711. What skills are required?
+Required skills are Java (Spring Boot), Rust (FFI/JNI), JavaScript/Svelte, Docker, and SQL databases.
+
+712. What skills are rare?
+Rare skills include bridging JVM memory spaces with Rust FFI using JNI mappings safely.
+
+713. How are skills developed?
+Skills are developed by writing code, analyzing logs, refactoring submodules, and reviewing PRs.
+
+714. What training is provided?
+Training is provided through technical documentation, setup manuals, and code blueprints in repositories.
+
+715. How is knowledge transferred?
+Knowledge is transferred via documented development manuals, architecture diagrams, and walkthrough files.
+
+716. What mentoring exists?
+Mentorship is collaborative, reviewing coding styles and logic on pull request drafts.
+
+717. How are skills documented?
+Skills are reflected in repository contribution guidelines and developer manuals in codebases.
+
+718. What is the learning culture?
+The culture encourages exploring efficient execution designs, Rust optimizations, and secure WebFlux architectures.
+
+719. How are skill gaps addressed?
+Gaps are addressed by writing documentation guides, setting up code samples, and tutoring contributors.
+
+720. What certifications are relevant?
+Relevant certifications include Java developer certificates, Kubernetes administrator (CKA), and secure coding standards.

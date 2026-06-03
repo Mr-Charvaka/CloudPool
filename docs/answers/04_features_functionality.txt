@@ -1,0 +1,183 @@
+================================================================================
+CLOUDPOOL TECHNICAL Q&A - CATEGORY 4: FEATURES & FUNCTIONALITY (Q221-280)
+================================================================================
+
+221. What is a complete list of features?
+The complete feature inventory comprises: JWT registration/login, multi-tenant Project isolation, encrypted Project Secrets storage, database state Snapshots, multi-engine Database Connection configuring (PostgreSQL, Redis, H2), Google Drive file pooling, OpenAI semantic Vector search, Stripe/Razorpay checkout, Cron Job scheduling, Web Application Firewall (WAF) blocking, real-time WebSocket Pub/Sub event broadcasting, a custom CLI, and a JavaScript SDK.
+
+222. How are features prioritized?
+Features are prioritized by core utility. Phase 1 focuses on authentication, database scoping, and JNI bridges. Phase 2 prioritizes developer features (secrets, snapshots, storage, vector search, CLI/SDK). Phase 3 targets operations (cron jobs, WAF security, distributed tracing, telemetry).
+
+223. What features are most used?
+The most used features are JWT authentication, Project Secret variables configurations, relational Database Connection configurations (testing and saving connection credentials), and file upload/retrieval via the Google Drive pooling wrapper.
+
+224. What features are rarely used?
+Rarely used features include the WAF blocking rules configuration, and the dynamic database topology rollback snapshots, which are primarily reserved for debugging or disaster recovery phases.
+
+225. What features are planned?
+Planned features include multi-runtime edge function compile containers (supporting Python and Go execution runtimes in the compute module) and automated SSL certificate renewals for network tunnel paths.
+
+226. What features are deprecated?
+The old monolithic REST endpoints and direct database access routes are deprecated, replaced entirely by Gateway routing rules directing requests to the proper microservice modules.
+
+227. What features are experimental?
+Experimental features include the JNI JniTest and RustBridge bindings for compiling raw C files dynamically inside JVM threads, and the automatic Web Application Firewall (WAF) rule generation tool.
+
+228. How are features versioned?
+Features are versioned as part of the overall microservice release cycle. There is no independent feature flag versioning, except through API routes (e.g. `/api/v1/projects` vs `/api/dev/payments`).
+
+229. How are features toggled?
+Features are toggled using Spring profiles (`local` vs. default) and application configuration properties (e.g. enabling or disabling caching or RabbitMQ dependencies).
+
+230. How are features documented individually?
+Individual features are documented in markdown files under `docs/` (such as `API.md` and `CachingStrategy.md`), describing endpoints, payloads, and execution configurations.
+
+231. What does the Projects feature do?
+The Projects feature isolates all configurations, secrets, keys, and connections. A project represents a tenant scope. Every security check verifies that the request context aligns with the project's ID boundary.
+
+232. Why does the Projects feature exist?
+It exists to support multi-tenancy. Rather than running separate servers for each client application, a developer can run one CloudPool instance and partition client environments using projects.
+
+233. Who uses the Projects feature?
+Developers use it to partition staging, development, and production settings, or separate configurations for multiple applications they are building on top of CloudPool.
+
+234. How is the Projects feature used?
+It is used by calling POST `/api/v1/projects` to create a workspace, selecting the active project in the dashboard dropdown, and passing the project ID header in API calls.
+
+235. What are the Projects feature inputs?
+Inputs are a unique project name, a description, and the user's authentication context (extracted from the JWT Bearer header).
+
+236. What are the Projects feature outputs?
+Outputs include a unique project UUID, name, description, owner ID, created timestamp, and associated default database settings.
+
+237. What are the Projects feature side effects?
+Creating a project creates a default H2 database connection configuration and initializes default empty directories for file storage allocations.
+
+238. What are the Projects feature edge cases?
+Edge cases include deleting a project with active database connections or active file pools, handled by cascade-deleting child configurations to prevent orphaned records.
+
+239. How is the Projects feature configured?
+It is configured by passing JSON variables through the dashboard or CLI commands, persisted to the relational database `projects` table.
+
+240. How does the Projects feature fail?
+It fails if the project name is duplicate for a user, if the authentication token is missing or expired, or if database write locks occur.
+
+241. What are the main user journeys?
+The main journey starts at registration/login, proceeds to creating a project, configuring database connections, adding secrets, checking file uploads, and calling search APIs.
+
+242. How do different user personas interact?
+Developers use CLI and SDK tools to make api calls, while administrators use the Svelte dashboard to configure settings, verify connections, and monitor logs.
+
+243. What are common task sequences?
+A common sequence: (1) Register account, (2) Create project "App-Staging", (3) Configure database host, (4) Add project API key, (5) Initialize JS SDK with key.
+
+244. What are uncommon but important tasks?
+Uncommon tasks include taking a database settings snapshot before a migration, restoring a past snapshot, and creating WAF block rules for target paths.
+
+245. How do users accomplish their goals?
+Users invoke endpoints via CLI, SDK libraries, or the GUI dashboard, which route requests through the gateway to be processed by microservices.
+
+246. What are user pain points?
+Pain points include manually compiling Rust FFI libraries for specific host architectures, and resolving database locking if H2 paths are configured incorrectly.
+
+247. What are workflow bottlenecks?
+Bottlenecks include generating vector embeddings via OpenAI (dependent on external API speed) and processing large file compression workloads.
+
+248. How do workflows differ by user type?
+System developers write tests and compile binaries; application developers configure tables and call APIs; administrators monitor metrics and logs.
+
+249. What are workflow dependencies?
+Workflows depend on Gateway availability, JWT authentication tokens, relational database connection health, and FFI library paths.
+
+250. How are workflows documented?
+Workflows are documented in the local development manuals, API reference files, and code migration walkthroughs under the `docs/` folder.
+
+251. What features depend on other features?
+Secrets, database connections, cron jobs, and snapshots depend on the active Project feature. The SDK and CLI depend on the Auth service's API keys.
+
+252. What features are independent?
+User registration and basic gateway routing configurations are independent and operate without active project context selections.
+
+253. What are feature interaction patterns?
+Interaction patterns include using API keys to authorize file uploads, which trigger Rust FFI checksum calculations, enqueuing audit records to RabbitMQ.
+
+254. What features conflict?
+Simultaneous snapshot restores and database connection updates can conflict, prevented by application thread locks and transactional wrappers.
+
+255. What features enhance each other?
+Vector search enhances database queries by adding semantic similarity, and cron jobs enhance system operations by automating background tasks.
+
+256. What is the feature activation order?
+Activation order: (1) Auth module start, (2) Database migration, (3) Gateway routing active, (4) Project creation, (5) Downstream feature access.
+
+257. How are feature combinations handled?
+Combinations (like running WAF filters over WebSocket tunnels) are handled by pipeline configuration chains in Spring Security and WebFlux.
+
+258. What are common feature combinations?
+Common combinations include using Project Secrets to store Google Drive API keys, allowing the File service to authenticate and upload data.
+
+259. What feature combinations are unsupported?
+Running Weaviate vector indexing directly on H2 databases without using the OpenAI embedding generator service is unsupported.
+
+260. How are feature dependencies managed?
+Dependencies are managed by configuration classes (e.g. `@Configuration`) verifying properties and bean initialization states at startup.
+
+261. What configuration options exist?
+Options include server port configurations, database URLs, JWT secrets, Redis cache configurations, RabbitMQ host ports, and Google API keys.
+
+262. What are configuration defaults?
+Defaults include gateway port `8080`, H2 database URL `jdbc:h2:file:../data/cloudpooldb`, token expiration `3600000ms`, and local cache enabled.
+
+263. How is configuration validated?
+Validation uses Spring `@Value` checks, `@ConfigurationProperties` validation, and manual checks on boot (e.g. verifying JWT key length is >= 64 bytes).
+
+264. How is configuration documented?
+Configurations are documented in `DEVELOPMENT.md`, which lists environment variables, default ports, and local profile exclusions.
+
+265. What are common configuration patterns?
+Patterns include using `application.yml` for base configurations, and override values inside `application-local.yml` for local execution profiles.
+
+266. What configuration mistakes are common?
+Common mistakes include configuring isolated database paths (e.g. `./data/cloudpooldb`), and running with missing JWT keys.
+
+267. How is configuration versioned?
+Version configuration is tracked in Git. Runtime configuration variables can be versioned by taking project snapshots.
+
+268. How are configuration changes handled?
+Changes require updating files and restarting services, or saving connection configurations in the database to be loaded dynamically.
+
+269. What configuration templates exist?
+Templates include the `.env.example` file in the root directory, which lists required variables for Docker Compose setups.
+
+270. How is configuration tested?
+Testing verifies that invalid keys block startup, and database connection tests confirm parameters are valid before saving.
+
+271. What user interfaces exist (web, mobile, CLI, API)?
+Interfaces are the web dashboard (SvelteKit), the custom CLI tool, the JavaScript SDK libraries, and the raw GraphQL/REST APIs.
+
+272. What is the design system?
+The design system uses vanilla CSS with a dark mode aesthetic, Outfit/Inter typography, clean glassmorphic panels, and borders.
+
+273. What are interaction patterns?
+Interaction patterns include navigation sidebars, modal configurations, log timelines, dropdown selectors, and button actions.
+
+274. What accessibility features exist?
+Accessibility is supported by semantic HTML, high contrast text scales, keyboard navigation support, and form labels.
+
+275. How is usability optimized?
+Usability is optimized by storing the active project ID in localStorage, pre-filling forms, and providing visual log lines.
+
+276. What are common user errors?
+Common errors include sending expired JWT tokens, attempting to upload files without keys, and using weak database passwords.
+
+277. How are errors communicated?
+Errors are communicated through alert popups on the dashboard, error streams in the CLI, and JSON payloads in API responses.
+
+278. What is the visual hierarchy?
+The hierarchy places key actions (dropdown selectors, nav tabs) at the top/left, main configurations in central cards, and logs at the bottom.
+
+279. What keyboard shortcuts exist?
+Standard browser shortcuts are supported. The CLI provides standard help flags (`--help`, `-h`) for quick command checks.
+
+280. How is help provided?
+Help is provided by descriptive placeholder texts in inputs, command tooltips, and guides in the documentation files.

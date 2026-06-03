@@ -1,0 +1,243 @@
+================================================================================
+CLOUDPOOL TECHNICAL Q&A - CATEGORY 3: TECHNICAL STACK & DEPENDENCIES (Q141-220)
+================================================================================
+
+141. What programming languages are used?
+The programming languages used across CloudPool are Java (primarily version 17) for the microservices backend, Rust (version 1.70+) for the native FFI math/crypto operations and CLI utilities, JavaScript and TypeScript for the dashboard UI (SvelteKit) and client-side SDKs, and Go for the DRAP dashboard proxy services.
+
+142. Why were these languages chosen?
+Java was chosen for its mature microservice ecosystem, robust JPA data layers, and configuration injection. Rust was selected for its bare-metal performance, memory safety, and cross-compilation capability to compile DLL/SO files for JNI. JavaScript/TypeScript was chosen for frontend speed, and Go for high-concurrency proxy services.
+
+143. What language versions are supported?
+The supported versions are Java 17 (or newer LTS releases), Rust 1.70+ (which stable compiles the Cargo project), Node.js 18+ (for compiling the Svelte frontend), and Go 1.20+ for building the DRAP dashboard APIs.
+
+144. Are there language-specific conventions?
+Java uses standard camelCase naming and Spring Boot patterns. Rust utilizes standard snake_case naming and clean unsafe mappings for FFI. JavaScript/TypeScript enforces linting rules via Prettier/ESLint, and Go utilizes standard formatting via `go fmt` and standard routing models.
+
+145. What are language compatibility concerns?
+The primary compatibility concern is the Java Native Interface (JNI) bridge. Compiling the Rust shared library requires generating platform-specific files (`.dll` on Windows, `.so` on Linux, `.dylib` on macOS), which must match the architecture (x64 or ARM64) of the running JVM.
+
+146. How are multiple languages integrated?
+Integration occurs via FFI and network protocols. The JVM loads the Rust library dynamically using `System.loadLibrary()`, mapping native methods declared in Java classes to Rust functions. Microservices communicate with the Go and JavaScript layers over standard HTTP REST, WebSockets, or TCP/UDP tunnels.
+
+147. What is the language learning curve?
+The learning curve is moderate to high. Developers must be comfortable with Spring Boot architectures, Rust's memory ownership and FFI mapping conventions, reactive JavaScript loops (SvelteKit), and containerized deployments using Docker and Kubernetes.
+
+148. What language communities are involved?
+The project leverages the large OpenJDK/Spring community, the Cargo/Rust crates ecosystem, the Node/npm JavaScript package registry, and the Go modules community, allowing developers to pull stable, well-maintained libraries.
+
+149. What language ecosystem is leveraged?
+The Java ecosystem (Maven, Spring Boot, Flyway, Hibernate), the Rust ecosystem (Cargo, JNI, Ring for cryptography), the JavaScript ecosystem (npm, Vite, SvelteKit), and the Go ecosystem (Gin/Fiber for API serving) are heavily leveraged.
+
+150. What language deprecations are planned?
+There are no active language deprecations planned. The core backend has been standardized on Java 17 and Rust 1.70+, ensuring long-term support and preventing the need to rewrite APIs for old runtime environments.
+
+151. What major frameworks are used?
+Major frameworks include Spring Boot (MVC, Security, Data JPA), Spring Cloud Gateway, SvelteKit, Flyway (database migrations), and Cargo/Rust modules for FFI and the native compiler utilities.
+
+152. What major libraries are used?
+Key libraries include Lombok, Hibernate, Jackson, io.jsonwebtoken (JWT parsing), WebFlux reactive libs, Weaviate Java client, RabbitTemplate (RabbitMQ connections), Jedis/Lettuce (Redis connections), and standard Rust FFI bindings.
+
+153. Why was each chosen?
+Spring Boot provides reliable transaction management and database abstracts. SvelteKit offers fast, simple single-page dashboard compilation. Flyway automates schema upgrades. Lombok eliminates boilerplates. Rust crates (Ring, Gzip) provide high-speed execution for performance-critical calculations.
+
+154. What are framework versions?
+Framework versions are locked in the POM files (such as Spring Boot 3.x dependencies and Spring Cloud 2022.x/2023.x release trains) and `package.json` configurations (Vite 4/5, SvelteKit 1/2), maintaining API compatibility.
+
+155. How are versions managed?
+Versions are managed using Maven's `<dependencyManagement>` section in the parent POM, Go modules (`go.mod`), and Node's `package.json` lockfiles (`package-lock.json`), ensuring consistent build environments.
+
+156. What are upgrade paths?
+Upgrade paths require updating dependency version tags in POM and package files, compiling the submodules, running testing suites locally, and resolving any deprecated method warnings before committing change sets.
+
+157. What are breaking changes in frameworks/libraries?
+Upgrading Spring Boot (e.g. 2.x to 3.x) introduced package name changes (from `javax.servlet` to `jakarta.servlet`) which required refactoring filters like `TenantFilter` and update declarations in `pom.xml`.
+
+158. How are framework updates handled?
+Updates are evaluated in isolated local branches. Developers update versions, execute `mvn clean compile`, run the unit and integration tests, verify dashboard connectivity, and push changes to GitHub once tests pass.
+
+159. What are framework limitations?
+Spring WebFlux and Gateway restrict using blocking JDBC operations directly on gateway threads, requiring the system to offload database calls to separate worker pools or run them inside downstream services.
+
+160. What are framework dependencies?
+Framework dependencies include the JDK runtime, the Node environment, Go runtimes, system-level C compilers for Cargo, and database/queue infrastructure running on the system or inside Docker containers.
+
+161. What databases are used?
+Databases are H2 (local file-based mixed mode), PostgreSQL (production relational storage), Weaviate (vector search indexing), and Redis (low-latency key-value caching and session store).
+
+162. Why were databases chosen?
+H2 was chosen for zero-dependency local development. PostgreSQL was selected for enterprise relational integrity. Redis was chosen for micro-second caching speeds, and Weaviate for advanced machine-learning embedding capabilities.
+
+163. What is the database version?
+Locally, H2 runs the embedded version matching Spring Boot's dependency tree. PostgreSQL versions are locked to v15+ in docker-compose files, and Weaviate is pinned to v1.x container releases.
+
+164. What is the database schema?
+The schema separates tenant identities from workspace settings. Tables include `users` (credentials), `projects` (tenants), `api_keys` (authorization tokens), `project_secrets` (encrypted parameters), and `audit_logs` (security events).
+
+165. How is data partitioned?
+Data is partitioned logically by project ID. All queries from tenant-aware microservices contain filter conditions scoped to the active project context to prevent cross-tenant data leaks.
+
+166. How is data replicated?
+In production deployments, replication is managed by the PostgreSQL database configuration (read replicas) and Redis sentinel clusters, ensuring data redundancy and high availability.
+
+167. What backup strategies exist?
+Backup strategies include scheduled SQL dumps (`pg_dump`) for relational PostgreSQL tables, file backups of local H2 databases, and volume snapshots of Weaviate vector index folders.
+
+168. What recovery strategies exist?
+Recovery strategies include restoring database states from latest backups, executing Flyway migration sets, and rebuilding vector indices by re-processing audit log document queues through RabbitMQ.
+
+169. How is database performance optimized?
+Performance is optimized using indexing on query fields (project ID, user email, API keys), utilizing connection pools (HikariCP), caching hot query records in Redis, and offloading search tasks to Weaviate.
+
+170. What database migration strategies exist?
+Schema migrations are handled by Flyway. Migrations are written as raw SQL scripts in resources (`db/migration/`) and executed automatically at application startup by Auth and Data services.
+
+171. What infrastructure is used (cloud, on-prem, hybrid)?
+The infrastructure supports cloud deployments (Kubernetes, AWS, GCP), on-prem bare-metal installations, or local developer workstation setups using Docker Compose.
+
+172. What cloud provider(s)?
+The deployment templates are provider-agnostic, supporting standard Kubernetes runtimes on Google Kubernetes Engine (GKE), Amazon EKS, Azure AKS, or self-hosted K8s clusters.
+
+173. How is infrastructure organized?
+Infrastructure is organized container-first. Subservices run in isolated Docker containers, managed locally by `docker-compose.yml` and in production by Kubernetes deployment and service manifests.
+
+174. What containerization is used?
+Docker is used for containerization. Dockerfiles use multi-stage compilation steps to keep runtime environments lightweight, copying only target compiled binaries and JAR files into base alpine containers.
+
+175. What orchestration is used?
+Kubernetes is used for orchestration in production. Manifests define replicas, ingress routing rules, Prometheus metrics endpoints, secrets storage, and database persistence volumes.
+
+176. How is deployment automated?
+Deployment is automated via GitHub Actions pipelines. Changes merged to the main branch trigger container image compilation, package uploads to registry, and rolling container updates on the target cluster.
+
+177. What CI/CD pipelines exist?
+Two pipelines exist: (1) `build.yml` (runs tests, compiles Rust/Java, audits dependencies on PRs) and (2) `deploy.yml` (updates container tags, restarts pods, runs actuator health verification on merge).
+
+178. How are environments managed (dev, staging, prod)?
+Environments are managed using Spring Boot profiles (`local` vs. default) and Kubernetes namespace boundaries (`cloudpool-dev`, `cloudpool-prod`) configured with distinct environment secret files.
+
+179. What monitoring is in place?
+Monitoring uses Prometheus to scrape metrics from Spring Boot Actuator endpoints (`/actuator/prometheus`) and Nginx logs, sending data to Grafana dashboards for visualization.
+
+180. What logging is in place?
+Logging uses Slf4j/Logback inside Spring Boot. Logs are written to stdout/stderr in JSON format, collected by container agents, and forwarded to centralized log storage (Elasticsearch/Loki).
+
+181. What security tools/libraries are used?
+Security tools include Spring Security, JWT (jjwt), Ring (Rust cryptographic library), OWASP dependency check plugins, CodeQL vulnerability scanners, and SSL/TLS encryption for network tunnels.
+
+182. What authentication mechanisms?
+Authentication uses stateless JWT tokens for dashboard logins and custom header API keys (`X-CloudPool-ApiKey`) for programmatic API accesses from the SDK and CLI tools.
+
+183. What authorization mechanisms?
+Authorization uses role-based access control (RBAC) and project-tenant boundary scoping. Requests must present tokens or keys that map to the requested resource's project ID.
+
+184. What encryption is used?
+Encryption includes HTTPS/TLS for all external routes, SHA-256 for password hashing, AES for encrypting stored database secrets, and WS/WSS protocols for WebSocket connections.
+
+185. What key management exists?
+JWT signing keys are configured through environment variables. Encryption keys for database secrets utilize standard Spring Boot symmetric encryptors configured in resource files.
+
+186. What secrets management exists?
+In local setups, secrets are managed via `application-local.yml` (excluded from Git). In Kubernetes, secrets are injected into containers from secure Kubernetes Secret resource variables.
+
+187. What vulnerability scanning exists?
+Vulnerability scanning is integrated into the GitHub repository using CodeQL analysis (scanning Java/JS/Rust on pushes) and Dependabot alerts (scanning package versions).
+
+188. What security testing exists?
+Security testing includes checking key lengths at startup, verifying route block rules on unauthenticated gateways, and auditing dependency graphs for known vulnerabilities.
+
+189. What compliance tools are used?
+Compliance is monitored using automated static analysis scanners (CodeQL) and build checks that reject compilations if dangerous dependencies or insecure code patterns are introduced.
+
+190. What audit logging exists?
+The Data and Auth modules write audit events (user registration, connection settings changes, secret deletion) to the `audit_logs` table, recording timestamps, actions, and project scopes.
+
+191. What IDEs/editors are recommended?
+Recommended IDEs are IntelliJ IDEA (with Lombok plugin enabled) for Java and Rust development, VS Code for Javascript/Svelte UI development, and GoLand for proxy service adjustments.
+
+192. What build tools are used?
+Build tools include Apache Maven (using `./mvnw` wrapper) for the Spring Boot backend, Cargo/rustc for Rust compilation, and npm/Vite for frontend dashboard compilation.
+
+193. What package managers are used?
+Package managers are Maven (for Java jar dependency libraries), Cargo (for Rust crates), and npm (for Node modules in the dashboard UI and JS SDK).
+
+194. What testing frameworks are used?
+Testing frameworks include JUnit 5 and Mockito for Java unit tests, Spring Boot Test for integration tests, Jest for JS SDK tests, and Cargo test for Rust FFI utilities.
+
+195. What linting/formatting tools are used?
+Linting uses Spotless or Checkstyle for Java, ESLint and Prettier for Svelte and JavaScript, `cargo fmt` for Rust files, and `go fmt` for Go files.
+
+196. What documentation tools are used?
+Documentation is written in Markdown format, placed in the `docs/` workspace folder, and managed using standard IDE renderers or converted to static HTML sites.
+
+197. What version control system is used?
+Git is used for version control. The repository is hosted on GitHub, utilizing branch protection rules and automated pull request workflows to control code quality.
+
+198. What issue tracking is used?
+Issue tracking is managed through GitHub Issues, allowing developers to create tickets, associate commits with bug fixes, and tag milestones.
+
+199. What collaboration tools are used?
+Collaboration tools include Slack/Teams for discussion, GitHub pull request comments for code reviews, and Shared markdown architecture plans for design updates.
+
+200. What profiling/debugging tools are recommended?
+Recommended tools are VisualVM or JProfiler for JVM debugging, Cargo Flamegraph for Rust performance profiling, and browser DevTools for inspecting WebSocket traffic.
+
+201. What third-party services are used?
+Third-party integrations include Google Drive API (for file pooling), Stripe API (payment checkouts), and Razorpay API (payment checkout simulations).
+
+202. What APIs are called?
+APIs called include OpenAI API (for generating vector embeddings), Google OAuth (for user authentication), and simulated payment gateway webhooks.
+
+203. Why was each service chosen?
+Google Drive was chosen to provide developers with cheap, personal file storage. OpenAI was selected for state-of-the-art embedding precision, and Stripe/Razorpay for industry-standard compliance.
+
+204. What are service versions?
+Versions are Google Drive API v3, Stripe API v3, and the latest OpenAI embedding endpoint configurations mapped in application properties.
+
+205. How are service failures handled?
+Service failures trigger fallback configurations, log errors internally, retry requests using exponential backoff, and return generic exception messages to clients.
+
+206. What are service rate limits?
+Rate limits are enforced at the API Gateway using custom filters, and external API requests conform to Google and OpenAI subscription rate-limiting limits.
+
+207. What are service costs/licensing?
+The codebase uses open-source Apache-2.0 licensing. External API costs depend on OpenAI and Google Cloud usage limits configured on user accounts.
+
+208. How are service migrations handled?
+Migrations require modifying client service classes, updating connection credentials in configurations, and running regression tests to verify payload compatibility.
+
+209. What alternative services exist?
+Alternatives include AWS S3 for file storage instead of Google Drive, HuggingFace local models for embeddings, and Braintree for payment processing.
+
+210. How are services monitored?
+Monitoring uses Actuator metrics tracking HTTP outgoing request call latencies, error rate counters, and Jaeger distributed traces.
+
+211. What is the dependency graph?
+The dependency graph starts at the parent POM, branching to submodules which depend on `cloudpool-common`. Common depends on standard Spring, Lombok, and JSON libraries.
+
+212. What are critical dependencies?
+Critical dependencies are the JDK 17 JVM, the compiled Rust JNI library, Spring Boot Framework libraries, and the relational database connectors.
+
+213. What are optional dependencies?
+Optional dependencies include Weaviate client configurations, Stripe payment connectors, and RabbitMQ messaging queues, which can be bypassed in `local` profiles.
+
+214. How are versions locked?
+Java dependencies are locked in parent POM dependency tag ranges. JavaScript and Node dependencies are locked in `package-lock.json` packages.
+
+215. How are updates managed?
+Updates are evaluated via Dependabot. Identified updates are compiled locally, verified through test suites, and merged to main when builds pass.
+
+216. What is the update frequency?
+Security updates are processed instantly on Dependabot alerts. General framework updates are evaluated at the end of feature release phases.
+
+217. How are security patches applied?
+Patches are applied by upgrading the target version in `pom.xml` or `package.json`, running `npm install` or `mvn compile`, and pushing to git.
+
+218. What are dependency conflicts?
+Conflicts can occur between Spring Boot transitives and external client libraries (like Weaviate vs. standard HTTP client versions), resolved by explicit `<exclusion>` blocks.
+
+219. How is dependency bloat managed?
+Bloat is managed by restricting dependencies in `cloudpool-common` to essential utilities, and utilizing maven dependency analyzer tools to identify unused jars.
+
+220. What is the long-term viability of dependencies?
+Long-term viability is high. The project relies on standard, industry-supported tools (Spring, Rust Cargo, npm) with active developer community backing.
