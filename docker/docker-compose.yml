@@ -64,13 +64,28 @@ services:
       timeout: 5s
       retries: 5
 
-  app:
+  gateway:
     build:
-      context: ..
-      dockerfile: Dockerfile
-    container_name: cloudpool-app
+      context: ../backend/spring-boot
+      dockerfile: cloudpool-gateway/Dockerfile
+    container_name: cloudpool-gateway
     ports:
       - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+    depends_on:
+      - auth
+      - data
+      - compute
+      - network
+
+  auth:
+    build:
+      context: ../backend/spring-boot
+      dockerfile: cloudpool-auth/Dockerfile
+    container_name: cloudpool-auth
+    ports:
+      - "8082:8082"
     environment:
       SPRING_PROFILES_ACTIVE: dev
       DATABASE_HOST: postgres
@@ -82,8 +97,32 @@ services:
       REDIS_PORT: 6379
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
-      RABBITMQ_USER: guest
-      RABBITMQ_PASSWORD: guest
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  data:
+    build:
+      context: ../backend/spring-boot
+      dockerfile: cloudpool-data/Dockerfile
+    container_name: cloudpool-data
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: cloudpool
+      DATABASE_USER: cloudpool
+      DATABASE_PASSWORD: cloudpool
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
       WEAVIATE_URL: http://weaviate:8080
     depends_on:
       postgres:
@@ -93,6 +132,58 @@ services:
       rabbitmq:
         condition: service_healthy
       weaviate:
+        condition: service_healthy
+
+  compute:
+    build:
+      context: ../backend/spring-boot
+      dockerfile: cloudpool-compute/Dockerfile
+    container_name: cloudpool-compute
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: cloudpool
+      DATABASE_USER: cloudpool
+      DATABASE_PASSWORD: cloudpool
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  network:
+    build:
+      context: ../backend/spring-boot
+      dockerfile: cloudpool-network/Dockerfile
+    container_name: cloudpool-network
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: cloudpool
+      DATABASE_USER: cloudpool
+      DATABASE_PASSWORD: cloudpool
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
 volumes:

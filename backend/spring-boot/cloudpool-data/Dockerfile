@@ -1,0 +1,7 @@
+FROM eclipse-temurin:17-jre-noble
+WORKDIR /app
+COPY target/cloudpool-data-*.jar app.jar
+COPY src/main/resources/libcloudpool_rust.so /usr/local/lib/ || true
+ENV LD_LIBRARY_PATH=/usr/local/lib
+EXPOSE 8083
+ENTRYPOINT ["java", "-Djava.library.path=/usr/local/lib", "-jar", "app.jar"]
