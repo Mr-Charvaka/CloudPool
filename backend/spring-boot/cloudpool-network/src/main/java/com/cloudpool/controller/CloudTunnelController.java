@@ -28,7 +28,11 @@ public class CloudTunnelController {
             @PathVariable String tunnelId,
             HttpServletRequest request) throws IOException {
 
-        String uri = request.getRequestURI().replaceFirst("/tunnels/" + tunnelId, "");
+        String prefix = "/tunnels/" + tunnelId;
+        String uri = request.getRequestURI();
+        if (uri.startsWith(prefix)) {
+            uri = uri.substring(prefix.length());
+        }
         if (uri.isEmpty()) uri = "/";
         if (request.getQueryString() != null) {
             uri += "?" + request.getQueryString();
@@ -60,7 +64,8 @@ public class CloudTunnelController {
         } catch (TimeoutException e) {
             return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body("Tunnel timeout");
         } catch (ExecutionException e) {
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Tunnel error: " + e.getMessage());
+            log.error("Execution error on forwarding request for tunnel ID {}: ", tunnelId, e);
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Tunnel connection failed due to gateway execution error");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Thread interrupted");

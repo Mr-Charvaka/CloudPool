@@ -28,5 +28,8 @@
   "dependencies": {
     "graphql": "^16.0.0",
     "graphql-request": "^6.0.0"
+  },
+  "overrides": {
+    "minimatch": "^9.0.5"
   }
 }

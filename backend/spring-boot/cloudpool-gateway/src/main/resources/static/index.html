@@ -3403,10 +3403,37 @@
     pubsubSocket = new WebSocket(`ws://${window.location.host}/ws/pubsub`);
     pubsubSocket.onopen = () => {
       pubsubSocket.send(JSON.stringify({ action: "subscribe", channel: channel, projectId: activeProjectId }));
-      document.getElementById('pubsubLog').innerHTML += `<div class="log-line"><span class="log-ts">[LOCAL]</span><span class="log-ok">Subscribed to ${channel}</span></div>`;
+      
+      const logLine = document.createElement('div');
+      logLine.className = 'log-line';
+      
+      const tsSpan = document.createElement('span');
+      tsSpan.className = 'log-ts';
+      tsSpan.textContent = '[LOCAL]';
+      
+      const okSpan = document.createElement('span');
+      okSpan.className = 'log-ok';
+      okSpan.textContent = `Subscribed to ${channel}`;
+      
+      logLine.appendChild(tsSpan);
+      logLine.appendChild(okSpan);
+      document.getElementById('pubsubLog').appendChild(logLine);
     };
     pubsubSocket.onmessage = (e) => {
-      document.getElementById('pubsubLog').innerHTML += `<div class="log-line"><span class="log-ts">[RECV]</span><span class="log-info">${e.data}</span></div>`;
+      const logLine = document.createElement('div');
+      logLine.className = 'log-line';
+      
+      const tsSpan = document.createElement('span');
+      tsSpan.className = 'log-ts';
+      tsSpan.textContent = '[RECV]';
+      
+      const infoSpan = document.createElement('span');
+      infoSpan.className = 'log-info';
+      infoSpan.textContent = e.data;
+      
+      logLine.appendChild(tsSpan);
+      logLine.appendChild(infoSpan);
+      document.getElementById('pubsubLog').appendChild(logLine);
     };
   }
 
