@@ -85,10 +85,15 @@ go run main.go
 | S3 storage adapter | Java (Spring) | Plug in AWS S3 / Cloudflare R2 / MinIO |
 | GraphQL schema extensions | Java | Add new GraphQL resolvers and subscriptions |
 
-**Quick start:**
+**Quick start (compile and run specific microservices):**
 ```bash
+# 1. Compile and install all submodules
 cd backend/spring-boot
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
+mvn clean install -DskipTests
+
+# 2. Run a specific service (e.g. Gateway, Auth, or Data) using the project flag (-pl)
+# Use the 'local' profile to run standalone without requiring Redis/RabbitMQ containers
+mvn -pl cloudpool-gateway spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
 ---
