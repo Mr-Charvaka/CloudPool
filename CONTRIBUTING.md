@@ -88,7 +88,7 @@ go run main.go
 **Quick start:**
 ```bash
 cd backend/spring-boot
-../../apache-maven-3.9.6/bin/mvn spring-boot:run -Dspring-boot.run.profiles=local
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 ---
