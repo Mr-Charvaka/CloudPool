@@ -13,7 +13,7 @@
 ![GraphQL](https://img.shields.io/badge/GraphQL-API-E10098.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supported-336791.svg)
 ![Weaviate](https://img.shields.io/badge/Weaviate-Vector_Search-blueviolet.svg)
-
+[![Open Source Helpers](https://www.codetriage.com/mr-charvaka/cloudpool/badges/users.svg)](https://www.codetriage.com/mr-charvaka/cloudpool)
 </div>
 
 
