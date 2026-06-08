@@ -99,16 +99,20 @@ public class HealthController {
         return webClient.get()
                 .uri(url)
                 .retrieve()
+                // Prevent WebClient from throwing WebClientResponseException on 4xx/5xx.
+                // Instead convert non-2xx into a controlled error that onErrorResume handles below.
+                .onStatus(status -> !status.is2xxSuccessful(),
+                          resp -> Mono.error(new RuntimeException("HTTP " + resp.statusCode().value())))
                 .toBodilessEntity()
                 .timeout(Duration.ofMillis(1000))
                 .map(resp -> {
                     Map<String, Object> statusMap = new HashMap<>();
-                    // Internal URL intentionally omitted — not exposed to callers
                     statusMap.put("name", name);
-                    statusMap.put("status", resp.getStatusCode().is2xxSuccessful() ? "UP" : "DOWN");
+                    statusMap.put("status", "UP");
                     return statusMap;
                 })
                 .onErrorResume(ex -> {
+                    // Catches: connection refused, timeout, DNS failure, non-2xx HTTP responses
                     Map<String, Object> statusMap = new HashMap<>();
                     statusMap.put("name", name);
                     statusMap.put("status", "DOWN");
