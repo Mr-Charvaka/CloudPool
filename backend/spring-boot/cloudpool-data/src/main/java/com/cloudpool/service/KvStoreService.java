@@ -97,6 +97,7 @@ public class KvStoreService {
      * Prevents database bloat over time.
      */
     @Scheduled(fixedRate = 60000)
+    @net.javacrumbs.shedlock.spring.annotation.SchedulerLock(name = "KvStore_purgeExpiredKeys", lockAtLeastFor = "30s", lockAtMostFor = "55s")
     @Transactional
     public void purgeExpiredKeys() {
         LocalDateTime now = LocalDateTime.now();

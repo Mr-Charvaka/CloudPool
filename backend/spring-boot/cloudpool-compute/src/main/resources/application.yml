@@ -48,8 +48,8 @@ logging:
     org.springframework.security: DEBUG
     org.hibernate.SQL: DEBUG
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [traceId=%X{traceId} spanId=%X{spanId}] - %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [traceId=%X{traceId} spanId=%X{spanId}] %logger{36} - %msg%n"
   file:
     name: logs/cloudpool-compute.log
     max-size: 10MB

@@ -243,9 +243,13 @@ public class ProjectService {
         Project project = getProject(projectId, userId);
         String schemaName = "cp_schema_" + projectId.toString().replace("-", "_").toLowerCase();
 
-        // 1. Create schema
-        jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + schemaName);
-        log.info("Auto-provisioned schema {} for project {}", schemaName, projectId);
+        // 1. Create schema on system database
+        try {
+            jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + schemaName);
+            log.info("Auto-provisioned schema {} for project {}", schemaName, projectId);
+        } catch (Exception e) {
+            log.warn("Failed to create schema on system database: {}", e.getMessage());
+        }
 
         // 2. Parse connection details
         String host = "localhost";
@@ -268,30 +272,42 @@ public class ProjectService {
             username = "sa";
             password = "password";
         } else {
+            // Provision dedicated PostgreSQL Docker container
             try {
-                if (datasourceUrl != null && datasourceUrl.startsWith("jdbc:postgresql://")) {
-                    String cleanUrl = datasourceUrl.substring("jdbc:postgresql://".length());
-                    int slashIdx = cleanUrl.indexOf('/');
-                    if (slashIdx != -1) {
-                        String hostPortStr = cleanUrl.substring(0, slashIdx);
-                        dbName = cleanUrl.substring(slashIdx + 1);
-                        int queryIdx = dbName.indexOf('?');
-                        if (queryIdx != -1) {
-                            dbName = dbName.substring(0, queryIdx);
-                        }
-                        int colonIdx = hostPortStr.indexOf(':');
-                        if (colonIdx != -1) {
-                            host = hostPortStr.substring(0, colonIdx);
-                            port = Integer.parseInt(hostPortStr.substring(colonIdx + 1));
-                        } else {
-                            host = hostPortStr;
+                log.info("Provisioning Docker PostgreSQL container for project: {}", projectId);
+                int dockerPort = com.cloudpool.util.DockerPostgresProvisioner.provisionOrStartContainer(projectId, "postgres");
+                host = "localhost";
+                port = dockerPort;
+                dbName = "postgres";
+                username = "postgres";
+                password = "postgres";
+            } catch (Exception e) {
+                log.warn("Failed to auto-provision Postgres Docker container, falling back to schema on default connection: {}", e.getMessage());
+                try {
+                    if (datasourceUrl != null && datasourceUrl.startsWith("jdbc:postgresql://")) {
+                        String cleanUrl = datasourceUrl.substring("jdbc:postgresql://".length());
+                        int slashIdx = cleanUrl.indexOf('/');
+                        if (slashIdx != -1) {
+                            String hostPortStr = cleanUrl.substring(0, slashIdx);
+                            dbName = cleanUrl.substring(slashIdx + 1);
+                            int queryIdx = dbName.indexOf('?');
+                            if (queryIdx != -1) {
+                                dbName = dbName.substring(0, queryIdx);
+                            }
+                            int colonIdx = hostPortStr.indexOf(':');
+                            if (colonIdx != -1) {
+                                host = hostPortStr.substring(0, colonIdx);
+                                port = Integer.parseInt(hostPortStr.substring(colonIdx + 1));
+                            } else {
+                                host = hostPortStr;
+                            }
                         }
                     }
+                } catch (Exception ex) {
+                    log.warn("Failed to parse PostgreSQL url {}, using defaults: {}", datasourceUrl, ex.getMessage());
                 }
-            } catch (Exception e) {
-                log.warn("Failed to parse PostgreSQL url {}, using defaults: {}", datasourceUrl, e.getMessage());
+                dbName = dbName + "?currentSchema=" + schemaName;
             }
-            dbName = dbName + "?currentSchema=" + schemaName;
         }
 
         // 3. Save connection

@@ -26,6 +26,9 @@ application-local.yml
 .idea/
 .vscode/
 
+# CloudPool Screenshot Guide
+docs/SCREENSHOTS_GUIDE.md
+
 # Maven binaries
 apache-maven-*/
 
@@ -45,5 +48,7 @@ sdks/rust/target/
 # Local Notes and Guides
 CloudPool_Code_Review.md
 CloudPool_Security_Fixes_Guide.md
-idea.tex
-*.tex
+*.tex
+
+# KORA Project Review (Excluded)
+kora_review/

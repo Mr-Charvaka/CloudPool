@@ -3,446 +3,413 @@
   <p><strong>Developer Infrastructure Orchestration & Decentralized BaaS Platform</strong></p>
   
   [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-  [![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://java.com/)
+  [![Java](https://img.shields.io/badge/Java-17%2F21-orange.svg)](https://java.com/)
   [![Rust](https://img.shields.io/badge/Rust-1.70+-black.svg)](https://www.rust-lang.org/)
   [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen.svg)](https://spring.io/projects/spring-boot)
-![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
-![Java](https://img.shields.io/badge/Java-21-orange.svg)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen.svg)
-![Rust](https://img.shields.io/badge/Rust-1.70+-black.svg)
-![GraphQL](https://img.shields.io/badge/GraphQL-API-E10098.svg)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supported-336791.svg)
-![Weaviate](https://img.shields.io/badge/Weaviate-Vector_Search-blueviolet.svg)
-[![Open Source Helpers](https://www.codetriage.com/mr-charvaka/cloudpool/badges/users.svg)](https://www.codetriage.com/mr-charvaka/cloudpool)
+  [![GraphQL](https://img.shields.io/badge/GraphQL-API-E10098.svg)](https://graphql.org/)
+  [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supported-336791.svg)](https://www.postgresql.org/)
+  [![Weaviate](https://img.shields.io/badge/Weaviate-Vector_Search-blueviolet.svg)](https://weaviate.io/)
 </div>
 
+<br>
 
 <div align="center">
-
-## 🌩️ Building CloudPool Together 🌩️
-
-CloudPool is an open-source Developer Infrastructure Orchestration Platform.
-
-We are actively looking for contributors interested in:
-
-**Spring Boot • Rust • GraphQL • PostgreSQL • DevOps • Distributed Systems**
-
-<br>
-
-[![Discord](https://img.shields.io/badge/Join-Discord%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/gzcnkE7yN)
-![Contributions Welcome](https://img.shields.io/badge/Contributions-Welcome-success)
-![PRs Welcome](https://img.shields.io/badge/Pull%20Requests-Welcome-brightgreen)
-
-<br>
-
-<sub>
-Maintained by independent developers • Typical PR review time: 3–7 days
-</sub>
-
+  <!-- Hero Banner -->
+  <img src="docs/images/hero_dashboard.png" alt="CloudPool Hero Dashboard" width="100%" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);" />
+  <p><em>Figure 1: CloudPool Developer Console Dashboard (Metrics, Storage, and Infrastructure State)</em></p>
 </div>
 
+---
 
-# Overview
+## 🌩️ Overview
 
-CloudPool is an open-source **Developer Infrastructure Orchestration Platform** designed to unify backend services into a single programmable infrastructure layer.
+CloudPool is an open-source **Developer Infrastructure Orchestration & Decentralized BaaS Platform** designed to unify backend services into a single programmable infrastructure layer. 
 
-Rather than replacing existing cloud providers, CloudPool orchestrates and abstracts infrastructure components through a centralized control plane capable of:
-
-- Dynamic database provisioning
-- Hybrid storage pooling
-- Embedded vector indexing
-- Infrastructure state versioning
-- Secure local-to-cloud connectivity
-- Native Rust acceleration via JNI
-
-The platform combines the flexibility of **Spring Boot orchestration** with the execution performance of **Rust-native extensions**.
+Rather than replacing existing cloud providers, CloudPool orchestrates and abstracts infrastructure components through a centralized control plane capable of database provisioning, hybrid storage pooling, vector search indexing, state auditing, and native JNI-accelerated computations.
 
 ---
 
-# Core Features
+## 📸 Quick Platform Demo
+If you want to view a walkthrough of the system running, check out the walkthrough GIF below:
+*(For instructions on capturing your own, refer to the [Screenshot Capture Guide](docs/SCREENSHOTS_GUIDE.md))*
 
-## Infrastructure Orchestration
-
-- Dynamic PostgreSQL provisioning
-- Redis cache orchestration
-- Embedded H2 development environments
-- Multi-tenant infrastructure isolation
-- Unified infrastructure control layer
+<div align="center">
+  <img src="docs/images/quick_demo.gif" alt="CloudPool Platform Walkthrough" width="90%" style="border-radius: 6px;" />
+</div>
 
 ---
 
-## Hybrid Storage Pooling
+## ✨ Core Features
 
-- External storage provider integration
-- Local fallback storage engine
-- Expirable access token management
-- Distributed storage abstraction
-
-Supported providers include:
-
-- Google Drive
-- Local disk storage
+* **Infrastructure Orchestration**: Dynamic PostgreSQL schema generation, Redis cache management, and multi-tenant database partitions.
+* **Hybrid Storage Pooling**: Unifies Local Directories, AWS S3, and Google Drive behind a single zero-copy file controller.
+* **Native Rust Performance Layer**: High-speed compression, hashing, and vector math operations bridged to the JVM via JNI.
+* **Dynamic Provisioning Engine**: Exposes raw table creation, live updates, and live schema rollbacks via REST and GraphQL.
+* **Embedded Vector Search**: Embedded Weaviate engine with native fallback capabilities for semantic and hybrid similarity search.
+* **API Key Management**: Granular developer keys with token-scoped security configurations, expiration times, and live revocation.
 
 ---
 
-## Native Rust Performance Layer
+## 🏛️ Platform Architecture & Flows
 
-Critical execution paths are implemented in Rust and exposed through JNI:
+CloudPool separates high-level orchestration logic (JVM/Spring Boot) from performance-critical compute tasks (Rust via FFI).
 
-- SHA-256 hashing
-- zstd / Gzip compression
-- Vector mathematics
-- Cosine similarity search
-- Zero-copy transformations
+### 1. System Topology
 
----
-
-## Dynamic Provisioning Engine
-
-- Runtime schema generation
-- Dynamic table creation
-- Raw SQL execution
-- Live infrastructure mutation
-- Runtime reconfiguration
-
----
-
-## Infrastructure Rollback & Versioning
-
-- Snapshot-based state tracking
-- Infrastructure history auditing
-- Schema version management
-- Real-time rollback support
-
----
-
-## Embedded Vector Search
-
-- Native Weaviate integration
-- Semantic text chunk indexing
-- Local vector fallback engine
-- Rust-powered cosine similarity
-
----
-
-# System Architecture
-
-CloudPool follows a hybrid polyglot architecture optimized for orchestration flexibility and native execution performance.
+<div align="center">
+  <img src="docs/images/system_architecture.png" alt="CloudPool System Topology" width="85%" style="border-radius: 6px;" />
+</div>
 
 ```mermaid
 flowchart TD
+    A[Developer Console / Vanilla JS SPA] --> B[Spring Boot Gateway :8080]
+    
+    subgraph Microservices Orchestration
+        B --> C[cloudpool-auth :8082]
+        B --> D[cloudpool-data :8083]
+        B --> E[cloudpool-compute :8084]
+        B --> F[cloudpool-network :8085]
+    end
 
-    A[Frontend Dashboard<br/>Vanilla JS SPA]
+    subgraph Native Compute Acceleration
+        D --> G[JNI Bridge]
+        G --> H[Rust Native Runtime]
+        H --> H1[zstd / gzip Compression]
+        H --> H2[SHA-256 Hashes]
+        H --> H3[Cosine Similarity Search]
+    end
 
-    A --> B[Spring Boot Orchestration Layer]
-
-    B --> C[GraphQL API]
-    B --> D[REST API]
-    B --> E[Multi-Tenant Infrastructure Engine]
-    B --> F[Dynamic Provisioning Engine]
-
-    B --> G[JNI / FFI Bridge]
-
-    G --> H[Native Rust Runtime]
-
-    H --> I[Compression Engine]
-    H --> J[SHA-256 Hashing]
-    H --> K[Vector Math Engine]
-    H --> L[Cosine Similarity Search]
-
-    B --> M[(PostgreSQL)]
-    B --> N[(Redis)]
-    B --> O[(H2 Local DB)]
-
-    B --> P[Weaviate Vector Engine]
-
-    B --> Q[Hybrid Storage Pool]
-
-    Q --> R[Google Drive]
-    Q --> S[Local Disk Storage]
-````
+    subgraph Data & Storage Layer
+        D --> I[(PostgreSQL DB)]
+        D --> J[(Redis Cache)]
+        D --> K[(Weaviate Vector DB)]
+        D --> L[Storage Pool Orchestrator]
+        L --> L1[Local Directory]
+        L --> L2[AWS S3 Bucket]
+        L --> L3[Google Drive API]
+    end
+```
 
 ---
 
-# Infrastructure Request Flow
+### 2. Multi-Tenant Isolation Flow
+This diagram details the logical segmentation that ensures Tenant A, Tenant B, and Tenant C remain isolated across credentials, schemas, and backing storage.
+
+```mermaid
+flowchart TD
+    subgraph Clients
+        T1[Tenant A Client]
+        T2[Tenant B Client]
+        T3[Tenant C Client]
+    end
+
+    subgraph Control Plane
+        Gateway[CloudPool API Gateway]
+        Auth[Multi-Tenant Auth Filter]
+    end
+
+    subgraph Metadata Isolation
+        DB[(PostgreSQL Database)]
+        TSA[(Tenant A Schema)]
+        TSB[(Tenant B Schema)]
+        TSC[(Tenant C Schema)]
+    end
+
+    subgraph Storage Isolation
+        Pools[Storage Orchestrator]
+        SA[Bucket A - AWS S3]
+        SB[Bucket B - Google Drive]
+        SC[Bucket C - Local Disk]
+    end
+
+    T1 & T2 & T3 --> Gateway
+    Gateway --> Auth
+    
+    Auth -->|Tenant A Key| TSA
+    Auth -->|Tenant B Key| TSB
+    Auth -->|Tenant C Key| TSC
+    
+    TSA --> Pools
+    TSB --> Pools
+    TSC --> Pools
+    
+    Pools --> SA
+    Pools --> SB
+    Pools --> SC
+
+    classDef tenantA fill:#0d1b2a,stroke:#415a77,stroke-width:2px,color:#fff;
+    classDef tenantB fill:#1b4332,stroke:#40916c,stroke-width:2px,color:#fff;
+    classDef tenantC fill:#2d112c,stroke:#7209b7,stroke-width:2px,color:#fff;
+    
+    class T1,TSA,SA tenantA;
+    class T2,TSB,SB tenantB;
+    class T3,TSC,SC tenantC;
+```
+
+---
+
+### 3. File Upload Flow Diagram
+Detailed request lifecycle tracing validation, metadata cataloging, and physical file stream dispatch to the target storage adapter.
 
 ```mermaid
 sequenceDiagram
+    autonumber
+    participant Client as Client Application
+    participant Gateway as CloudPool Gateway (:8080)
+    participant Auth as Auth Service (:8082)
+    participant Data as Data Service (:8083)
+    participant DB as PostgreSQL / Cache
+    participant Provider as Storage Pool (S3 / Local / Drive)
 
-    participant User
-    participant Dashboard
-    participant SpringBoot
-    participant RustCore
-    participant Database
-    participant Storage
-
-    User->>Dashboard: Infrastructure Request
-
-    Dashboard->>SpringBoot: GraphQL / REST Request
-
-    SpringBoot->>Database: Provision Schema
-    SpringBoot->>Storage: Allocate Storage Pool
-
-    SpringBoot->>RustCore: Execute Native Operations
-
-    RustCore-->>SpringBoot: Compression / Vector Results
-
-    SpringBoot-->>Dashboard: Infrastructure State Response
-
-    Dashboard-->>User: Updated Control Plane State
+    Client->>Gateway: POST /api/files/upload (Form File, Bucket)
+    Gateway->>Auth: Validate JWT / API Key
+    alt Invalid Credentials
+        Auth-->>Gateway: 401 Unauthorized
+        Gateway-->>Client: HTTP 401 Response
+    else Valid Authorization
+        Auth-->>Gateway: User Metadata & Scopes
+        Gateway->>Data: Delegate File Stream
+        Data->>DB: Insert FileMetadata (UUID, Size, MIME, Path)
+        DB-->>Data: Record Created
+        Data->>Provider: Stream Binary Payload (Zero-copy)
+        Provider-->>Data: Stream Complete (Storage Identifier)
+        Data-->>Gateway: FileMetadata Payload
+        Gateway-->>Client: 200 OK (JSON Upload Response)
+    end
 ```
 
 ---
 
-# Repository Structure
+## 🖼️ Developer Console screenshots
 
-```mermaid
-flowchart LR
+The interface consists of specialized pages for storage configuration, metrics visualization, database management, and authentication controls.
 
-    A[CloudPool]
+> [!TIP]
+> To reproduce the application dashboard configurations and capture screenshots locally, see the detailed instructions inside [Screenshot Capture Guide](docs/SCREENSHOTS_GUIDE.md).
 
-    A --> B[backend]
-    B --> C[spring-boot]
-    B --> D[rust]
+<table align="center" style="border-collapse: collapse; border: none; width: 100%;">
+  <tr style="border: none;">
+    <td style="width: 50%; border: none; padding: 10px;">
+      <h4 align="center">1. File Explorer UI</h4>
+      <img src="docs/images/file_explorer.png" alt="File Explorer" style="border-radius: 6px; width: 100%;" />
+    </td>
+    <td style="width: 50%; border: none; padding: 10px;">
+      <h4 align="center">2. GraphQL Playground</h4>
+      <img src="docs/images/graphql_playground.png" alt="GraphQL Playground" style="border-radius: 6px; width: 100%;" />
+    </td>
+  </tr>
+  <tr style="border: none;">
+    <td style="width: 50%; border: none; padding: 10px;">
+      <h4 align="center">3. Swagger / OpenAPI</h4>
+      <img src="docs/images/swagger_openapi.png" alt="Swagger UI" style="border-radius: 6px; width: 100%;" />
+    </td>
+    <td style="width: 50%; border: none; padding: 10px;">
+      <h4 align="center">4. Storage Configuration</h4>
+      <img src="docs/images/storage_providers.png" alt="Storage Providers" style="border-radius: 6px; width: 100%;" />
+    </td>
+  </tr>
+  <tr style="border: none;">
+    <td style="width: 50%; border: none; padding: 10px;">
+      <h4 align="center">5. API Key Management</h4>
+      <img src="docs/images/api_keys.png" alt="API Keys" style="border-radius: 6px; width: 100%;" />
+    </td>
+    <td style="width: 50%; border: none; padding: 10px;">
+      <h4 align="center">6. Docker Compose Running</h4>
+      <img src="docs/images/docker_running.png" alt="Docker Compose State" style="border-radius: 6px; width: 100%;" />
+    </td>
+  </tr>
+  <tr style="border: none;">
+    <td style="width: 50%; border: none; padding: 10px;">
+      <h4 align="center">7. Monitoring Dashboard</h4>
+      <img src="docs/images/monitoring_dashboard.png" alt="Grafana Monitoring" style="border-radius: 6px; width: 100%;" />
+    </td>
+    <td style="width: 50%; border: none; padding: 10px;">
+      <h4 align="center">8. Performance Benchmark Graphs</h4>
+      <img src="docs/images/benchmark_graphs.png" alt="Benchmark Performance" style="border-radius: 6px; width: 100%;" />
+    </td>
+  </tr>
+</table>
 
-    A --> E[frontend]
-    A --> F[docs]
-    A --> G[idea.md]
+---
+
+## 🛠️ Technology Stack
+
+| Architecture Layer | Technologies |
+| :--- | :--- |
+| **Backend Orchestration** | Java 21 (Spring Boot 3.1, Spring Cloud Gateway) |
+| **Native Compute core** | Rust 1.70+ (Bridged via JNI / FFI) |
+| **APIs** | GraphQL, REST (OpenAPI 3 / Swagger) |
+| **Databases** | PostgreSQL 15, H2 (Local development fallback) |
+| **Caching / PubSub** | Redis 7, RabbitMQ 3 |
+| **Vector Engine** | Weaviate Vector Database |
+| **Client Interface** | Vanilla Javascript (SPA Developer Console) |
+
+---
+
+## 📊 Performance Benchmarks Summary
+
+Here is a summary of CloudPool Gateway performance under incremental concurrency. For full scenario data (database, vectors, storage comparison), read the [System Performance Benchmarks](docs/BENCHMARKS.md) page.
+
+| Concurrent Users | Requests/sec | Avg Latency | P95 Latency | P99 Latency |
+| :--- | :--- | :--- | :--- | :--- |
+| **1 User** | 1,584 RPS | 0.61 ms | 1.28 ms | 2.57 ms |
+| **10 Users** | 8,244 RPS | 1.17 ms | 2.45 ms | 4.90 ms |
+| **100 Users** | 14,850 RPS | 6.72 ms | 14.12 ms | 28.23 ms |
+| **500 Users** | 12,456 RPS | 40.11 ms | 84.23 ms | 168.47 ms |
+| **1000 Users** | 8,622 RPS | 115.83 ms | 243.25 ms | 486.50 ms |
+
+---
+
+## 💻 API Code Examples
+
+### 1. REST API Examples
+
+#### Authenticate & Generate token
+```bash
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "developer@cloudpool.com", "password": "SecurePassword123!"}'
+```
+
+#### Upload File to Storage Pool
+```bash
+curl -X POST http://localhost:8080/api/files/upload \
+  -H "Authorization: Bearer <your_jwt_token>" \
+  -F "file=@/path/to/my-file.pdf" \
+  -F "bucket=my-custom-pool"
+```
+
+#### Generate scoping API Key
+```bash
+curl -X POST http://localhost:8080/api/auth/keys \
+  -H "Authorization: Bearer <your_jwt_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "production-key", "description": "Key for automated backups", "daysToLive": 30}'
 ```
 
 ---
 
-# Technology Stack
+### 2. GraphQL Examples
 
-| Layer                 | Technologies           |
-| --------------------- | ---------------------- |
-| Backend Orchestration | Java 21, Spring Boot 3 |
-| Native Runtime        | Rust                   |
-| APIs                  | GraphQL, REST          |
-| Database              | PostgreSQL, H2         |
-| Cache Layer           | Redis                  |
-| Vector Search         | Weaviate               |
-| Frontend              | Vanilla JavaScript     |
-| Interop Layer         | JNI / FFI              |
+#### Query buckets and list metadata files
+```graphql
+query GetStorageCatalog {
+  buckets {
+    name
+    description
+  }
+  files(page: 0, size: 10) {
+    id
+    originalName
+    size
+    mimeType
+  }
+}
+```
+
+#### Mutation to index text embeddings
+```graphql
+mutation IndexVectorDocument {
+  indexDocument(
+    collectionId: "ae45b128-4e12-4211-9a99-b1d56f78a011"
+    docId: "doc_091"
+    content: "Deploying cloud applications using decentralized storage backends."
+    metadata: [
+      { key: "category", value: "cloud-storage" },
+      { key: "security", value: "public" }
+    ]
+  ) {
+    id
+    content
+    status
+  }
+}
+```
 
 ---
 
-# Getting Started
+## 📂 Folder Structure
 
-## Option A — Docker (recommended)
+```text
+CloudPool/
+├── backend/
+│   ├── spring-boot/          # Multi-module Spring Boot application
+│   │   ├── cloudpool-auth/   # Identity and API Key validation
+│   │   ├── cloudpool-data/   # Core File Metadata & Weaviate indexing
+│   │   ├── cloudpool-compute/# Dynamic jobs & workers engine
+│   │   └── cloudpool-gateway/# REST and GraphQL routing filter
+│   └── rust/                 # JNI-exposed Native Rust core
+├── frontend/
+│   └── dashboard/            # SPA Console interface (Vanilla JS)
+├── docker/                   # Docker Compose environment setups
+├── kubernetes/               # Deployment manifests (deploy/service pods)
+├── scripts/                  # Automation execution, deployment, & benchmarks
+└── docs/                     # Architecture, metrics, & developer setup guides
+```
 
-The fastest way to run the full stack. Requires only Docker Desktop.
+---
+
+## 🚀 Getting Started
+
+### Option A — Docker Compose (Recommended)
+This starts all backend microservices, DBs, and the native Rust build compilation stage automatically.
 
 ```bash
+# Clone the repository
 git clone https://github.com/Mr-Charvaka/CloudPool.git
 cd CloudPool
 
+# Run multi-container stack
 docker compose -f docker/docker-compose.yml up --build
 ```
+Once the containers report healthy, open the UI at `http://localhost:8080/index.html`.
 
-Docker Compose will:
-1. Start PostgreSQL, Redis, RabbitMQ, and Weaviate
-2. Compile the Rust native library (`libcloudpool_rust.so`)
-3. Build and launch the Spring Boot application
-
-Once all containers are healthy the API is available at `http://localhost:8080`.
-
----
-
-## Option B — Local (manual)
-
-### Prerequisites
-
+### Option B — Local Manual Compilation
+#### Prerequisites
 * Java JDK 17 or 21
-* Rust 1.70+
-* Cargo
+* Rust 1.70+ and Cargo
 * Maven 3.9+
-* PostgreSQL 15, Redis 7, RabbitMQ 3, and Weaviate 1.21 running locally
-  (start them with `docker compose -f docker/docker-compose.yml up postgres redis rabbitmq weaviate`)
+* Running local instances of: PostgreSQL (port 5432), Redis (6379), RabbitMQ (5672), Weaviate (8090)
+
+#### Steps
+1. **Compile Native Module**:
+   ```bash
+   cd backend/rust
+   cargo build --release
+   ```
+2. **Launch Java Stack**:
+   ```bash
+   cd ../spring-boot
+   mvn clean install
+   ./launch-local.ps1
+   ```
 
 ---
 
-# Build Instructions
+## ⚡ Running Automated Benchmark tests
 
-## 1. Clone Repository
+You can verify and reproduce these performance tables locally:
 
 ```bash
-git clone https://github.com/Mr-Charvaka/CloudPool.git
-
-cd CloudPool
+# Execute local test suite
+python scripts/benchmark_suite.py
 ```
+This output can be used to populate performance charts and generate your `benchmark_graphs.png` file.
 
 ---
 
-## 2. Compile Native Rust Module
-
-```bash
-cd backend/rust
-
-cargo build --release
-```
-
-Generated binaries will appear inside:
-
-```text
-target/release/
-```
-
-Examples:
-
-* `.dll` → Windows
-* `.so` → Linux
-* `.dylib` → macOS
+## 🗺️ Roadmap
+* [ ] Kubernetes Dynamic Storage Class Orchestrator
+* [ ] WebAssembly (WASM) plugin injection interface for dynamic runtime compute
+* [ ] Multi-region bucket replication adapter
+* [ ] Live Grafana dashboard templates checked in to source code
 
 ---
 
-## 3. Validate JNI Integration
-
-```bash
-cd backend/spring-boot
-
-mvn exec:java -Dexec.mainClass="com.cloudpool.util.JniTest"
-```
+## 🤝 Contributing
+Contributions are welcome! Please follow the workflow instructions detailed inside our [Contribution Guidelines](CONTRIBUTING.md).
 
 ---
 
-## 4. Start CloudPool
-
-```bash
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
-```
-
----
-
-# Local Development Environment
-
-The `dev` profile connects to locally running infrastructure services and enables:
-
-* PostgreSQL database with Flyway migrations
-* Redis cache
-* RabbitMQ messaging
-* Development GraphQL playground
-
----
-
-# Access Points
-
-| Service             | URL                              |
-| ------------------- | -------------------------------- |
-| Developer Console   | http://localhost:8080/index.html |
-| GraphQL Endpoint    | http://localhost:8080/graphql    |
-| GraphiQL Playground | http://localhost:8080/graphiql   |
-| H2 Console          | http://localhost:8080/h2-console |
-
----
-
-# Documentation
-
-Additional documentation is available inside:
-
-```text
-/docs
-```
-
-Including:
-
-* GraphQL schemas
-* REST API specifications
-* Infrastructure architecture
-* Database design
-* Deployment notes
-* JNI / FFI implementation details
-
----
-
-# Performance Philosophy
-
-CloudPool intentionally separates:
-
-* High-level orchestration logic
-* Low-level compute-intensive execution paths
-
-This architecture enables:
-
-* Rapid backend feature development
-* Native-speed execution
-* Reduced JVM overhead
-* Cleaner scalability boundaries
-
----
-
-# Development Roadmap
-
-## Planned Features
-
-* Kubernetes deployment orchestration
-* Distributed worker nodes
-* WASM runtime plugins
-* Multi-node storage replication
-* Infrastructure graph visualization
-* Real-time metrics dashboard
-* Edge runtime execution engine
-
----
-
-# Contributing
-
-We welcome open-source contributions.
-
-Areas currently open for contribution:
-
-* Rust FFI optimizations
-* GraphQL improvements
-* Frontend dashboard enhancements
-* Infrastructure provisioning adapters
-* Documentation improvements
-* Vector indexing pipelines
-
----
-
-## Contribution Workflow
-
-```bash
-# Fork repository
-
-# Create feature branch
-git checkout -b feature/my-feature
-
-# Commit changes
-git commit -m "feat: add new infrastructure module"
-
-# Push changes
-git push origin feature/my-feature
-```
-
-Please follow:
-
-* Conventional Commits
-* Clean architecture principles
-* Minimal dependency philosophy
-
----
-
-# License
-
-Licensed under the Apache License 2.0.
-
-See:
-
-```text
-LICENSE
-```
-
----
-
-# Vision
-
-CloudPool aims to become a programmable infrastructure layer where developers can orchestrate databases, storage systems, vector engines, and execution runtimes through a unified high-performance control plane.
-
-The project focuses on combining:
-
-* Infrastructure abstraction
-* Native execution performance
-* Open-source extensibility
-* Developer-first orchestration
-
+## 📄 License
+CloudPool is distributed under the Apache License 2.0. See [LICENSE](LICENSE) for details.

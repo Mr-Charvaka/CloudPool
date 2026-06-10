@@ -114,6 +114,7 @@ public class TenantAuthService {
     }
 
     @Scheduled(fixedRate = 3600000) // 1 hour
+    @net.javacrumbs.shedlock.spring.annotation.SchedulerLock(name = "TenantAuth_purgeExpiredSessions", lockAtLeastFor = "5m", lockAtMostFor = "55m")
     @Transactional
     public void purgeExpiredSessions() {
         int deleted = sessionRepository.deleteExpiredSessions(LocalDateTime.now());

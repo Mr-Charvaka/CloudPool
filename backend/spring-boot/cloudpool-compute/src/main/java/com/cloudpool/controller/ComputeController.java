@@ -260,30 +260,39 @@ public class ComputeController {
     }
 
     private String executeSandbox(String code, String paramsJson) {
-        try {
-            ScriptEngineManager manager = new ScriptEngineManager();
-            ScriptEngine engine = manager.getEngineByName("js");
-            if (engine == null) {
-                engine = manager.getEngineByName("nashorn");
-            }
-            if (engine == null) {
-                engine = manager.getEngineByName("GraalVM");
-            }
+        java.util.concurrent.Future<String> future = executor.submit(() -> {
+            try {
+                ScriptEngineManager manager = new ScriptEngineManager();
+                ScriptEngine engine = manager.getEngineByName("js");
+                if (engine == null) {
+                    engine = manager.getEngineByName("nashorn");
+                }
+                if (engine == null) {
+                    engine = manager.getEngineByName("GraalVM");
+                }
 
-            if (engine != null) {
-                engine.eval("var params = " + paramsJson + ";");
-                Object result = engine.eval(code);
-                return result != null ? result.toString() : "null";
+                if (engine != null) {
+                    engine.eval("var params = " + paramsJson + ";");
+                    Object result = engine.eval(code);
+                    return result != null ? result.toString() : "null";
+                }
+            } catch (Exception e) {
+                return "Sandbox execution error: " + e.getMessage();
             }
+            return "Simulated isolated Wasm execution success.\n" +
+                    "Code length: " + code.length() + " bytes\n" +
+                    "Parameters: " + paramsJson + "\n" +
+                    "Execution result: OK";
+        });
+
+        try {
+            return future.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (java.util.concurrent.TimeoutException e) {
+            future.cancel(true); // Attempt to interrupt the runaway thread
+            return "Sandbox execution error: Execution timed out (exceeded 5 seconds).";
         } catch (Exception e) {
             return "Sandbox execution error: " + e.getMessage();
         }
-
-        // Simulating Rust WebAssembly execution sandbox for testing
-        return "Simulated isolated Wasm execution success.\n" +
-                "Code length: " + code.length() + " bytes\n" +
-                "Parameters: " + paramsJson + "\n" +
-                "Execution result: OK";
     }
 
     /* ── CONTAINER HOSTING ── */

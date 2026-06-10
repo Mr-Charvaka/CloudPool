@@ -1,0 +1,85 @@
+name: Multi-Platform CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  rust-multiplatform:
+    name: Rust Lib - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            backend/rust/target/
+          key: ${{ matrix.os }}-cargo-${{ hashFiles('backend/rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.os }}-cargo-
+
+      - name: Run Cargo test
+        working-directory: backend/rust
+        run: cargo test --verbose
+
+      - name: Build Rust release library
+        working-directory: backend/rust
+        run: cargo build --release --verbose
+
+  springboot-test:
+    name: Spring Boot Microservices Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: cloudpool_test
+          POSTGRES_USER: cloudpool
+          POSTGRES_PASSWORD: password
+        options: >-
+          --health-cmd "pg_isready -U cloudpool -d cloudpool_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust native library
+        working-directory: backend/rust
+        run: cargo build --release
+
+      - name: Run Maven JNI & Unit Tests
+        working-directory: backend/spring-boot
+        run: mvn clean test -Dspring.profiles.active=ci
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/cloudpool_test
+          SPRING_DATASOURCE_USERNAME: cloudpool
+          SPRING_DATASOURCE_PASSWORD: password
+          CLOUDPOOL_JWT_SECRET: ci-test-secret-key-minimum-32-chars-long
+          CLOUDPOOL_GOOGLE_DRIVE_CLIENT_ID: dummy-client-id
+          CLOUDPOOL_GOOGLE_DRIVE_CLIENT_SECRET: dummy-client-secret

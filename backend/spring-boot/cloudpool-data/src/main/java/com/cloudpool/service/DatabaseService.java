@@ -40,19 +40,41 @@ public class DatabaseService {
         }
         Optional<DatabaseConnection> activeConnOpt = databaseConnectionRepository.findByProjectIdAndDbType(projectId, "POSTGRESQL");
         if (activeConnOpt.isPresent() && activeConnOpt.get().isActive()) {
+            DatabaseConnection conn = activeConnOpt.get();
             try {
                 org.springframework.jdbc.datasource.DriverManagerDataSource dataSource = new org.springframework.jdbc.datasource.DriverManagerDataSource();
-                String host = activeConnOpt.get().getHost();
-                String dbName = activeConnOpt.get().getDatabaseName();
-                if (dbName.toLowerCase().contains("h2") || dbName.toLowerCase().contains("cloudpooldb")) {
+                String host = conn.getHost();
+                String dbName = conn.getDatabaseName();
+                int port = conn.getPort();
+
+                boolean isH2 = dbName.toLowerCase().contains("h2") || dbName.toLowerCase().contains("cloudpooldb");
+                if (!isH2) {
+                    try {
+                        String password = conn.getPassword();
+                        if (password == null || password.trim().isEmpty()) {
+                            password = "postgres";
+                        }
+                        int dockerPort = com.cloudpool.util.DockerPostgresProvisioner.provisionOrStartContainer(projectId, password);
+                        if (dockerPort != port) {
+                            log.info("Docker container port changed from {} to {} for project {}. Updating repository.", port, dockerPort, projectId);
+                            port = dockerPort;
+                            conn.setPort(port);
+                            databaseConnectionRepository.save(conn);
+                        }
+                    } catch (Exception dockerEx) {
+                        log.error("Failed ensuring Docker container running for project {}: {}", projectId, dockerEx.getMessage());
+                    }
+                }
+
+                if (isH2) {
                     dataSource.setDriverClassName("org.h2.Driver");
                     dataSource.setUrl("jdbc:h2:" + dbName);
                 } else {
                     dataSource.setDriverClassName("org.postgresql.Driver");
-                    dataSource.setUrl("jdbc:postgresql://" + host + ":" + activeConnOpt.get().getPort() + "/" + dbName);
+                    dataSource.setUrl("jdbc:postgresql://" + host + ":" + port + "/" + dbName);
                 }
-                dataSource.setUsername(activeConnOpt.get().getUsername());
-                dataSource.setPassword(activeConnOpt.get().getPassword());
+                dataSource.setUsername(conn.getUsername());
+                dataSource.setPassword(conn.getPassword());
                 return new JdbcTemplate(dataSource);
             } catch (Exception e) {
                 log.error("Failed to construct dynamic PostgreSQL/H2 connection: {}", e.getMessage());
