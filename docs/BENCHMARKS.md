@@ -217,3 +217,98 @@ Profiles the execution speed of the gateway defense filter.
 * **SQL Injection attempt (Prepared statements)**: Query rejected in 0.00 ms (Zero overhead)
 * **GraphQL Introspection**: Blocked in 0.12 ms
 * **IP Rate Limiting (Token Bucket check)**: HTTP 429 in 0.05 ms
+
+
+## ⚡ Latest Load Test Performance Report (Automated k6 Run)
+
+### Key Metrics
+* **Throughput**: 46.2 req/s
+* **P50 Latency**: 81.99ms
+* **P95 Latency**: 217.36ms
+* **P99 Latency**: 317.2ms
+* **Failed Requests**: 0.00%
+
+### Latency Distribution Chart
+```text
+P50 Latency | ##########------------------------------ 81.99ms
+P95 Latency | ###########################------------- 217.36ms
+P99 Latency | ######################################## 317.2ms
+```
+### Key Metrics
+* **Throughput**: 32.4 req/s
+* **P50 Latency**: 0ms
+* **P95 Latency**: 0ms
+* **P99 Latency**: 0ms
+* **Failed Requests**: 0.00%
+
+### Latency Distribution Chart
+```text
+P50 Latency | ---------------------------------------- 0ms
+P95 Latency | ---------------------------------------- 0ms
+P99 Latency | ---------------------------------------- 0ms
+```
+### Key Metrics
+* **Throughput**: 30.0 req/s
+* **P50 Latency**: 0ms
+* **P95 Latency**: 0ms
+* **P99 Latency**: 0ms
+* **Failed Requests**: 50.00%
+
+### Latency Distribution Chart
+```text
+P50 Latency | ---------------------------------------- 0ms
+P95 Latency | ---------------------------------------- 0ms
+P99 Latency | ---------------------------------------- 0ms
+```
+### Key Metrics
+* **Throughput**: 50.3 req/s
+* **P50 Latency**: 0ms
+* **P95 Latency**: 0ms
+* **P99 Latency**: 0ms
+* **Failed Requests**: 100.00%
+
+### Latency Distribution Chart
+```text
+P50 Latency | ---------------------------------------- 0ms
+P95 Latency | ---------------------------------------- 0ms
+P99 Latency | ---------------------------------------- 0ms
+```
+### Key Metrics
+* **Throughput**: 50.7 req/s
+* **P50 Latency**: 0ms
+* **P95 Latency**: 0ms
+* **P99 Latency**: 0ms
+* **Failed Requests**: 50.00%
+
+### Latency Distribution Chart
+```text
+P50 Latency | ---------------------------------------- 0ms
+P95 Latency | ---------------------------------------- 0ms
+P99 Latency | ---------------------------------------- 0ms
+```
+### Key Metrics
+* **Throughput**: 52.7 req/s
+* **P50 Latency**: 0ms
+* **P95 Latency**: 0ms
+* **P99 Latency**: 0ms
+* **Failed Requests**: 50.00%
+
+### Latency Distribution Chart
+```text
+P50 Latency | ---------------------------------------- 0ms
+P95 Latency | ---------------------------------------- 0ms
+P99 Latency | ---------------------------------------- 0ms
+```
+### Key Metrics
+* **Throughput**: 181.0 req/s
+* **P50 Latency**: 18.4ms
+* **P95 Latency**: 42.1ms
+* **P99 Latency**: 67.5ms
+* **Failed Requests**: 0.00%
+
+### Latency Distribution Chart
+```text
+P50 Latency | ##########------------------------------ 18.4ms
+P95 Latency | ########################---------------- 42.1ms
+P99 Latency | ######################################## 67.5ms
+```

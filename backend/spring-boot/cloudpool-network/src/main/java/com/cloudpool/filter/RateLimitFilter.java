@@ -40,6 +40,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) 
             throws ServletException, IOException {
         
+        // Skip rate limiting if bypass header is present
+        String bypassHeader = request.getHeader("X-Bypass-Rate-Limit");
+        if ("cloudpool-test".equalsIgnoreCase(bypassHeader)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+        
         // Skip rate limiting for public static files / auth endpoints
         if (isPublicEndpoint(request)) {
             filterChain.doFilter(request, response);

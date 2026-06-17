@@ -9,39 +9,39 @@ spring:
       routes:
         # Microservice specific sub-routes of projects (must be defined BEFORE the general projects route)
         - id: cloudpool-data-project-kv
-          uri: http://localhost:8083
+          uri: ${CLOUDPOOL_SERVICES_DATA_URL:http://localhost:8083}
           predicates:
             - Path=/api/v1/projects/*/kv/**
         - id: cloudpool-compute-project-cron
-          uri: http://localhost:8084
+          uri: ${CLOUDPOOL_SERVICES_COMPUTE_URL:http://localhost:8084}
           predicates:
             - Path=/api/v1/projects/*/cron/**
         - id: cloudpool-network-project-waf
-          uri: http://localhost:8085
+          uri: ${CLOUDPOOL_SERVICES_NETWORK_URL:http://localhost:8085}
           predicates:
             - Path=/api/v1/projects/*/waf/**
 
         # General auth & project routes
         - id: cloudpool-auth-api
-          uri: http://localhost:8082
+          uri: ${CLOUDPOOL_SERVICES_AUTH_URL:http://localhost:8082}
           predicates:
             - Path=/api/auth/**, /oauth/**, /oauth/callback, /api/keys/**, /api/v1/projects, /api/v1/projects/**
 
         # Data & Storage routes
         - id: cloudpool-data-api
-          uri: http://localhost:8083
+          uri: ${CLOUDPOOL_SERVICES_DATA_URL:http://localhost:8083}
           predicates:
             - Path=/api/v1/db/**, /api/files/**, /api/storage/**, /api/console/**, /api/vector/**, /graphql, /graphiql/**, /api/payment/**, /api/analytics/**
 
         # Compute routes
         - id: cloudpool-compute-api
-          uri: http://localhost:8084
+          uri: ${CLOUDPOOL_SERVICES_COMPUTE_URL:http://localhost:8084}
           predicates:
             - Path=/api/compute/**, /api/cron/**, /api/email/**
 
         # Network & Websocket routes
         - id: cloudpool-network-api
-          uri: http://localhost:8085
+          uri: ${CLOUDPOOL_SERVICES_NETWORK_URL:http://localhost:8085}
           predicates:
             - Path=/api/network/**, /api/waf/**, /api/tunnel/**, /api/pubsub/**, /ws/**
 

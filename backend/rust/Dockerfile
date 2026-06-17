@@ -1,5 +1,5 @@
 # Build Rust FFI native shared library
-FROM rust:1.75 AS builder
+FROM rust:latest AS builder
 WORKDIR /usr/src/cloudpool-rust
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src

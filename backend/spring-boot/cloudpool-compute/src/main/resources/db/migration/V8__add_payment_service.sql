@@ -2,7 +2,7 @@
 -- Stores user-owned payment gateway credentials (encrypted) and their transaction records
 
 CREATE TABLE IF NOT EXISTS payment_gateways (
-    id                       UUID         NOT NULL DEFAULT RANDOM_UUID(),
+    id                       UUID         NOT NULL DEFAULT gen_random_uuid(),
     user_id                  UUID         NOT NULL,
     display_name             VARCHAR(120) NOT NULL,
     provider                 VARCHAR(30)  NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS payment_gateways (
 CREATE INDEX IF NOT EXISTS idx_payment_gateways_user ON payment_gateways(user_id);
 
 CREATE TABLE IF NOT EXISTS payment_transactions (
-    id                      UUID         NOT NULL DEFAULT RANDOM_UUID(),
+    id                      UUID         NOT NULL DEFAULT gen_random_uuid(),
     gateway_id              UUID         NOT NULL,
     amount                  NUMERIC(18,2) NOT NULL,
     currency                VARCHAR(10)  NOT NULL DEFAULT 'USD',
