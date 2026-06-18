@@ -19,5 +19,5 @@ public interface FileShareRepository extends JpaRepository<FileShare, UUID> {
 
     @Modifying
     @Query("DELETE FROM FileShare f WHERE f.expiresAt IS NOT NULL AND f.expiresAt < :now")
-    int deleteExpiredShares(LocalDateTime now);
+    int deleteExpiredShares(@org.springframework.data.repository.query.Param("now") LocalDateTime now);
 }
