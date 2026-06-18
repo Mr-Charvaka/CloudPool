@@ -16,7 +16,8 @@ public class TimestampTest {
         LocalDateTime localDateTime = LocalDateTime.of(2026, 6, 3, 12, 0, 0);
         String expectedFormat = "2026-06-03T12:00:00";
         
-        assertEquals(expectedFormat, localDateTime.toString(), "Timestamp should follow standard ISO-8601 format string");
+        String formatted = localDateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        assertEquals(expectedFormat, formatted, "Timestamp should follow standard ISO-8601 format string");
     }
 
     @Test

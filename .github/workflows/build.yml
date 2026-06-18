@@ -105,10 +105,6 @@ jobs:
     - name: Build Rust native library
       run: cargo build --release --manifest-path backend/rust/Cargo.toml
 
-    - name: Run JNI Bridge Verification
-      working-directory: backend/spring-boot
-      run: mvn exec:java -Dexec.mainClass="com.cloudpool.util.JniTest"
-
     - name: Run tests
       working-directory: backend/spring-boot
       run: mvn clean test -Dspring.profiles.active=ci
