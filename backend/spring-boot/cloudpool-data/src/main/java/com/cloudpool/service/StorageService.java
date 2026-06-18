@@ -6,8 +6,11 @@ import com.cloudpool.repository.BucketRepository;
 import com.cloudpool.repository.FileMetadataRepository;
 import com.cloudpool.repository.FileShareRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.cloudpool.util.FileUploadValidator;
 
@@ -22,6 +25,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StorageService {
 
     private final FileMetadataRepository fileMetadataRepository;
@@ -198,10 +202,20 @@ public class StorageService {
                 return driveQuota;
             }
         }
-        
+
         java.util.Map<String, Long> result = new java.util.HashMap<>();
         result.put("limit", user.getStorageQuota());
         result.put("usage", user.getCurrentUsage());
         return result;
+    }
+
+    @Scheduled(fixedRate = 86400000)
+    @net.javacrumbs.shedlock.spring.annotation.SchedulerLock(name = "FileShare_purgeExpiredTokens", lockAtLeastFor = "5m", lockAtMostFor = "55m")
+    @Transactional
+    public void purgeExpiredShares() {
+        int deleted = fileShareRepository.deleteExpiredShares(LocalDateTime.now());
+        if (deleted > 0) {
+            log.info("Purged {} expired file sharing tokens from database.", deleted);
+        }
     }
 }
