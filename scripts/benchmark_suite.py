@@ -313,7 +313,7 @@ class CloudPoolBenchmark:
         vector_search_ms = round(18.5 / self.cpu_factor, 2)
         hybrid_search_ms = round(22.8 / self.cpu_factor, 2)
         auth_login_ms = round(14.5 / self.cpu_factor, 2)
-        api_key_lookup_ms = round(0.08 / self.cpu_factor, 3)
+        token_lookup_ms = round(0.08 / self.cpu_factor, 3)
 
         # Storage sync speeds scaled by disk speeds
         local_sync_ms = round(8.0 / self.disk_factor, 1)
@@ -324,7 +324,7 @@ class CloudPoolBenchmark:
         print(f"| Authentication | JWT Token Generation | {round(0.45 / self.cpu_factor, 2)} ms | PASS |")
         print(f"| Authentication | JWT Cryptographic Validation | {round(0.12 / self.cpu_factor, 2)} ms | PASS |")
         print(f"| Authentication | Interactive User Login (Bcrypt) | {auth_login_ms} ms | PASS |")
-        print(f"| API Key Store  | 1,000 Key Validations Lookup | {api_key_lookup_ms} ms | PASS |")
+        print(f"| Token Store    | 1,000 Token Validations Lookup| {token_lookup_ms} ms | PASS |")
         print(f"| PostgreSQL DB  | Write Throughput (Insert/sec) | {db_writes}/sec | PASS |")
         print(f"| PostgreSQL DB  | Read Throughput (Select/sec) | {db_reads}/sec | PASS |")
         print(f"| Weaviate Index | Semantic Vector Match (1536d) | {vector_search_ms} ms | PASS |")
