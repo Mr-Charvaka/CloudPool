@@ -138,11 +138,15 @@ jobs:
       run: docker build -t cloudpool:${{ github.sha }} .
 
     - name: Push to Docker Registry
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKER_USERNAME != ''
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       run: |
+        if [ -z "$DOCKER_USERNAME" ]; then
+          echo "Docker credentials not provided, skipping push."
+          exit 0
+        fi
         echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
         docker tag cloudpool:${{ github.sha }} "$DOCKER_USERNAME/cloudpool:${{ github.sha }}"
         docker tag cloudpool:${{ github.sha }} "$DOCKER_USERNAME/cloudpool:latest"
