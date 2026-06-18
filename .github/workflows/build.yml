@@ -33,11 +33,12 @@ jobs:
         npm install
         npm run build
 
-    - name: Build React Dashboard
-      working-directory: frontend/react-dashboard
-      run: |
-        npm install
-        npm run build
+    # React Dashboard build skipped — project is an empty contribution scaffold
+    # - name: Build React Dashboard
+    #   working-directory: frontend/react-dashboard
+    #   run: |
+    #     npm install
+    #     npm run build
 
     - name: Build Svelte UI (DRAP)
       working-directory: DRAP/dashboard/ui
