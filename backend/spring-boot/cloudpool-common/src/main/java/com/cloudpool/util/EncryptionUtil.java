@@ -9,6 +9,7 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.Mac;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -31,28 +32,12 @@ public class EncryptionUtil {
         try {
             // Strip whitespace/newlines
             String cleanKey = masterKeyBase64.trim();
-            byte[] decodedKey;
             
-            // Try standard base64 decoding first, fallback to raw bytes if it's not base64
-            try {
-                decodedKey = Base64.getDecoder().decode(cleanKey);
-            } catch (IllegalArgumentException e) {
-                // If it's a raw password/key string, pad/truncate to 32 bytes
-                byte[] rawBytes = cleanKey.getBytes(StandardCharsets.UTF_8);
-                decodedKey = new byte[32];
-                System.arraycopy(rawBytes, 0, decodedKey, 0, Math.min(rawBytes.length, 32));
-            }
- 
-            if (decodedKey.length != 32) { // 256 bits = 32 bytes
-                // Pad/truncate key to 32 bytes for safety
-                byte[] temp = new byte[32];
-                System.arraycopy(decodedKey, 0, temp, 0, Math.min(decodedKey.length, 32));
-                decodedKey = temp;
-            }
- 
-            this.secretKey = new SecretKeySpec(decodedKey, 0, 32, ALGORITHM);
+            byte[] derivedKey = hkdfSha256(cleanKey.getBytes(StandardCharsets.UTF_8),
+                                "cloudpool-db-conn-v1".getBytes(StandardCharsets.UTF_8), 32);
+            this.secretKey = new SecretKeySpec(derivedKey, 0, 32, ALGORITHM);
             
-            log.info("✅ Encryption key initialized successfully");
+            log.info("✅ Encryption key initialized successfully with HKDF");
         } catch (Exception e) {
             throw new com.cloudpool.exception.CloudPoolException("Failed to initialize encryption master key config", e);
         }
@@ -137,6 +122,17 @@ public class EncryptionUtil {
         } catch (Exception e) {
             throw new com.cloudpool.exception.CloudPoolException("Failed to generate master key", e);
         }
+    }
+
+    private static byte[] hkdfSha256(byte[] ikm, byte[] info, int length) throws Exception {
+        Mac hmac = Mac.getInstance("HmacSHA256");
+        hmac.init(new SecretKeySpec(new byte[32], "HmacSHA256")); // salt = zeros, per HKDF spec when no salt given
+        byte[] prk = hmac.doFinal(ikm);
+
+        hmac.init(new SecretKeySpec(prk, "HmacSHA256"));
+        hmac.update(info);
+        hmac.update((byte) 1);
+        return java.util.Arrays.copyOf(hmac.doFinal(), length);
     }
 }
 
