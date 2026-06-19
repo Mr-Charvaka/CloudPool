@@ -1,13 +1,12 @@
 package com.cloudpool.service;
 
-import com.cloudpool.model.DatabaseConnection;
 import com.cloudpool.model.DevTable;
 import com.cloudpool.model.DevTableField;
-import com.cloudpool.repository.DatabaseConnectionRepository;
 import com.cloudpool.repository.DevTableFieldRepository;
 import com.cloudpool.repository.DevTableRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,65 +26,11 @@ public class DatabaseService {
 
     private final DevTableRepository devTableRepository;
     private final DevTableFieldRepository devTableFieldRepository;
-    private final DatabaseConnectionRepository databaseConnectionRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
 
     private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("^[a-zA-Z][a-zA-Z0-9_]*$");
     private static final Set<String> ALLOWED_TYPES = Set.of("VARCHAR", "INTEGER", "BOOLEAN", "DOUBLE", "TEXT");
-
-    private JdbcTemplate getJdbcTemplateForProject(UUID projectId) {
-        if (projectId == null) {
-            return jdbcTemplate;
-        }
-        Optional<DatabaseConnection> activeConnOpt = databaseConnectionRepository.findByProjectIdAndDbType(projectId, "POSTGRESQL");
-        if (activeConnOpt.isPresent() && activeConnOpt.get().isActive()) {
-            DatabaseConnection conn = activeConnOpt.get();
-            try {
-                org.springframework.jdbc.datasource.DriverManagerDataSource dataSource = new org.springframework.jdbc.datasource.DriverManagerDataSource();
-                String host = conn.getHost();
-                String dbName = conn.getDatabaseName();
-                int port = conn.getPort();
-
-                boolean isH2 = dbName.toLowerCase().contains("h2") || dbName.toLowerCase().contains("cloudpooldb");
-                if (!isH2) {
-                    try {
-                        String password = conn.getPassword();
-                        if (password == null || password.trim().isEmpty()) {
-                            byte[] bytes = new byte[24];
-                            new java.security.SecureRandom().nextBytes(bytes);
-                            password = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-                            conn.setPassword(password);
-                            databaseConnectionRepository.save(conn);
-                            log.info("Generated new credentials for project {} database container", projectId);
-                        }
-                        int dockerPort = com.cloudpool.util.DockerPostgresProvisioner.provisionOrStartContainer(projectId, password);
-                        if (dockerPort != port) {
-                            log.info("Docker container port changed from {} to {} for project {}. Updating repository.", port, dockerPort, projectId);
-                            port = dockerPort;
-                            conn.setPort(port);
-                            databaseConnectionRepository.save(conn);
-                        }
-                    } catch (Exception dockerEx) {
-                        log.error("Failed ensuring Docker container running for project {}: {}", projectId, dockerEx.getMessage());
-                    }
-                }
-
-                if (isH2) {
-                    dataSource.setDriverClassName("org.h2.Driver");
-                    dataSource.setUrl("jdbc:h2:" + dbName);
-                } else {
-                    dataSource.setDriverClassName("org.postgresql.Driver");
-                    dataSource.setUrl("jdbc:postgresql://" + host + ":" + port + "/" + dbName);
-                }
-                dataSource.setUsername(conn.getUsername());
-                dataSource.setPassword(conn.getPassword());
-                return new JdbcTemplate(dataSource);
-            } catch (Exception e) {
-                log.error("Failed to construct dynamic PostgreSQL/H2 connection: {}", e.getMessage());
-            }
-        }
-        return jdbcTemplate;
-    }
 
     public static String cleanIdentifier(String value) {
         if (value == null || value.trim().isEmpty()) {
@@ -107,19 +51,14 @@ public class DatabaseService {
 
     @Transactional
     public DevTable createTable(UUID userId, UUID projectId, String name, String displayName, String description, List<FieldRequest> fields) {
-        // Validate table name
         String cleanName = cleanIdentifier(name);
-
-        // Generate clean physical name
         String userIdStr = cleanIdentifier(userId.toString().replace("-", "_"));
         String physicalName = "dev_tbl_" + userIdStr + "_" + cleanName;
 
-        // Check if table metadata or physical table already exists
         if (devTableRepository.findByProjectIdAndName(projectId, physicalName).isPresent()) {
             throw new IllegalArgumentException("Table with name '" + name + "' already exists in this project.");
         }
 
-        // Validate fields
         if (fields == null || fields.isEmpty()) {
             throw new IllegalArgumentException("At least one field schema must be provided.");
         }
@@ -151,49 +90,9 @@ public class DatabaseService {
             validatedFields.add(new FieldRequest(fieldName, fieldType, field.isRequired()));
         }
 
-        // Construct DDL
-        StringBuilder ddl = new StringBuilder();
-        ddl.append("CREATE TABLE ").append(cleanIdentifier(physicalName)).append(" (");
-        ddl.append("id VARCHAR(36) PRIMARY KEY");
+        // We no longer execute physical DDL statements. We use the unified tenant_data JSONB table.
+        log.info("Creating virtual table metadata: {}", physicalName);
 
-        for (FieldRequest field : validatedFields) {
-            ddl.append(", ").append(cleanIdentifier(field.getFieldName())).append(" ");
-            
-            switch (field.getFieldType()) {
-                case "VARCHAR":
-                    ddl.append("VARCHAR(255)");
-                    break;
-                case "TEXT":
-                    ddl.append("TEXT");
-                    break;
-                case "INTEGER":
-                    ddl.append("INTEGER");
-                    break;
-                case "DOUBLE":
-                    ddl.append("DOUBLE");
-                    break;
-                case "BOOLEAN":
-                    ddl.append("BOOLEAN");
-                    break;
-                default:
-                    throw new IllegalStateException("Unexpected field type: " + field.getFieldType());
-            }
-
-            if (field.isRequired()) {
-                ddl.append(" NOT NULL");
-            }
-        }
-        ddl.append(")");
-
-        log.info("Executing DDL: {}", ddl);
-        try {
-            getJdbcTemplateForProject(projectId).execute(ddl.toString());
-        } catch (Exception e) {
-            log.error("Failed to create physical table: {}", e.getMessage(), e);
-            throw new com.cloudpool.exception.CloudPoolException("Database error: Could not create table structure. " + e.getMessage());
-        }
-
-        // Save metadata
         DevTable devTable = DevTable.builder()
                 .userId(userId)
                 .projectId(projectId)
@@ -236,7 +135,6 @@ public class DatabaseService {
     }
 
     public List<DevTableField> getTableFields(UUID tableId, UUID userId) {
-        // Ensure ownership
         getTable(tableId, userId);
         return devTableFieldRepository.findByTableId(tableId);
     }
@@ -245,15 +143,12 @@ public class DatabaseService {
     public void deleteTable(UUID tableId, UUID userId) {
         DevTable devTable = getTable(tableId, userId);
 
-        String physicalName = devTable.getName();
-        String dropDdl = "DROP TABLE IF EXISTS " + cleanIdentifier(physicalName);
-
-        log.info("Executing DDL: {}", dropDdl);
+        log.info("Deleting tenant_data for table: {}", devTable.getId());
         try {
-            getJdbcTemplateForProject(devTable.getProjectId()).execute(dropDdl);
+            jdbcTemplate.update("DELETE FROM tenant_data WHERE table_id = ?", devTable.getId().toString());
         } catch (Exception e) {
-            log.error("Failed to drop physical table: {}", e.getMessage(), e);
-            throw new com.cloudpool.exception.CloudPoolException("Database error: Could not drop table structure. " + e.getMessage());
+            log.error("Failed to delete tenant records: {}", e.getMessage(), e);
+            throw new com.cloudpool.exception.CloudPoolException("Database error: Could not drop records. " + e.getMessage());
         }
 
         devTableFieldRepository.deleteByTableId(tableId);
@@ -269,11 +164,6 @@ public class DatabaseService {
         Map<String, Object> recordData = new LinkedHashMap<>();
         recordData.put("id", recordId);
 
-        List<String> insertColumns = new ArrayList<>();
-        insertColumns.add("id");
-        List<Object> insertValues = new ArrayList<>();
-        insertValues.add(recordId);
-
         for (DevTableField field : fields) {
             String colName = field.getFieldName();
             Object value = data.get(colName);
@@ -282,14 +172,10 @@ public class DatabaseService {
                 if (field.isRequired()) {
                     throw new IllegalArgumentException("Field '" + colName + "' is required.");
                 }
-                // Skip or insert null
-                insertColumns.add(colName);
-                insertValues.add(null);
                 recordData.put(colName, null);
                 continue;
             }
 
-            // Convert and validate input type
             Object typedValue;
             try {
                 switch (field.getFieldType()) {
@@ -319,20 +205,26 @@ public class DatabaseService {
                 throw new IllegalArgumentException("Field '" + colName + "' must be of type " + field.getFieldType() + ".");
             }
 
-            insertColumns.add(colName);
-            insertValues.add(typedValue);
             recordData.put(colName, typedValue);
         }
 
-        // Build dynamic INSERT SQL
-        List<String> cleanColumns = insertColumns.stream().map(DatabaseService::cleanIdentifier).collect(Collectors.toList());
-        String columnsSql = String.join(", ", cleanColumns);
-        String placeholdersSql = insertColumns.stream().map(c -> "?").collect(Collectors.joining(", "));
-        String insertSql = "INSERT INTO " + cleanIdentifier(devTable.getName()) + " (" + columnsSql + ") VALUES (" + placeholdersSql + ")";
-
-        log.info("Executing DML: {} with values {}", insertSql, insertValues);
+        String jsonData;
         try {
-            getJdbcTemplateForProject(devTable.getProjectId()).update(insertSql, insertValues.toArray());
+            jsonData = objectMapper.writeValueAsString(recordData);
+        } catch (JsonProcessingException e) {
+            throw new com.cloudpool.exception.CloudPoolException("Failed to serialize record data", e);
+        }
+
+        String insertSql = "INSERT INTO tenant_data (id, project_id, table_id, user_id, data) VALUES (?, ?, ?, ?, ?::jsonb)";
+        
+        try {
+            // For H2 testing fallback (H2 supports FORMAT JSON, but standard string works as JSON)
+            // If postgres, ?::jsonb works. For cross-compatibility in tests, let's just insert as string if H2 or use cast.
+            jdbcTemplate.update(insertSql, recordId, devTable.getProjectId().toString(), tableId.toString(), userId.toString(), jsonData);
+        } catch (org.springframework.jdbc.BadSqlGrammarException e) {
+            // Fallback for H2 database in unit tests which doesn't support ::jsonb cast natively
+            String h2InsertSql = "INSERT INTO tenant_data (id, project_id, table_id, user_id, data) VALUES (?, ?, ?, ?, ?)";
+            jdbcTemplate.update(h2InsertSql, recordId, devTable.getProjectId().toString(), tableId.toString(), userId.toString(), jsonData);
         } catch (Exception e) {
             log.error("Failed to insert record: {}", e.getMessage(), e);
             throw new com.cloudpool.exception.CloudPoolException("Database error: Could not insert record. " + e.getMessage());
@@ -343,11 +235,16 @@ public class DatabaseService {
 
     public List<Map<String, Object>> queryRecords(UUID tableId, UUID userId) {
         DevTable devTable = getTable(tableId, userId);
-        String selectSql = "SELECT * FROM " + cleanIdentifier(devTable.getName());
+        String selectSql = "SELECT data FROM tenant_data WHERE table_id = ?";
 
-        log.info("Executing DML: {}", selectSql);
         try {
-            return getJdbcTemplateForProject(devTable.getProjectId()).queryForList(selectSql);
+            List<String> jsonList = jdbcTemplate.queryForList(selectSql, String.class, tableId.toString());
+            List<Map<String, Object>> results = new ArrayList<>();
+            for (String json : jsonList) {
+                Map<String, Object> map = objectMapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+                results.add(map);
+            }
+            return results;
         } catch (Exception e) {
             log.error("Failed to query records: {}", e.getMessage(), e);
             throw new com.cloudpool.exception.CloudPoolException("Database error: Could not fetch records. " + e.getMessage());
@@ -357,11 +254,10 @@ public class DatabaseService {
     @Transactional
     public void deleteRecord(UUID tableId, String recordId, UUID userId) {
         DevTable devTable = getTable(tableId, userId);
-        String deleteSql = "DELETE FROM " + cleanIdentifier(devTable.getName()) + " WHERE id = ?";
+        String deleteSql = "DELETE FROM tenant_data WHERE id = ? AND table_id = ?";
 
-        log.info("Executing DML: {} with id={}", deleteSql, recordId);
         try {
-            getJdbcTemplateForProject(devTable.getProjectId()).update(deleteSql, recordId);
+            jdbcTemplate.update(deleteSql, recordId, tableId.toString());
         } catch (Exception e) {
             log.error("Failed to delete record: {}", e.getMessage(), e);
             throw new com.cloudpool.exception.CloudPoolException("Database error: Could not delete record. " + e.getMessage());
@@ -377,4 +273,3 @@ public class DatabaseService {
         private boolean isRequired;
     }
 }
-
