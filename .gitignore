@@ -45,10 +45,25 @@ sdks/nodejs/node_modules/
 sdks/nodejs/dist/
 sdks/rust/target/
 
-# Local Notes and Guides
+# Local Notes, Guides, and Ideas
 CloudPool_Code_Review.md
 CloudPool_Security_Fixes_Guide.md
-*.tex
+angry_world_top_1_code_review_v2.md
+ultimate_engineer_roast.md
+idea.md
+idea.tex
+Refrence to freebies.md
+Documentation For Contributors.pdf
 
 # KORA Project Review (Excluded)
-kora_review/
+kora_review/
+
+# Zips and Archives
+*.zip
+*.tar.gz
+
+# Scripts and Environment Files
+*.py
+*.pyc
+__pycache__/
+*.env.example
