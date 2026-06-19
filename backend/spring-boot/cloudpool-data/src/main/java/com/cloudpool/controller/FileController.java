@@ -52,7 +52,7 @@ public class FileController {
     public ResponseEntity<?> downloadFile(@PathVariable("id") UUID id) {
         try {
             User user = getAuthenticatedUser();
-            byte[] data = storageService.downloadFile(id, user);
+            org.springframework.core.io.Resource data = storageService.downloadFile(id, user);
             
             // To find original filename
             String filename = "downloaded_file";
@@ -123,7 +123,7 @@ public class FileController {
             FileMetadata metadata = fileMetadataRepository.findById(share.getFileId())
                     .orElseThrow(() -> new IllegalArgumentException("File not found"));
 
-            byte[] data = storageService.downloadFileDirectly(metadata);
+            org.springframework.core.io.Resource data = storageService.downloadFileDirectly(metadata);
 
             // Audit Log (system action / anonymous download)
             auditLogService.log(metadata.getBucket().getUser(), "DOWNLOAD_SHARED_FILE", "FILE", metadata.getId().toString(),
@@ -133,7 +133,9 @@ public class FileController {
             if (metadata.getMimeType() != null) {
                 try {
                     mediaType = MediaType.parseMediaType(metadata.getMimeType());
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    // ignore
+                }
             }
 
             return ResponseEntity.ok()
