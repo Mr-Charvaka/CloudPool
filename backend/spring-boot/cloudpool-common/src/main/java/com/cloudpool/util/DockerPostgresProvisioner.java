@@ -36,7 +36,7 @@ public class DockerPostgresProvisioner {
             // Find host port
             int hostPort = getContainerPort(containerName);
             if (hostPort <= 0) {
-                throw new RuntimeException("Could not find mapped host port for container " + containerName);
+                throw new com.cloudpool.exception.CloudPoolException("Could not find mapped host port for container " + containerName);
             }
 
             log.info("Container {} mapped to host port {}. Waiting for PostgreSQL to be ready...", containerName, hostPort);
@@ -46,7 +46,7 @@ public class DockerPostgresProvisioner {
 
         } catch (Exception e) {
             log.error("Failed to provision/start Docker container for project {}: {}", projectId, e.getMessage(), e);
-            throw new RuntimeException("DBaaS container provisioning failed: " + e.getMessage(), e);
+            throw new com.cloudpool.exception.CloudPoolException("DBaaS container provisioning failed: " + e.getMessage(), e);
         }
     }
 
@@ -90,12 +90,12 @@ public class DockerPostgresProvisioner {
                     Thread.sleep(500);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    throw new RuntimeException(ie);
+                    throw new com.cloudpool.exception.CloudPoolException(ie);
                 }
             }
         }
         if (!ready) {
-            throw new RuntimeException("PostgreSQL port " + port + " did not become ready in 20 seconds");
+            throw new com.cloudpool.exception.CloudPoolException("PostgreSQL port " + port + " did not become ready in 20 seconds");
         }
     }
 
@@ -111,7 +111,7 @@ public class DockerPostgresProvisioner {
         }
         int exitCode = process.waitFor();
         if (exitCode != 0) {
-            throw new RuntimeException("Command failed with exit code: " + exitCode);
+            throw new com.cloudpool.exception.CloudPoolException("Command failed with exit code: " + exitCode);
         }
     }
 
@@ -130,3 +130,4 @@ public class DockerPostgresProvisioner {
         return sb.toString().trim();
     }
 }
+

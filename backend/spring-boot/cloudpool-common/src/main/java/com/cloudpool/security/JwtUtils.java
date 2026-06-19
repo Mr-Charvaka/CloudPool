@@ -50,7 +50,7 @@ public class JwtUtils {
             this.jwtExpirationMs = jwtExpirationMs;
             log.info("✅ JWT configuration validated successfully");
         } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize JWT signing key", e);
+            throw new com.cloudpool.exception.CloudPoolException("Failed to initialize JWT signing key", e);
         }
     }
  
@@ -71,7 +71,7 @@ public class JwtUtils {
                     .compact();
         } catch (Exception e) {
             log.error("Failed to generate JWT token for email: {}", email);
-            throw new RuntimeException("Failed to generate JWT token", e);
+            throw new com.cloudpool.exception.CloudPoolException("Failed to generate JWT token", e);
         }
     }
  
@@ -129,3 +129,4 @@ public class JwtUtils {
         }
     }
 }
+

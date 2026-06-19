@@ -29,7 +29,7 @@ public class TenantLeakRealTimeTest {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("X-Bypass-Rate-Limit", "cloudpool-test");
+
 
         HttpEntity<Map<String, String>> regRequest = new HttpEntity<>(regData, headers);
         try {
@@ -61,7 +61,7 @@ public class TenantLeakRealTimeTest {
         HttpHeaders headers1 = new HttpHeaders();
         headers1.set("Authorization", "Bearer " + token);
         headers1.set("X-Tenant-ID", "tenant-a");
-        headers1.set("X-Bypass-Rate-Limit", "cloudpool-test");
+
         HttpEntity<Void> request1 = new HttpEntity<>(headers1);
 
         ResponseEntity<String> response1 = restTemplate.exchange(filesUrl, HttpMethod.GET, request1, String.class);
@@ -70,7 +70,7 @@ public class TenantLeakRealTimeTest {
         // Request 2: No X-Tenant-ID header. Should NOT see tenant-a context or files
         HttpHeaders headers2 = new HttpHeaders();
         headers2.set("Authorization", "Bearer " + token);
-        headers2.set("X-Bypass-Rate-Limit", "cloudpool-test");
+
         HttpEntity<Void> request2 = new HttpEntity<>(headers2);
 
         ResponseEntity<String> response2 = restTemplate.exchange(filesUrl, HttpMethod.GET, request2, String.class);
