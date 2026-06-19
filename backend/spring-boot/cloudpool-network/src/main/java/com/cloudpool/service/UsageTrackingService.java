@@ -4,12 +4,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 
 /**
  * UsageTrackingService enforces per-minute API rate limits per user/API-key.
@@ -38,6 +41,14 @@ public class UsageTrackingService {
     public static final int LIMIT_ANON   = 30;
 
     private final RedisTemplate<String, Object> redisTemplate;
+
+    private static final String LUA_SCRIPT =
+            "local count = redis.call('INCR', KEYS[1]) " +
+            "if count == 1 then " +
+            "  redis.call('EXPIRE', KEYS[1], ARGV[1]) " +
+            "end " +
+            "return count";
+    private final RedisScript<Long> script = new DefaultRedisScript<>(LUA_SCRIPT, Long.class);
 
     // In-memory fallback: key → [count, windowStartMs]
     private final Map<String, long[]> localCounters = new ConcurrentHashMap<>();
@@ -84,7 +95,9 @@ public class UsageTrackingService {
             try {
                 Object val = redisTemplate.opsForValue().get(key);
                 if (val instanceof Number n) return n.longValue();
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.warn("Redis unavailable while fetching user usage: {}", e.getMessage());
+            }
         }
         long[] state = localCounters.get(key);
         if (state == null) return 0L;
@@ -101,7 +114,9 @@ public class UsageTrackingService {
             try {
                 Object val = redisTemplate.opsForValue().get(key);
                 if (val instanceof Number n) return n.longValue();
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.warn("Redis unavailable while fetching api key usage: {}", e.getMessage());
+            }
         }
         long[] state = localCounters.get(key);
         if (state == null) return 0L;
@@ -120,12 +135,8 @@ public class UsageTrackingService {
 
     private boolean checkRedis(String key, int limit) {
         try {
-            Long count = redisTemplate.opsForValue().increment(key);
+            Long count = redisTemplate.execute(script, Collections.singletonList(key), 60);
             if (count == null) return true; // Fail open on null
-            if (count == 1L) {
-                // First increment — set 60-second TTL to define the window
-                redisTemplate.expire(key, 60, TimeUnit.SECONDS);
-            }
             if (count > limit) {
                 log.warn("Rate limit exceeded for key={} count={} limit={}", key, count, limit);
                 return false;
