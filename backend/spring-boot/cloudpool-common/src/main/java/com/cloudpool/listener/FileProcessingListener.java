@@ -94,11 +94,29 @@ public class FileProcessingListener {
                 log.info("File: {}, size: {} bytes", metadata.getOriginalName(), metadata.getSize());
 
                 // Compute checksum via native Rust bridge if available
-                if (RustBridge.isLibraryLoaded()) {
-                    byte[] fileData = storageService.downloadFileDirectly(metadata);
-                    if (fileData != null && fileData.length > 0) {
+                byte[] fileData = storageService.downloadFileDirectly(metadata);
+                if (fileData != null && fileData.length > 0) {
+                    if (RustBridge.isLibraryLoaded()) {
                         String checksum = RustBridge.calculateChecksum(fileData);
                         log.info("Native checksum for file {}: {}", fileId, checksum);
+                    } else {
+                        // JVM fallback so background jobs don't silently no-op when the .so isn't present
+                        try {
+                            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+                            byte[] hash = digest.digest(fileData);
+                            StringBuilder hexString = new StringBuilder(2 * hash.length);
+                            for (byte b : hash) {
+                                String hex = Integer.toHexString(0xff & b);
+                                if (hex.length() == 1) {
+                                    hexString.append('0');
+                                }
+                                hexString.append(hex);
+                            }
+                            String checksum = hexString.toString();
+                            log.info("JVM-fallback checksum for file {}: {}", fileId, checksum);
+                        } catch (java.security.NoSuchAlgorithmException e) {
+                            log.error("SHA-256 algorithm not found", e);
+                        }
                     }
                 }
             } else {
