@@ -1,4 +1,4 @@
-﻿package com.cloudpool.security;
+package com.cloudpool.security;
 
 import com.cloudpool.model.User;
 import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
