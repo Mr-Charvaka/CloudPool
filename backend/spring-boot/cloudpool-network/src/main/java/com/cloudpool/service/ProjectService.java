@@ -50,11 +50,7 @@ public class ProjectService {
                 .updatedAt(LocalDateTime.now())
                 .build();
         Project saved = projectRepository.save(project);
-        try {
-            provisionProjectDatabase(saved.getId(), userId);
-        } catch (Exception e) {
-            log.error("Failed to auto-provision database schema for project {}: {}", saved.getId(), e.getMessage());
-        }
+        // Unified tenant_data schema requires no database provisioning or Docker containers.
         return saved;
     }
 
@@ -82,13 +78,13 @@ public class ProjectService {
     public void deleteProject(UUID projectId, UUID userId) {
         Project project = getProject(projectId, userId);
 
-        // Drop physical tables associated with the project
+        // Delete metadata and tenant_data
         List<DevTable> tables = devTableRepository.findByProjectId(projectId, org.springframework.data.domain.Pageable.unpaged()).getContent();
         for (DevTable table : tables) {
             try {
-                jdbcTemplate.execute("DROP TABLE IF EXISTS " + table.getName());
+                jdbcTemplate.update("DELETE FROM tenant_data WHERE table_id = ?", table.getId().toString());
             } catch (Exception e) {
-                log.error("Failed to drop table {} during project deletion: {}", table.getName(), e.getMessage());
+                log.error("Failed to clear tenant_data {} during project deletion: {}", table.getName(), e.getMessage());
             }
             devTableFieldRepository.deleteByTableId(table.getId());
             devTableRepository.delete(table);
@@ -240,91 +236,7 @@ public class ProjectService {
 
     @Transactional
     public DatabaseConnection provisionProjectDatabase(UUID projectId, UUID userId) {
-        Project project = getProject(projectId, userId);
-        String schemaName = "cp_schema_" + projectId.toString().replace("-", "_").toLowerCase();
-
-        // 1. Create schema on system database
-        try {
-            jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + schemaName);
-            log.info("Auto-provisioned schema {} for project {}", schemaName, projectId);
-        } catch (Exception e) {
-            log.warn("Failed to create schema on system database: {}", e.getMessage());
-        }
-
-        // 2. Parse connection details
-        String host = "localhost";
-        int port = 5432;
-        String dbName = "cloudpool";
-        String username = datasourceUsername;
-        String password = datasourcePassword;
-
-        boolean isH2 = datasourceUrl != null && datasourceUrl.contains("h2");
-        if (isH2) {
-            host = "localhost";
-            port = 0;
-            String baseFile = "./data/cloudpooldb";
-            if (datasourceUrl.startsWith("jdbc:h2:")) {
-                String cleanUrl = datasourceUrl.substring("jdbc:h2:".length());
-                int semiIdx = cleanUrl.indexOf(';');
-                baseFile = semiIdx != -1 ? cleanUrl.substring(0, semiIdx) : cleanUrl;
-            }
-            dbName = baseFile + ";SCHEMA=" + schemaName;
-            username = "sa";
-            password = "password";
-        } else {
-            // Provision dedicated PostgreSQL Docker container
-            try {
-                log.info("Provisioning Docker PostgreSQL container for project: {}", projectId);
-                int dockerPort = com.cloudpool.util.DockerPostgresProvisioner.provisionOrStartContainer(projectId, "postgres");
-                host = "localhost";
-                port = dockerPort;
-                dbName = "postgres";
-                username = "postgres";
-                password = "postgres";
-            } catch (Exception e) {
-                log.warn("Failed to auto-provision Postgres Docker container, falling back to schema on default connection: {}", e.getMessage());
-                try {
-                    if (datasourceUrl != null && datasourceUrl.startsWith("jdbc:postgresql://")) {
-                        String cleanUrl = datasourceUrl.substring("jdbc:postgresql://".length());
-                        int slashIdx = cleanUrl.indexOf('/');
-                        if (slashIdx != -1) {
-                            String hostPortStr = cleanUrl.substring(0, slashIdx);
-                            dbName = cleanUrl.substring(slashIdx + 1);
-                            int queryIdx = dbName.indexOf('?');
-                            if (queryIdx != -1) {
-                                dbName = dbName.substring(0, queryIdx);
-                            }
-                            int colonIdx = hostPortStr.indexOf(':');
-                            if (colonIdx != -1) {
-                                host = hostPortStr.substring(0, colonIdx);
-                                port = Integer.parseInt(hostPortStr.substring(colonIdx + 1));
-                            } else {
-                                host = hostPortStr;
-                            }
-                        }
-                    }
-                } catch (Exception ex) {
-                    log.warn("Failed to parse PostgreSQL url {}, using defaults: {}", datasourceUrl, ex.getMessage());
-                }
-                dbName = dbName + "?currentSchema=" + schemaName;
-            }
-        }
-
-        // 3. Save connection
-        DatabaseConnection conn = saveConnection(
-                projectId,
-                "POSTGRESQL",
-                host,
-                port,
-                dbName,
-                username,
-                password,
-                true,
-                userId
-        );
-
-        log.info("Registered auto-provisioned DatabaseConnection {} for project {}", conn.getId(), projectId);
-        return conn;
+        throw new UnsupportedOperationException("Database provisioning is no longer supported. The platform now uses a high-performance unified JSONB architecture (Phase 3).");
     }
 
     @Transactional
@@ -472,13 +384,13 @@ public class ProjectService {
             }
 
             // 3. Restore Table Schemas
-            // A. Drop current dynamic physical tables
+            // A. Delete current metadata and tenant_data
             List<DevTable> currentTables = devTableRepository.findByProjectId(projectId, org.springframework.data.domain.Pageable.unpaged()).getContent();
             for (DevTable table : currentTables) {
                 try {
-                    targetTemplate.execute("DROP TABLE IF EXISTS " + table.getName());
+                    jdbcTemplate.update("DELETE FROM tenant_data WHERE table_id = ?", table.getId().toString());
                 } catch (Exception e) {
-                    log.warn("Failed to drop table {} during rollback: {}", table.getName(), e.getMessage());
+                    log.warn("Failed to clear tenant_data {} during rollback: {}", table.getName(), e.getMessage());
                 }
                 devTableFieldRepository.deleteByTableId(table.getId());
                 devTableRepository.delete(table);
@@ -498,46 +410,7 @@ public class ProjectService {
                             .build();
                     DevTable savedTable = devTableRepository.save(table);
 
-                    // Rebuild CREATE TABLE DDL
-                    StringBuilder ddl = new StringBuilder();
-                    ddl.append("CREATE TABLE ").append(t.getName()).append(" (");
-                    ddl.append("id VARCHAR(36) PRIMARY KEY");
-
-                    for (FieldState f : t.getFields()) {
-                        DevTableField field = DevTableField.builder()
-                                .table(savedTable)
-                                .fieldName(f.getFieldName())
-                                .fieldType(f.getFieldType())
-                                .isRequired(f.isRequired())
-                                .build();
-                        devTableFieldRepository.save(field);
-
-                        ddl.append(", ").append(f.getFieldName()).append(" ");
-                        switch (f.getFieldType()) {
-                            case "VARCHAR":
-                                ddl.append("VARCHAR(255)");
-                                break;
-                            case "TEXT":
-                                ddl.append("CLOB");
-                                break;
-                            case "INTEGER":
-                                ddl.append("INTEGER");
-                                break;
-                            case "DOUBLE":
-                                ddl.append("DOUBLE PRECISION");
-                                break;
-                            case "BOOLEAN":
-                                ddl.append("BOOLEAN");
-                                break;
-                        }
-                        if (f.isRequired()) {
-                            ddl.append(" NOT NULL");
-                        }
-                    }
-                    ddl.append(")");
-
-                    log.info("Rollback: executing DDL {}", ddl);
-                    targetTemplate.execute(ddl.toString());
+                    log.info("Rollback: Recreated metadata for virtual table {}", t.getName());
                 }
             }
 
