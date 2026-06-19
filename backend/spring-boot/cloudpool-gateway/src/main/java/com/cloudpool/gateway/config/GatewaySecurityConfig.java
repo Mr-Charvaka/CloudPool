@@ -9,6 +9,9 @@ import org.springframework.security.web.server.util.matcher.ServerWebExchangeMat
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.server.adapter.ForwardedHeaderTransformer;
 
 import java.util.Arrays;
 import java.util.List;
@@ -17,25 +20,40 @@ import java.util.List;
 @EnableWebFluxSecurity
 public class GatewaySecurityConfig {
 
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:8080}")
+    private String[] allowedOrigins;
+
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         http
-            // Gateway is a stateless reverse proxy — CSRF is handled by individual microservices
-            .csrf(csrf -> csrf.requireCsrfProtectionMatcher(ServerWebExchangeMatchers.pathMatchers("/csrf-require")))
+            // Centralize CSRF protection at the Gateway
+            .csrf(csrf -> csrf.csrfTokenRepository(CookieServerCsrfTokenRepository.withHttpOnlyFalse()))
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeExchange(exchanges -> exchanges
-                .anyExchange().permitAll()
-            );
+                .pathMatchers("/api/auth/**", "/public/**").permitAll()
+                .anyExchange().authenticated()
+            )
+            // Strict JWT signature validation
+            .oauth2ResourceServer(ServerHttpSecurity.OAuth2ResourceServerSpec::jwt)
+            // Use mTLS for internal microservice communication
+            .x509(x509 -> x509.principalExtractor(cert -> cert.getSubjectDN().getName()));
+            
         return http.build();
+    }
+
+    @Bean
+    public ForwardedHeaderTransformer forwardedHeaderTransformer() {
+        // Configure ForwardedHeaderFilter securely
+        return new ForwardedHeaderTransformer();
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(Arrays.asList("http://localhost:3000", "http://localhost:8080"));
+        config.setAllowedOriginPatterns(Arrays.asList(allowedOrigins));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-API-KEY", "X-Project-Id", "X-XSRF-TOKEN"));
-        config.setExposedHeaders(Arrays.asList("Authorization"));
+        // DO NOT expose Authorization headers globally
         config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
