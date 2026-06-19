@@ -13,6 +13,21 @@ import org.springframework.scheduling.annotation.Async;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import javax.annotation.PostConstruct;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -29,6 +44,21 @@ public class ComputeService {
     private final BackgroundJobRepository backgroundJobRepository;
     private final GraphQLSubscriptionService subscriptionService;
     private final QuotaPolicy quotaPolicy;
+    private final ObjectMapper objectMapper;
+
+    // Warm worker pool for serverless functions (Nashorn/GraalVM)
+    private final BlockingQueue<ScriptEngine> scriptEnginePool = new ArrayBlockingQueue<>(10);
+
+    @PostConstruct
+    public void initWorkerPool() {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        for (int i = 0; i < 10; i++) {
+            ScriptEngine engine = manager.getEngineByName("JavaScript");
+            if (engine != null) {
+                scriptEnginePool.offer(engine);
+            }
+        }
+    }
 
     @Transactional
     public StaticSite deployStaticSite(User user, String name, String bucketName, String domain) {
@@ -73,11 +103,13 @@ public class ComputeService {
         return serverlessFunctionRepository.findByUser(user);
     }
 
-    public String executeServerlessFunction(UUID userId, UUID id, String paramsJson) {
-        ServerlessFunction function = serverlessFunctionRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Serverless function not found"));
-        if (!function.getUserId().equals(userId)) throw new CloudPoolException("Unauthorized");
-        return executeSandbox(function.getCode(), paramsJson);
+    public java.util.concurrent.CompletableFuture<String> executeServerlessFunctionAsync(UUID userId, UUID id, String paramsJson) {
+        return java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            ServerlessFunction function = serverlessFunctionRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Serverless function not found"));
+            if (!function.getUserId().equals(userId)) throw new CloudPoolException("Unauthorized");
+            return executeSandbox(function.getCode(), paramsJson);
+        });
     }
 
     @Transactional
@@ -90,8 +122,10 @@ public class ComputeService {
 
     @Transactional
     public ContainerDeployment deployContainer(UUID userId, String name, String dockerImage, double cpu, int memory, int replicas) {
+        User user = new User();
+        user.setId(userId);
         // Enforce product quota limits before allocating resources
-        // quotaPolicy.enforceContainerQuota(user); // TODO: Refactor QuotaPolicy for UUID
+        quotaPolicy.enforceContainerQuota(user);
 
         ContainerDeployment deployment = ContainerDeployment.builder()
                 .name(name)
@@ -118,7 +152,6 @@ public class ComputeService {
         containerDeploymentRepository.delete(deployment);
     }
 
-    @Async("deploymentExecutor")
     public void processContainerDeploymentAsync(ContainerDeployment deployment) {
         BackgroundJob job = BackgroundJob.builder()
                 .jobType("CONTAINER_DEPLOYMENT")
@@ -130,9 +163,30 @@ public class ComputeService {
 
         try {
             log.info("Provisioning infrastructure for container: {}", deployment.getName());
-            Thread.sleep(1500); 
-            log.info("Pulling docker image: {}", deployment.getDockerImage());
-            Thread.sleep(2000);
+            
+            // Actually run the container with quotas, non-root user, and hard-kill timeout
+            ProcessBuilder pb = new ProcessBuilder(
+                "docker", "run", "-d", 
+                "--name", "deploy_" + deployment.getId(),
+                "--user", "1000:1000", // Run as non-root user
+                "--storage-opt", "size=2G", // Enforce storage quotas
+                "--memory", deployment.getMemory() + "m", 
+                "--cpus", String.valueOf(deployment.getCpu()), 
+                deployment.getDockerImage()
+            );
+            
+            Process process = pb.start();
+            boolean finished = process.waitFor(60, TimeUnit.SECONDS); // Hard-kill timeout for provisioning
+            
+            if (!finished) {
+                process.destroyForcibly();
+                throw new CloudPoolException("Docker provisioning timed out and was forcibly killed.");
+            }
+            
+            int exitCode = process.exitValue();
+            if (exitCode != 0) {
+                throw new CloudPoolException("Docker run failed with exit code " + exitCode);
+            }
 
             ContainerDeployment active = containerDeploymentRepository.findById(deployment.getId()).orElse(null);
             if (active != null) {
@@ -159,17 +213,32 @@ public class ComputeService {
     }
 
     private String executeSandbox(String code, String paramsJson) {
+        ScriptEngine engine = null;
         try {
-            ScriptEngineManager manager = new ScriptEngineManager();
-            ScriptEngine engine = manager.getEngineByName("js");
-            engine.put("PARAMS", paramsJson);
-            engine.put("RESULT", "");
-            String wrapped = "try { var args = JSON.parse(PARAMS); var res = (function(args) { " + code + " })(args); RESULT = JSON.stringify(res); } catch (e) { RESULT = 'ERROR: ' + e.getMessage(); }";
-            engine.eval(wrapped);
-            return (String) engine.get("RESULT");
+            engine = scriptEnginePool.poll(5, TimeUnit.SECONDS);
+            if (engine == null) {
+                throw new CloudPoolException("No warm workers available for execution.");
+            }
+            
+            // Securely evaluate params using ObjectMapper to avoid JS Injection
+            Object paramsObj = objectMapper.readValue(paramsJson != null && !paramsJson.isBlank() ? paramsJson : "{}", Object.class);
+            engine.put("params", paramsObj);
+            
+            // Execute the code inside the warm engine
+            String script = "const res = (function(args) { " + code + " })(params); res;";
+            Object result = engine.eval(script);
+            
+            return objectMapper.writeValueAsString(result);
+            
         } catch (Exception e) {
             log.error("Error executing serverless function sandbox", e);
             throw new CloudPoolException("Sandbox Execution Error: " + e.getMessage());
+        } finally {
+            if (engine != null) {
+                // Wipe state if possible, then return to pool
+                engine.put("params", null);
+                scriptEnginePool.offer(engine);
+            }
         }
     }
 }
