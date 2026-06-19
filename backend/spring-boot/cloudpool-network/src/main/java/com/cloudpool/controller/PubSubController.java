@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.Map;
 import java.util.UUID;
@@ -15,7 +16,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/pubsub")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class PubSubController {
 
     private final PubSubWebSocketHandler pubSubHandler;
@@ -29,7 +30,7 @@ public class PubSubController {
     @PostMapping("/broadcast")
     public ResponseEntity<?> broadcast(
             @PathVariable UUID projectId,
-            @RequestBody BroadcastRequest request) {
+            @Valid @RequestBody BroadcastRequest request) {
         validateProjectAccess(projectId);
         try {
             // Scope channels by projectId to ensure tenants don't overlap

@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.Map;
 import java.util.UUID;
@@ -16,7 +17,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/waf")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class WafController {
 
     private final WafRuleRepository wafRuleRepository;
@@ -36,7 +37,7 @@ public class WafController {
     @PostMapping
     public ResponseEntity<?> addRule(
             @PathVariable UUID projectId,
-            @RequestBody WafRuleRequest request) {
+            @Valid @RequestBody WafRuleRequest request) {
         validateProjectAccess(projectId);
         
         WafRule rule = new WafRule();

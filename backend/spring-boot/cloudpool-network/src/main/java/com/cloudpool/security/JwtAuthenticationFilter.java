@@ -119,7 +119,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             byte[] hash = digest.digest(apiKeyRaw.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
-            throw new RuntimeException("SHA-256 algorithm not available", e);
+            throw new com.cloudpool.exception.CloudPoolException("SHA-256 algorithm not available", e);
         }
     }
 }
+

@@ -349,7 +349,7 @@ public class ProjectService {
                 return res != null && res == 1;
             } catch (Exception e) {
                 log.error("PostgreSQL connection test failed: {}", e.getMessage());
-                throw new RuntimeException("PostgreSQL connection test failed: " + e.getMessage(), e);
+                throw new com.cloudpool.exception.CloudPoolException("PostgreSQL connection test failed: " + e.getMessage(), e);
             }
         } else if ("REDIS".equalsIgnoreCase(dbType)) {
             try (redis.clients.jedis.Jedis jedis = new redis.clients.jedis.Jedis(safeHost, port, 2000)) {
@@ -360,7 +360,7 @@ public class ProjectService {
                 return "PONG".equalsIgnoreCase(pingRes);
             } catch (Exception e) {
                 log.error("Redis connection test failed: {}", e.getMessage());
-                throw new RuntimeException("Redis connection test failed: " + e.getMessage(), e);
+                throw new com.cloudpool.exception.CloudPoolException("Redis connection test failed: " + e.getMessage(), e);
             }
         } else {
             throw new IllegalArgumentException("Unsupported database type: " + dbType);
@@ -407,7 +407,7 @@ public class ProjectService {
             return projectSnapshotRepository.save(snapshot);
         } catch (Exception e) {
             log.error("Failed to serialize snapshot topology: {}", e.getMessage(), e);
-            throw new RuntimeException("Snapshot failed: " + e.getMessage());
+            throw new com.cloudpool.exception.CloudPoolException("Snapshot failed: " + e.getMessage());
         }
     }
 
@@ -543,7 +543,7 @@ public class ProjectService {
 
         } catch (Exception e) {
             log.error("Failed to restore snapshot topology: {}", e.getMessage(), e);
-            throw new RuntimeException("Snapshot restoration failed: " + e.getMessage());
+            throw new com.cloudpool.exception.CloudPoolException("Snapshot restoration failed: " + e.getMessage());
         }
     }
 
@@ -611,3 +611,4 @@ public class ProjectService {
         private boolean isRequired;
     }
 }
+
