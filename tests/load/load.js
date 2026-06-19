@@ -41,13 +41,13 @@ export default function () {
   const params = {
     headers: {
       'Content-Type': 'application/json',
-      'X-Bypass-Rate-Limit': 'cloudpool-test',
+
     },
   };
 
   let authRes = http.post(`${BASE_URL}/api/auth/login`, loginPayload, params);
   check(authRes, {
-    'auth status is 200 or 401/404 (handled)': (r) => r.status === 200 || r.status === 401 || r.status === 404,
+    'auth status is 200/401/404/429': (r) => r.status === 200 || r.status === 401 || r.status === 404 || r.status === 429,
   });
 
   sleep(0.5);

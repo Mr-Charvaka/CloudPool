@@ -1,13 +1,13 @@
-version: '3.8'
+
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16
     container_name: cloudpool-postgres
     environment:
-      POSTGRES_DB: cloudpool
-      POSTGRES_USER: cloudpool
-      POSTGRES_PASSWORD: cloudpool
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -93,8 +93,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://toxiproxy:5433/cloudpool
-      SPRING_DATASOURCE_USERNAME: cloudpool
-      SPRING_DATASOURCE_PASSWORD: cloudpool
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -122,8 +122,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://toxiproxy:5433/cloudpool
-      SPRING_DATASOURCE_USERNAME: cloudpool
-      SPRING_DATASOURCE_PASSWORD: cloudpool
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -154,8 +154,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://toxiproxy:5433/cloudpool
-      SPRING_DATASOURCE_USERNAME: cloudpool
-      SPRING_DATASOURCE_PASSWORD: cloudpool
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -183,8 +183,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://toxiproxy:5433/cloudpool
-      SPRING_DATASOURCE_USERNAME: cloudpool
-      SPRING_DATASOURCE_PASSWORD: cloudpool
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379

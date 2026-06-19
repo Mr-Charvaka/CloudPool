@@ -59,7 +59,7 @@ class CloudPoolChaosTester:
         if headers is None:
             headers = {}
         headers["Content-Type"] = "application/json"
-        headers["X-Bypass-Rate-Limit"] = "cloudpool-test"
+
         
         body = json.dumps(data).encode("utf-8") if data else None
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
