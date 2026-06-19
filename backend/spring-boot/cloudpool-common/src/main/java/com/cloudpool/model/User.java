@@ -40,6 +40,7 @@ public class User {
     @Column(length = 1000)
     private String googleAccessToken;
 
+    @Convert(converter = com.cloudpool.util.EncryptedStringConverter.class)
     @Column(length = 1000)
     private String googleRefreshToken;
 
@@ -48,6 +49,7 @@ public class User {
     @Column(length = 500)
     private String customClientId;
 
+    @Convert(converter = com.cloudpool.util.EncryptedStringConverter.class)
     @Column(length = 500)
     private String customClientSecret;
 
