@@ -20,6 +20,7 @@ aes = "0.8"
 aes-gcm = "0.10"
 base64 = "0.21"
 rand = "0.8"
+hkdf = "0.12"
 
 # FFI
 libloading = "0.8"

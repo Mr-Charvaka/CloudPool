@@ -6,6 +6,8 @@ use aes_gcm::{Aes256Gcm, Key, Nonce};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use rand::RngCore;
+use hkdf::Hkdf;
+use sha2::Sha256;
 
 pub struct CryptoUtil {
     key: [u8; 32],
@@ -21,28 +23,11 @@ impl CryptoUtil {
 
     /// Derive 32-byte key from raw or base64 key string, matching Java's implementation.
     pub fn derive_key(master_key: &str) -> [u8; 32] {
-        let clean_key = master_key.trim();
-        let mut decoded = match STANDARD.decode(clean_key) {
-            Ok(k) => k,
-            Err(_) => {
-                let raw_bytes = clean_key.as_bytes();
-                let mut k = vec![0u8; 32];
-                let copy_len = std::cmp::min(raw_bytes.len(), 32);
-                k[..copy_len].copy_from_slice(&raw_bytes[..copy_len]);
-                k
-            }
-        };
-
-        if decoded.len() != 32 {
-            let mut temp = vec![0u8; 32];
-            let copy_len = std::cmp::min(decoded.len(), 32);
-            temp[..copy_len].copy_from_slice(&decoded[..copy_len]);
-            decoded = temp;
-        }
-
-        let mut result = [0u8; 32];
-        result.copy_from_slice(&decoded[..32]);
-        result
+        let hk = Hkdf::<Sha256>::new(None, master_key.trim().as_bytes());
+        let mut okm = [0u8; 32];
+        hk.expand(b"cloudpool-aes-gcm-v1", &mut okm)
+            .expect("32 bytes is a valid HKDF output length");
+        okm
     }
 
     /// Encrypt plaintext using AES-GCM (returns base64 string).
@@ -79,10 +64,16 @@ impl CryptoUtil {
         Ok(encrypted_buffer)
     }
 
-    /// Decrypt raw bytes supporting both AES-GCM and legacy AES-ECB fallback.
+    /// Only call this explicitly from a one-time migration job, never from the hot decrypt path.
+    pub fn migrate_legacy_ciphertext(&self, data: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
+        log::warn!("Decrypting legacy ECB ciphertext during migration — this should not happen post-cutover");
+        self.decrypt_legacy_bytes(data)
+    }
+
+    /// Decrypt raw bytes using AES-GCM only. No legacy fallback.
     pub fn decrypt_bytes(&self, data: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
         if data.len() < 12 + 16 {
-            return self.decrypt_legacy_bytes(data);
+            return Err("Ciphertext too short for AES-GCM; use migrate_legacy_ciphertext explicitly if this is known legacy data".into());
         }
 
         let key = Key::<Aes256Gcm>::from_slice(&self.key);
@@ -92,10 +83,8 @@ impl CryptoUtil {
         let encrypted_payload = &data[12..];
         let nonce = Nonce::from_slice(iv);
 
-        match cipher.decrypt(nonce, encrypted_payload) {
-            Ok(decrypted_bytes) => Ok(decrypted_bytes),
-            Err(_) => self.decrypt_legacy_bytes(data),
-        }
+        cipher.decrypt(nonce, encrypted_payload)
+            .map_err(|e| format!("AES-GCM decryption failed: {}", e).into())
     }
 
     /// Decrypt raw bytes using legacy AES-ECB and PKCS#7 unpadding.
@@ -177,9 +166,9 @@ mod tests {
             cipher.encrypt_block(block);
         }
 
-        let base64_ciphertext = STANDARD.encode(padded);
+        let base64_ciphertext = STANDARD.decode(STANDARD.encode(padded)).unwrap();
         let crypto = CryptoUtil::new(DEFAULT_KEY);
-        let decrypted = crypto.decrypt(&base64_ciphertext).unwrap();
-        assert_eq!("legacy-data-888", decrypted);
+        let decrypted = crypto.migrate_legacy_ciphertext(&base64_ciphertext).unwrap();
+        assert_eq!(b"legacy-data-888".to_vec(), decrypted);
     }
 }
