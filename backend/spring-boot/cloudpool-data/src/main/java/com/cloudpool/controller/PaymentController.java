@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -21,7 +22,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/dev/payments")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class PaymentController {
 
     private final PaymentService paymentService;
@@ -57,7 +58,7 @@ public class PaymentController {
 
     /** Register a new payment gateway */
     @PostMapping("/gateways")
-    public ResponseEntity<?> registerGateway(@RequestBody RegisterGatewayRequest req) {
+    public ResponseEntity<?> registerGateway(@Valid @RequestBody RegisterGatewayRequest req) {
         UUID userId = currentUser().getId();
         try {
             PaymentGateway.Provider provider = PaymentGateway.Provider.valueOf(req.getProvider().toUpperCase());
@@ -112,7 +113,7 @@ public class PaymentController {
     /** Create a charge on a specific gateway */
     @PostMapping("/gateways/{gatewayId}/charge")
     public ResponseEntity<?> createCharge(@PathVariable UUID gatewayId,
-                                          @RequestBody ChargeRequest req) {
+                                          @Valid @RequestBody ChargeRequest req) {
         UUID userId = currentUser().getId();
         if (req.getAmount() == null || req.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             return ResponseEntity.badRequest().body(Map.of("error", "Amount must be positive"));
@@ -175,6 +176,7 @@ public class PaymentController {
     @Data
     public static class RegisterGatewayRequest {
         private String displayName;
+        @jakarta.validation.constraints.NotBlank
         private String provider;        // STRIPE | RAZORPAY | CUSTOM
         private String mode;            // LIVE | TEST (default TEST)
         private String apiKey;          // Publishable key

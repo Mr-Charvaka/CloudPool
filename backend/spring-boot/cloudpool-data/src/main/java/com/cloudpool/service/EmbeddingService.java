@@ -73,25 +73,25 @@ public class EmbeddingService {
                     if (statusCode == 429 || statusCode == 503 || statusCode >= 500) {
                         attempt++;
                         if (attempt >= maxRetries) {
-                            throw new RuntimeException("Failed to fetch embedding: HTTP status " + statusCode);
+                            throw new com.cloudpool.exception.CloudPoolException("Failed to fetch embedding: HTTP status " + statusCode);
                         }
                         log.warn("Transient error from OpenAI (HTTP {}), retrying attempt {}/{} in {} ms...",
                                 statusCode, attempt, maxRetries, backoffMs);
                         Thread.sleep(backoffMs);
                         backoffMs *= 2;
                     } else {
-                        throw new RuntimeException("Failed to fetch embedding: HTTP status " + response.getStatusCode());
+                        throw new com.cloudpool.exception.CloudPoolException("Failed to fetch embedding: HTTP status " + response.getStatusCode());
                     }
                 }
             } catch (Exception e) {
                 if (e instanceof InterruptedException) {
                     Thread.currentThread().interrupt();
-                    throw new RuntimeException("Embedding generation interrupted", e);
+                    throw new com.cloudpool.exception.CloudPoolException("Embedding generation interrupted", e);
                 }
                 attempt++;
                 if (attempt >= maxRetries) {
                     log.error("Failed to generate embedding after {} attempts: {}", maxRetries, e.getMessage());
-                    throw new RuntimeException("Error generating embedding from OpenAI: " + e.getMessage(), e);
+                    throw new com.cloudpool.exception.CloudPoolException("Error generating embedding from OpenAI: " + e.getMessage(), e);
                 }
                 log.warn("Error calling OpenAI (attempt {}/{}), retrying in {} ms: {}",
                         attempt, maxRetries, backoffMs, e.getMessage());
@@ -99,7 +99,7 @@ public class EmbeddingService {
                     Thread.sleep(backoffMs);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    throw new RuntimeException(ie);
+                    throw new com.cloudpool.exception.CloudPoolException(ie);
                 }
                 backoffMs *= 2;
             }
@@ -129,3 +129,4 @@ public class EmbeddingService {
         return vector;
     }
 }
+

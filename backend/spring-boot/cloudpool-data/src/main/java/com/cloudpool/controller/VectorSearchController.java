@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/vector")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class VectorSearchController {
 
     private final VectorService vectorService;

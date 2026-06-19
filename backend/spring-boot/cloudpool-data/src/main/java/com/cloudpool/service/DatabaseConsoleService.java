@@ -31,7 +31,7 @@ public class DatabaseConsoleService {
             dataSource.setPassword(conn.getPassword());
             return new JdbcTemplate(dataSource);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to construct dynamic PostgreSQL connection: " + e.getMessage(), e);
+            throw new com.cloudpool.exception.CloudPoolException("Failed to construct dynamic PostgreSQL connection: " + e.getMessage(), e);
         }
     }
 
@@ -215,3 +215,4 @@ public class DatabaseConsoleService {
         private String message;
     }
 }
+

@@ -20,6 +20,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.UUID;
 
@@ -187,8 +189,8 @@ public class StorageService {
         return data;
     }
 
-    public List<FileMetadata> listUserFiles(User user) {
-        return fileMetadataRepository.findByUserId(user.getId());
+    public Page<FileMetadata> listUserFiles(User user, Pageable pageable) {
+        return fileMetadataRepository.findByUserId(user.getId(), pageable);
     }
 
     public List<Bucket> listUserBuckets(User user) {

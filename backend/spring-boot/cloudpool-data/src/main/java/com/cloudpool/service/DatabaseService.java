@@ -185,7 +185,7 @@ public class DatabaseService {
             getJdbcTemplateForProject(projectId).execute(ddl.toString());
         } catch (Exception e) {
             log.error("Failed to create physical table: {}", e.getMessage(), e);
-            throw new RuntimeException("Database error: Could not create table structure. " + e.getMessage());
+            throw new com.cloudpool.exception.CloudPoolException("Database error: Could not create table structure. " + e.getMessage());
         }
 
         // Save metadata
@@ -248,7 +248,7 @@ public class DatabaseService {
             getJdbcTemplateForProject(devTable.getProjectId()).execute(dropDdl);
         } catch (Exception e) {
             log.error("Failed to drop physical table: {}", e.getMessage(), e);
-            throw new RuntimeException("Database error: Could not drop table structure. " + e.getMessage());
+            throw new com.cloudpool.exception.CloudPoolException("Database error: Could not drop table structure. " + e.getMessage());
         }
 
         devTableFieldRepository.deleteByTableId(tableId);
@@ -330,7 +330,7 @@ public class DatabaseService {
             getJdbcTemplateForProject(devTable.getProjectId()).update(insertSql, insertValues.toArray());
         } catch (Exception e) {
             log.error("Failed to insert record: {}", e.getMessage(), e);
-            throw new RuntimeException("Database error: Could not insert record. " + e.getMessage());
+            throw new com.cloudpool.exception.CloudPoolException("Database error: Could not insert record. " + e.getMessage());
         }
 
         return recordData;
@@ -345,7 +345,7 @@ public class DatabaseService {
             return getJdbcTemplateForProject(devTable.getProjectId()).queryForList(selectSql);
         } catch (Exception e) {
             log.error("Failed to query records: {}", e.getMessage(), e);
-            throw new RuntimeException("Database error: Could not fetch records. " + e.getMessage());
+            throw new com.cloudpool.exception.CloudPoolException("Database error: Could not fetch records. " + e.getMessage());
         }
     }
 
@@ -359,7 +359,7 @@ public class DatabaseService {
             getJdbcTemplateForProject(devTable.getProjectId()).update(deleteSql, recordId);
         } catch (Exception e) {
             log.error("Failed to delete record: {}", e.getMessage(), e);
-            throw new RuntimeException("Database error: Could not delete record. " + e.getMessage());
+            throw new com.cloudpool.exception.CloudPoolException("Database error: Could not delete record. " + e.getMessage());
         }
     }
 
@@ -372,3 +372,4 @@ public class DatabaseService {
         private boolean isRequired;
     }
 }
+

@@ -66,16 +66,9 @@ public class GraphQLController {
     @QueryMapping
     public List<FileMetadata> files(@Argument Integer page, @Argument Integer size) {
         User user = getAuthenticatedUser();
-        List<FileMetadata> allFiles = storageService.listUserFiles(user);
-        if (page == null || size == null || page < 0 || size <= 0) {
-            return allFiles;
-        }
-        int fromIndex = page * size;
-        if (fromIndex >= allFiles.size()) {
-            return Collections.emptyList();
-        }
-        int toIndex = Math.min(fromIndex + size, allFiles.size());
-        return allFiles.subList(fromIndex, toIndex);
+        int pageNum = (page != null && page >= 0) ? page : 0;
+        int pageSize = (size != null && size > 0) ? size : 20;
+        return storageService.listUserFiles(user, org.springframework.data.domain.PageRequest.of(pageNum, pageSize)).getContent();
     }
 
     @QueryMapping
@@ -233,7 +226,7 @@ public class GraphQLController {
             byte[] hash = digest.digest(apiKeyRaw.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
-            throw new RuntimeException("SHA-256 algorithm not available", e);
+            throw new com.cloudpool.exception.CloudPoolException("SHA-256 algorithm not available", e);
         }
     }
 
@@ -284,6 +277,7 @@ public class GraphQLController {
     @AllArgsConstructor
     public static class ApiKeyResponse {
         private UUID id;
+        @jakarta.validation.constraints.NotBlank
         private String name;
         private String apiKey;
         private String createdAt;
@@ -294,3 +288,4 @@ public class GraphQLController {
         return subscriptionService.getJobUpdatesFlux();
     }
 }
+

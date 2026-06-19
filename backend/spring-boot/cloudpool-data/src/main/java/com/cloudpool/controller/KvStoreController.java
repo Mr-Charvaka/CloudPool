@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.Map;
 import java.util.UUID;
@@ -15,7 +16,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/kv")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class KvStoreController {
 
     private final KvStoreService kvStoreService;
@@ -35,7 +36,7 @@ public class KvStoreController {
     public ResponseEntity<?> setKey(
             @PathVariable UUID projectId,
             @PathVariable String keyName,
-            @RequestBody KvRequest request) {
+            @Valid @RequestBody KvRequest request) {
         validateProjectAccess(projectId);
         kvStoreService.set(projectId, keyName, request.getValue(), request.getTtlSeconds());
         return ResponseEntity.ok(Map.of("message", "Key saved successfully"));

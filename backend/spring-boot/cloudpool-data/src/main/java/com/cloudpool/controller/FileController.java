@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -22,7 +23,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/files")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class FileController {
 
     private final StorageService storageService;
@@ -66,9 +67,11 @@ public class FileController {
     }
 
     @GetMapping
-    public ResponseEntity<List<FileMetadata>> listFiles() {
+    public ResponseEntity<org.springframework.data.domain.Page<FileMetadata>> listFiles(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         User user = getAuthenticatedUser();
-        return ResponseEntity.ok(storageService.listUserFiles(user));
+        return ResponseEntity.ok(storageService.listUserFiles(user, PageRequest.of(page, size)));
     }
 
     @GetMapping("/buckets")
@@ -93,7 +96,7 @@ public class FileController {
     @PostMapping("/{fileId}/share")
     public ResponseEntity<?> shareFile(
             @PathVariable("fileId") UUID fileId,
-            @RequestBody(required = false) ShareFileRequest request) {
+            @Valid @RequestBody(required = false) ShareFileRequest request) {
         try {
             User user = getAuthenticatedUser();
             String email = request != null ? request.getSharedWithEmail() : null;

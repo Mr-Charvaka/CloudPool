@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.Map;
@@ -19,7 +20,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/db")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class DatabaseRestController {
 
     private final DatabaseService databaseService;
@@ -31,7 +32,7 @@ public class DatabaseRestController {
 
     @PostMapping("/tables")
     public ResponseEntity<?> createTable(
-            @RequestBody CreateTableRequest request,
+            @Valid @RequestBody CreateTableRequest request,
             @RequestHeader(value = "X-Project-Id", required = false) String projectIdHeader) {
         try {
             User user = getAuthenticatedUser();
@@ -115,7 +116,7 @@ public class DatabaseRestController {
     }
 
     @PostMapping("/tables/{tableId}/records")
-    public ResponseEntity<?> insertRecord(@PathVariable UUID tableId, @RequestBody Map<String, Object> data) {
+    public ResponseEntity<?> insertRecord(@PathVariable UUID tableId, @Valid @RequestBody Map<String, Object> data) {
         try {
             User user = getAuthenticatedUser();
             Map<String, Object> record = databaseService.insertRecord(tableId, data, user.getId());
@@ -152,6 +153,7 @@ public class DatabaseRestController {
     @Data
     public static class CreateTableRequest {
         private UUID projectId;
+        @jakarta.validation.constraints.NotBlank
         private String name;
         private String displayName;
         private String description;
