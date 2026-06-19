@@ -16,6 +16,9 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
 
+import com.cloudpool.publisher.DeploymentPublisher;
+import com.cloudpool.event.DeploymentRequestedEvent;
+
 @Slf4j
 @RestController
 @RequestMapping("/api/compute")
@@ -23,6 +26,7 @@ import java.util.*;
 public class ComputeController {
 
     private final ComputeService computeService;
+    private final DeploymentPublisher deploymentPublisher;
     private final StorageService storageService;
 
     private User getAuthenticatedUser() {
@@ -83,7 +87,7 @@ public class ComputeController {
     }
 
     @PostMapping("/serverless/{id}/execute")
-    public ResponseEntity<?> executeServerlessFunction(
+    public java.util.concurrent.CompletableFuture<ResponseEntity<?>> executeServerlessFunction(
             @PathVariable("id") UUID id,
             @Valid @RequestBody(required = false) Map<String, Object> params) {
         
@@ -95,12 +99,12 @@ public class ComputeController {
             } catch (Exception ignored) {}
         }
 
-        String result = computeService.executeServerlessFunction(user, id, paramsJson);
-        return ResponseEntity.ok(Map.of(
-                "status", "SUCCESS",
-                "executionOutput", result,
-                "timestamp", LocalDateTime.now().toString()
-        ));
+        return computeService.executeServerlessFunctionAsync(user.getId(), id, paramsJson)
+                .thenApply(result -> ResponseEntity.ok(Map.of(
+                        "status", "SUCCESS",
+                        "executionOutput", result,
+                        "timestamp", LocalDateTime.now().toString()
+                )));
     }
 
     @DeleteMapping("/serverless/{id}")
@@ -115,12 +119,22 @@ public class ComputeController {
     @PostMapping("/container")
     public ResponseEntity<?> deployContainer(@Valid @RequestBody ContainerRequest request) {
         User user = getAuthenticatedUser();
-        ContainerDeployment deployment = computeService.deployContainer(
-                user, request.getName(), request.getDockerImage(), request.getCpu(), request.getMemory(), request.getReplicas()
-        );
-        // Delegate async processing to the named @Bean executor in the service
-        computeService.processContainerDeploymentAsync(deployment);
-        return ResponseEntity.ok(Map.of("message", "Container deployment initiated", "deploymentId", deployment.getId()));
+        
+        java.util.UUID eventId = java.util.UUID.randomUUID();
+        DeploymentRequestedEvent event = DeploymentRequestedEvent.builder()
+                .eventId(eventId)
+                .userId(user.getId())
+                .name(request.getName())
+                .dockerImage(request.getDockerImage())
+                .cpu(request.getCpu())
+                .memory(request.getMemory())
+                .replicas(request.getReplicas())
+                .timestamp(java.time.Instant.now())
+                .build();
+                
+        deploymentPublisher.requestDeployment(event);
+        
+        return ResponseEntity.ok(Map.of("message", "Container deployment initiated via event stream", "eventId", eventId));
     }
 
     @GetMapping("/container")
