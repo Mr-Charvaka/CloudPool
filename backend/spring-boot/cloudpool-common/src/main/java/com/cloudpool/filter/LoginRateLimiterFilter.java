@@ -9,16 +9,28 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 
 @Slf4j
 @Component
 public class LoginRateLimiterFilter implements Filter {
 
     private final RedisTemplate<String, Object> redisTemplate;
+    
+    private static final String LUA_SCRIPT =
+            "local count = redis.call('INCR', KEYS[1]) " +
+            "if count == 1 then " +
+            "  redis.call('EXPIRE', KEYS[1], ARGV[1]) " +
+            "end " +
+            "return count";
+    private final RedisScript<Long> script = new DefaultRedisScript<>(LUA_SCRIPT, Long.class);
+
     private final Map<String, Long> localAttempts = new ConcurrentHashMap<>();
 
     public LoginRateLimiterFilter(Optional<RedisTemplate<String, Object>> redisTemplate) {
@@ -50,10 +62,7 @@ public class LoginRateLimiterFilter implements Filter {
         String key = "rate:login:" + ip;
         if (redisTemplate != null) {
             try {
-                Long count = redisTemplate.opsForValue().increment(key);
-                if (count == null || count == 1) {
-                    redisTemplate.expire(key, 60, TimeUnit.SECONDS);
-                }
+                Long count = redisTemplate.execute(script, Collections.singletonList(key), 60);
                 return count != null && count > 5; // Allow 5 attempts per minute
             } catch (Exception e) {
                 log.debug("Redis rate limiting error, falling back to local storage: {}", e.getMessage());
