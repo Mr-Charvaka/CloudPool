@@ -32,13 +32,9 @@ public class TenantFilter extends OncePerRequestFilter {
                 // Set context
                 TenantContextHolder.setUserId(user.getId().toString());
                 
-                // Get tenant from header or default to user's own id
-                String tenantId = request.getHeader("X-Tenant-ID");
-                if (tenantId != null && !tenantId.trim().isEmpty()) {
-                    TenantContextHolder.setTenantId(tenantId);
-                } else {
-                    TenantContextHolder.setTenantId(user.getId().toString());
-                }
+                // Tenant identity is NEVER taken from client input.
+                // It is strictly bound to the authenticated principal to prevent IDOR spoofing.
+                TenantContextHolder.setTenantId(user.getId().toString());
             }
 
             filterChain.doFilter(request, response);
