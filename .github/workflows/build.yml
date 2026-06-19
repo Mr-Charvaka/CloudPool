@@ -22,7 +22,6 @@ jobs:
         cache: 'npm'
         cache-dependency-path: |
           sdk/javascript/package-lock.json
-          frontend/react-dashboard/package-lock.json
           DRAP/dashboard/ui/package-lock.json
           DRAP/DRAP-main/dashboard/ui/package-lock.json
       continue-on-error: true
