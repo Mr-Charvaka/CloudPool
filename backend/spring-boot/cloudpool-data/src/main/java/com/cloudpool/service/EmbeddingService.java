@@ -36,8 +36,8 @@ public class EmbeddingService {
         }
 
         if (apiKey == null || apiKey.trim().isEmpty() || "your-openai-key-here".equals(apiKey)) {
-            log.warn("OpenAI API key not configured. Returning dummy embedding (1536 dims).");
-            return generateMockEmbedding(text);
+            log.error("OpenAI API key not configured. Cannot generate embedding.");
+            throw new com.cloudpool.exception.CloudPoolException("Vector embedding service is currently unavailable. Please configure the OpenAI API key.");
         }
 
         int maxRetries = 3;
@@ -103,30 +103,7 @@ public class EmbeddingService {
                 }
                 backoffMs *= 2;
             }
-        }
-        return generateMockEmbedding(text);
-    }
-
-    private float[] generateMockEmbedding(String text) {
-        float[] vector = new float[1536];
-        // Generate pseudo-random vector based on string hash for consistency
-        int hash = text.hashCode();
-        java.util.Random rand = new java.util.Random(hash);
-        for (int i = 0; i < 1536; i++) {
-            vector[i] = rand.nextFloat() * 2.0f - 1.0f;
-        }
-        // Normalize the vector
-        float magnitude = 0.0f;
-        for (float val : vector) {
-            magnitude += val * val;
-        }
-        magnitude = (float) Math.sqrt(magnitude);
-        if (magnitude > 0) {
-            for (int i = 0; i < 1536; i++) {
-                vector[i] /= magnitude;
-            }
-        }
-        return vector;
+        throw new com.cloudpool.exception.CloudPoolException("Embedding service is unavailable.");
     }
 }
 
