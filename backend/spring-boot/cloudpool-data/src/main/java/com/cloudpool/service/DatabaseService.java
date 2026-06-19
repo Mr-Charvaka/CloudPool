@@ -52,7 +52,12 @@ public class DatabaseService {
                     try {
                         String password = conn.getPassword();
                         if (password == null || password.trim().isEmpty()) {
-                            password = "postgres";
+                            byte[] bytes = new byte[24];
+                            new java.security.SecureRandom().nextBytes(bytes);
+                            password = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+                            conn.setPassword(password);
+                            databaseConnectionRepository.save(conn);
+                            log.info("Generated new credentials for project {} database container", projectId);
                         }
                         int dockerPort = com.cloudpool.util.DockerPostgresProvisioner.provisionOrStartContainer(projectId, password);
                         if (dockerPort != port) {
