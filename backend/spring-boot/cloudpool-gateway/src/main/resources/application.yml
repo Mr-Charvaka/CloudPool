@@ -48,3 +48,6 @@ spring:
 logging:
   level:
     org.springframework.cloud.gateway: DEBUG
+
+server:
+  forward-headers-strategy: FRAMEWORK
