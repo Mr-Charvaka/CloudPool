@@ -14,6 +14,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.Arrays;
  
 @Component
 @Slf4j
@@ -28,13 +29,16 @@ public class EncryptionUtil {
     private final SecretKey secretKey;
     private final SecureRandom secureRandom = new SecureRandom();
  
-    public EncryptionUtil(@Value("${cloudpool.encryption.master-key}") String masterKeyBase64) {
+    public EncryptionUtil(@Value("${cloudpool.encryption.master-key}") String masterKeyBase64,
+                          @Value("${cloudpool.encryption.salt}") String saltBase64) {
         try {
             // Strip whitespace/newlines
             String cleanKey = masterKeyBase64.trim();
+            byte[] salt = Base64.getDecoder().decode(saltBase64.trim());
             
             byte[] derivedKey = hkdfSha256(cleanKey.getBytes(StandardCharsets.UTF_8),
-                                "cloudpool-db-conn-v1".getBytes(StandardCharsets.UTF_8), 32);
+                                salt,
+                                "cloudpool-aes-gcm-v1".getBytes(StandardCharsets.UTF_8), 32);
             this.secretKey = new SecretKeySpec(derivedKey, 0, 32, ALGORITHM);
             
             log.info("✅ Encryption key initialized successfully with HKDF");
@@ -44,30 +48,47 @@ public class EncryptionUtil {
     }
  
     /**
-     * Encrypt plaintext using AES-GCM
+     * Encrypt plaintext using AES-GCM and Envelope Encryption
      */
-    public String encrypt(String plaintext) {
-        if (plaintext == null || plaintext.isBlank()) {
+    public byte[] encrypt(byte[] plaintext) {
+        if (plaintext == null || plaintext.length == 0) {
             return null;
         }
         
         try {
+            // Envelope Encryption: Generate DEK
+            byte[] dekBytes = new byte[32];
+            secureRandom.nextBytes(dekBytes);
+            SecretKey dek = new SecretKeySpec(dekBytes, ALGORITHM);
+
+            // Encrypt DEK with KEK (secretKey)
+            byte[] kekIv = new byte[IV_LENGTH_BYTES];
+            secureRandom.nextBytes(kekIv);
+            Cipher kekCipher = Cipher.getInstance(TRANSFORMATION);
+            kekCipher.init(Cipher.ENCRYPT_MODE, secretKey, new GCMParameterSpec(TAG_LENGTH_BIT, kekIv));
+            byte[] encryptedDek = kekCipher.doFinal(dekBytes);
+
+            // Encrypt data with DEK
             byte[] iv = new byte[IV_LENGTH_BYTES];
             secureRandom.nextBytes(iv);
             
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
             GCMParameterSpec parameterSpec = new GCMParameterSpec(TAG_LENGTH_BIT, iv);
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey, parameterSpec);
+            cipher.init(Cipher.ENCRYPT_MODE, dek, parameterSpec);
             
-            byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
+            byte[] ciphertext = cipher.doFinal(plaintext);
             
-            // Combine IV and ciphertext: [12 bytes IV][ciphertext]
-            byte[] encryptedBuffer = ByteBuffer.allocate(iv.length + ciphertext.length)
+            // Format: [kekIv: 12] [encryptedDek length: 2] [encryptedDek] [iv: 12] [ciphertext]
+            byte[] encryptedBuffer = ByteBuffer.allocate(kekIv.length + 2 + encryptedDek.length + iv.length + ciphertext.length)
+                    .put(kekIv)
+                    .putShort((short) encryptedDek.length)
+                    .put(encryptedDek)
                     .put(iv)
                     .put(ciphertext)
                     .array();
             
-            return Base64.getEncoder().encodeToString(encryptedBuffer);
+            Arrays.fill(dekBytes, (byte) 0); // Zeroize DEK
+            return encryptedBuffer;
         } catch (Exception e) {
             log.error("Encryption failed: {}", e.getMessage());
             throw new com.cloudpool.exception.CloudPoolException("Failed to encrypt data", e);
@@ -75,33 +96,44 @@ public class EncryptionUtil {
     }
  
     /**
-     * Decrypt ciphertext supporting both new AES-GCM format and legacy AES-ECB fallback
+     * Decrypt ciphertext using Envelope Encryption
      */
-    public String decrypt(String ciphertext) {
-        if (ciphertext == null || ciphertext.isBlank()) {
+    public byte[] decrypt(byte[] ciphertext) {
+        if (ciphertext == null || ciphertext.length == 0) {
             return null;
         }
         
         try {
-            byte[] decoded = Base64.getDecoder().decode(ciphertext);
-            // GCM ciphertext payload must at least contain 12-byte IV + 16-byte GCM tag
-            if (decoded.length < IV_LENGTH_BYTES + 16) {
-                throw new IllegalArgumentException("Invalid ciphertext format");
-            }
+            ByteBuffer byteBuffer = ByteBuffer.wrap(ciphertext);
             
-            ByteBuffer byteBuffer = ByteBuffer.wrap(decoded);
+            byte[] kekIv = new byte[IV_LENGTH_BYTES];
+            byteBuffer.get(kekIv);
+            
+            short encryptedDekLength = byteBuffer.getShort();
+            byte[] encryptedDek = new byte[encryptedDekLength];
+            byteBuffer.get(encryptedDek);
+            
             byte[] iv = new byte[IV_LENGTH_BYTES];
             byteBuffer.get(iv);
             
             byte[] ciphertextBytes = new byte[byteBuffer.remaining()];
             byteBuffer.get(ciphertextBytes);
             
+            // Decrypt DEK
+            Cipher kekCipher = Cipher.getInstance(TRANSFORMATION);
+            kekCipher.init(Cipher.DECRYPT_MODE, secretKey, new GCMParameterSpec(TAG_LENGTH_BIT, kekIv));
+            byte[] dekBytes = kekCipher.doFinal(encryptedDek);
+            SecretKey dek = new SecretKeySpec(dekBytes, ALGORITHM);
+            
+            // Decrypt Data
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
             GCMParameterSpec parameterSpec = new GCMParameterSpec(TAG_LENGTH_BIT, iv);
-            cipher.init(Cipher.DECRYPT_MODE, secretKey, parameterSpec);
+            cipher.init(Cipher.DECRYPT_MODE, dek, parameterSpec);
             
             byte[] decryptedBytes = cipher.doFinal(ciphertextBytes);
-            return new String(decryptedBytes, StandardCharsets.UTF_8);
+            
+            Arrays.fill(dekBytes, (byte) 0); // Zeroize DEK
+            return decryptedBytes;
         } catch (Exception e) {
             log.error("Decryption failed: {}", e.getMessage());
             throw new com.cloudpool.exception.CloudPoolException("Failed to decrypt data", e);
@@ -124,9 +156,9 @@ public class EncryptionUtil {
         }
     }
 
-    private static byte[] hkdfSha256(byte[] ikm, byte[] info, int length) throws Exception {
+    private static byte[] hkdfSha256(byte[] ikm, byte[] salt, byte[] info, int length) throws Exception {
         Mac hmac = Mac.getInstance("HmacSHA256");
-        hmac.init(new SecretKeySpec(new byte[32], "HmacSHA256")); // salt = zeros, per HKDF spec when no salt given
+        hmac.init(new SecretKeySpec(salt, "HmacSHA256"));
         byte[] prk = hmac.doFinal(ikm);
 
         hmac.init(new SecretKeySpec(prk, "HmacSHA256"));
