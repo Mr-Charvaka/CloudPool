@@ -9,6 +9,12 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:sa}
     password: ${SPRING_DATASOURCE_PASSWORD:password}
     driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
 
   # Server Configuration
   server:
@@ -87,3 +93,7 @@ cloudpool:
 
 server:
   port: 8085
+
+server:
+  forward-headers-strategy: FRAMEWORK
+
