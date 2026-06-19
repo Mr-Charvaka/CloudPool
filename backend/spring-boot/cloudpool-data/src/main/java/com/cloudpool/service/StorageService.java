@@ -160,17 +160,18 @@ public class StorageService {
         return savedShare;
     }
 
-    public byte[] downloadFileDirectly(FileMetadata metadata) throws IOException {
+    public org.springframework.core.io.Resource downloadFileDirectly(FileMetadata metadata) throws IOException {
         if (metadata.getDriveFileId() != null) {
             // Download directly from Google Drive!
-            return googleDriveService.downloadFile(metadata.getDriveFileId(), metadata.getBucket().getUser());
+            byte[] data = googleDriveService.downloadFile(metadata.getDriveFileId(), metadata.getBucket().getUser());
+            return new org.springframework.core.io.ByteArrayResource(data);
         } else {
             Path filePath = Paths.get(metadata.getDriveLocation());
-            return Files.readAllBytes(filePath);
+            return new org.springframework.core.io.FileSystemResource(filePath);
         }
     }
 
-    public byte[] downloadFile(UUID fileId, User user) throws IOException {
+    public org.springframework.core.io.Resource downloadFile(UUID fileId, User user) throws IOException {
         FileMetadata metadata = fileMetadataRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("File not found"));
 
@@ -179,7 +180,7 @@ public class StorageService {
             throw new SecurityException("Unauthorized access to file");
         }
 
-        byte[] data = downloadFileDirectly(metadata);
+        org.springframework.core.io.Resource data = downloadFileDirectly(metadata);
 
         // Audit Log
         auditLogService.log(user, AuditLogService.ACTION_FILE_DOWNLOAD, "FILE", metadata.getId().toString(),
