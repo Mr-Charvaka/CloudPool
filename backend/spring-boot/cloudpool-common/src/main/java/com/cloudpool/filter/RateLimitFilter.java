@@ -1,38 +1,33 @@
 package com.cloudpool.filter;
  
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.google.common.util.concurrent.RateLimiter;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
- 
+import org.springframework.data.redis.core.StringRedisTemplate;
+
 import java.io.IOException;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.security.Principal;
  
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class RateLimitFilter extends OncePerRequestFilter {
  
     @Value("${cloudpool.rate-limit.requests-per-minute:120}")
-    private double requestsPerMinute;
+    private double defaultRequestsPerMinute;
  
-    private final LoadingCache<String, RateLimiter> limiters = CacheBuilder.newBuilder()
-        .maximumSize(10000)
-        .expireAfterAccess(10, TimeUnit.MINUTES)
-        .build(new CacheLoader<>() {
-            @Override
-            public RateLimiter load(String key) {
-                return RateLimiter.create(requestsPerMinute / 60.0); // Per second
-            }
-        });
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+    private final Semaphore globalConcurrencyLimit = new Semaphore(1000);
  
     @Override
     protected void doFilterInternal(HttpServletRequest request, 
@@ -42,48 +37,63 @@ public class RateLimitFilter extends OncePerRequestFilter {
         
 
         
-        // Skip rate limiting for public static files / auth endpoints
+        // /api/auth/ bypass removed for Issue 19
         if (isPublicEndpoint(request)) {
             filterChain.doFilter(request, response);
             return;
         }
  
         String clientId = getClientId(request);
+        double limit = "GET".equalsIgnoreCase(request.getMethod()) ? defaultRequestsPerMinute : defaultRequestsPerMinute / 2.0;
         
+        if (!globalConcurrencyLimit.tryAcquire()) {
+            log.error("Global concurrency limit reached!");
+            response.setStatus(503);
+            response.setContentType("application/json");
+            response.getWriter().write(objectMapper.writeValueAsString(java.util.Map.of("error", "Service unavailable due to high load.")));
+            return;
+        }
+
         try {
-            RateLimiter rateLimiter = limiters.get(clientId);
+            String key = "ratelimit:" + clientId;
+            Long currentRequests = redisTemplate.opsForValue().increment(key);
+            if (currentRequests == 1) {
+                redisTemplate.expire(key, 60, TimeUnit.SECONDS);
+            }
             
-            if (!rateLimiter.tryAcquire(1, 1, TimeUnit.SECONDS)) {
-                log.warn("Rate limit exceeded for client: {}", clientId);
+            response.setHeader("X-RateLimit-Limit", String.valueOf((int)limit));
+            response.setHeader("X-RateLimit-Remaining", String.valueOf(Math.max(0, (int)limit - currentRequests)));
+            
+            if (currentRequests > limit) {
+                log.debug("Rate limit exceeded for client: {}", clientId);
                 response.setStatus(429); // SC_TOO_MANY_REQUESTS
                 response.setHeader("Retry-After", "60");
                 response.setContentType("application/json");
-                response.getWriter().write("{\"error\":\"Too many requests. Please try again later.\"}");
+                response.getWriter().write(objectMapper.writeValueAsString(java.util.Map.of("error", "Too many requests. Please try again later.")));
                 return;
             }
-        } catch (ExecutionException e) {
-            log.error("Rate limiter error: {}", e.getMessage());
-        }
  
-        filterChain.doFilter(request, response);
+            filterChain.doFilter(request, response);
+        } finally {
+            globalConcurrencyLimit.release();
+        }
     }
  
-    /**
-     * Get client identifier (IP, API key, or user)
-     */
     private String getClientId(HttpServletRequest request) {
+        Principal principal = request.getUserPrincipal();
+        if (principal != null && principal.getName() != null) {
+            return "user:" + principal.getName();
+        }
+        
         // Try API key first
         String apiKey = request.getHeader("X-API-KEY");
         if (apiKey != null && !apiKey.isBlank()) {
             return "api-key:" + apiKey;
         }
  
-        // Fall back to IP address
-        String clientIp = request.getHeader("X-Forwarded-For");
-        if (clientIp == null || clientIp.isEmpty()) {
-            clientIp = request.getRemoteAddr();
-        }
-        return "ip:" + clientIp;
+        // Prevent manual X-Forwarded-For spoofing. Rely on Spring Boot's 
+        // ForwardedHeaderFilter to securely set RemoteAddr when behind a trusted proxy.
+        return "ip:" + request.getRemoteAddr();
     }
  
     /**
@@ -91,8 +101,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
      */
     private boolean isPublicEndpoint(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.startsWith("/api/auth/") || 
-               path.startsWith("/error") || 
+        return path.startsWith("/error") || 
                path.equals("/") || 
                path.equals("/index.html") || 
                path.startsWith("/static/") || 
