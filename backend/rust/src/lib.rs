@@ -4,7 +4,6 @@ pub mod vector_service;
 pub mod cache;
 pub mod error;
 pub mod models;
-pub mod crypto;
 pub mod config;
 
 pub use error::{CloudpoolError, Result};
@@ -164,3 +163,4 @@ pub extern "system" fn Java_com_cloudpool_util_RustBridge_convertToWebp<'local>(
         }
     }
 }
+
