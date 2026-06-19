@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.Map;
 import java.util.UUID;
@@ -19,7 +20,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/cron")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class CronJobController {
 
     private final CronJobService cronJobService;
@@ -41,7 +42,7 @@ public class CronJobController {
     @PostMapping
     public ResponseEntity<?> createOrUpdateJob(
             @PathVariable UUID projectId,
-            @RequestBody JobRequest request) {
+            @Valid @RequestBody JobRequest request) {
         validateProjectAccess(projectId);
         try {
             CronJob job = cronJobService.createOrUpdateJob(
@@ -90,6 +91,8 @@ public class CronJobController {
 
     @Data
     public static class JobRequest {
+        @jakarta.validation.constraints.NotBlank
+
         private String name;
         private String cronExpression;
         private String targetUrl;

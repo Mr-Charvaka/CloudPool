@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 @SpringBootApplication
 @EnableCaching
 @EnableAsync
+@EnableScheduling
 @EnableMethodSecurity(
     securedEnabled = true,
     jsr250Enabled = true,

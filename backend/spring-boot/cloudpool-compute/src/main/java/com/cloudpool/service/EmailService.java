@@ -213,7 +213,7 @@ public class EmailService {
         ctx.close();
 
         if (bestMx == null) {
-            throw new RuntimeException("Failed to parse MX records for domain: " + domain);
+            throw new com.cloudpool.exception.CloudPoolException("Failed to parse MX records for domain: " + domain);
         }
 
         return bestMx;
@@ -237,3 +237,4 @@ public class EmailService {
         receivedEmailRepository.deleteAll();
     }
 }
+

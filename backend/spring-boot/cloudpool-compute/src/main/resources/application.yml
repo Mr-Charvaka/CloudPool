@@ -73,14 +73,14 @@ management:
 # Custom Application Properties
 cloudpool:
   jwt:
-    secret: ${JWT_SECRET:d1f88c8078c1db294e82b71be5e8f6e80b2a75ffca79b9e6e6a1a8c3d6e5a6b0c2e3f4g5h6j7k8l9m0n1p2q3r4s5t6u7v8w9x0y1z2a3b4c5d6e7f8g9}
+    secret: ${JWT_SECRET}
     expiration-ms: ${JWT_EXPIRATION_MS:3600000}
   
   cors:
     allowed-origins: ${CLOUDPOOL_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8080,http://cloudpool.empirebot.in,http://*.empirebot.in}
  
   encryption:
-    master-key: ${CLOUDPOOL_ENCRYPTION_MASTER_KEY:d1f88c8078c1db294e82b71be5e8f6e80b2a75ffca79b9e6e6a1a8c3d6e5a6b0c2e3f4g5h6j7k8l9m0n1p2q3r4s5t6u7v8w9x0y1z2a3b4c5d6e7f8g9}
+    master-key: ${CLOUDPOOL_ENCRYPTION_MASTER_KEY}
  
   rate-limit:
     requests-per-minute: ${CLOUDPOOL_RATE_LIMIT_RPM:120}

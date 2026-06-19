@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.Map;
@@ -15,7 +16,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/projects")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class ProjectRestController {
 
     private final ProjectService projectService;
@@ -34,7 +35,7 @@ public class ProjectRestController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createProject(@RequestBody CreateProjectRequest request) {
+    public ResponseEntity<?> createProject(@Valid @RequestBody CreateProjectRequest request) {
         if (request.getName() == null || request.getName().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Project name is required"));
         }
@@ -72,7 +73,7 @@ public class ProjectRestController {
     }
 
     @PostMapping("/{projectId}/secrets")
-    public ResponseEntity<?> addSecret(@PathVariable UUID projectId, @RequestBody SaveSecretRequest request) {
+    public ResponseEntity<?> addSecret(@PathVariable UUID projectId, @Valid @RequestBody SaveSecretRequest request) {
         if (request.getKey() == null || request.getKey().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Secret key is required"));
         }
@@ -110,7 +111,7 @@ public class ProjectRestController {
     }
 
     @PostMapping("/{projectId}/connections")
-    public ResponseEntity<?> saveConnection(@PathVariable UUID projectId, @RequestBody SaveConnectionRequest request) {
+    public ResponseEntity<?> saveConnection(@PathVariable UUID projectId, @Valid @RequestBody SaveConnectionRequest request) {
         if (request.getDbType() == null || request.getHost() == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "dbType and host are required"));
         }
@@ -145,7 +146,7 @@ public class ProjectRestController {
     }
 
     @PostMapping("/{projectId}/connections/test")
-    public ResponseEntity<?> testConnection(@PathVariable UUID projectId, @RequestBody SaveConnectionRequest request) {
+    public ResponseEntity<?> testConnection(@PathVariable UUID projectId, @Valid @RequestBody SaveConnectionRequest request) {
         try {
             boolean success = projectService.testConnection(
                     request.getDbType(),
@@ -175,7 +176,7 @@ public class ProjectRestController {
     }
 
     @PostMapping("/{projectId}/snapshots")
-    public ResponseEntity<?> createSnapshot(@PathVariable UUID projectId, @RequestBody CreateSnapshotRequest request) {
+    public ResponseEntity<?> createSnapshot(@PathVariable UUID projectId, @Valid @RequestBody CreateSnapshotRequest request) {
         if (request.getName() == null || request.getName().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Snapshot name is required"));
         }
@@ -203,6 +204,8 @@ public class ProjectRestController {
 
     @Data
     public static class CreateProjectRequest {
+        @jakarta.validation.constraints.NotBlank
+
         private String name;
         private String description;
     }
@@ -220,12 +223,16 @@ public class ProjectRestController {
         private int port;
         private String databaseName;
         private String username;
+        @jakarta.validation.constraints.NotBlank
+        @jakarta.validation.constraints.Size(min=8)
         private String password;
         private boolean active;
     }
 
     @Data
     public static class CreateSnapshotRequest {
+        @jakarta.validation.constraints.NotBlank
+
         private String name;
     }
 }

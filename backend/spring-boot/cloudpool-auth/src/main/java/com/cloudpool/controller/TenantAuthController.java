@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.Map;
 import java.util.UUID;
@@ -16,7 +17,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class TenantAuthController {
 
     private final TenantAuthService tenantAuthService;
@@ -55,7 +56,7 @@ public class TenantAuthController {
     @PostMapping("/signup")
     public ResponseEntity<?> signup(
             @PathVariable UUID projectId,
-            @RequestBody SignupRequest request) {
+            @Valid @RequestBody SignupRequest request) {
         validateProjectAccess(projectId);
         try {
             TenantUser user = tenantAuthService.register(
@@ -74,7 +75,7 @@ public class TenantAuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(
             @PathVariable UUID projectId,
-            @RequestBody LoginRequest request) {
+            @Valid @RequestBody LoginRequest request) {
         validateProjectAccess(projectId);
         try {
             TenantAuthService.AuthResult result = tenantAuthService.login(projectId, request.getEmail(), request.getPassword());
@@ -95,7 +96,7 @@ public class TenantAuthController {
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(
             @PathVariable UUID projectId,
-            @RequestBody RefreshRequest request) {
+            @Valid @RequestBody RefreshRequest request) {
         validateProjectAccess(projectId);
         try {
             TenantAuthService.AuthResult result = tenantAuthService.refreshToken(request.getRefreshToken());
@@ -111,7 +112,7 @@ public class TenantAuthController {
     @PostMapping("/logout")
     public ResponseEntity<?> logout(
             @PathVariable UUID projectId,
-            @RequestBody RefreshRequest request) {
+            @Valid @RequestBody RefreshRequest request) {
         validateProjectAccess(projectId);
         tenantAuthService.logout(request.getRefreshToken());
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
@@ -119,7 +120,13 @@ public class TenantAuthController {
 
     @Data
     public static class SignupRequest {
+        @jakarta.validation.constraints.NotBlank
+
+        @jakarta.validation.constraints.Email
+
         private String email;
+        @jakarta.validation.constraints.NotBlank
+        @jakarta.validation.constraints.Size(min=8)
         private String password;
         private String displayName;
         private String metadata;
@@ -127,7 +134,13 @@ public class TenantAuthController {
 
     @Data
     public static class LoginRequest {
+        @jakarta.validation.constraints.NotBlank
+
+        @jakarta.validation.constraints.Email
+
         private String email;
+        @jakarta.validation.constraints.NotBlank
+        @jakarta.validation.constraints.Size(min=8)
         private String password;
     }
 

@@ -58,7 +58,7 @@ public class BackgroundJobService {
 
         BackgroundJob job = BackgroundJob.builder()
                 .jobType("FILE_PROCESSING")
-                .status("PENDING")
+                .status(com.cloudpool.model.enums.BackgroundJobStatus.PENDING)
                 .payload(payloadStr)
                 .build();
 
@@ -104,7 +104,7 @@ public class BackgroundJobService {
 
         BackgroundJob job = BackgroundJob.builder()
                 .jobType("EMBEDDING_GENERATION")
-                .status("PENDING")
+                .status(com.cloudpool.model.enums.BackgroundJobStatus.PENDING)
                 .payload(payloadStr)
                 .build();
 
@@ -125,3 +125,4 @@ public class BackgroundJobService {
         return BackgroundJobDTO.fromEntity(saved);
     }
 }
+

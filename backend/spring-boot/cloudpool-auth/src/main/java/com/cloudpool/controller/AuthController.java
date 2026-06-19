@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 import com.cloudpool.service.AuditLogService;
 
 import java.util.HashMap;
@@ -19,7 +20,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class AuthController {
 
     private final UserRepository userRepository;
@@ -31,7 +32,7 @@ public class AuthController {
     private final com.cloudpool.service.MetricsService metricsService;
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email is already in use"));
         }
@@ -40,7 +41,7 @@ public class AuthController {
                 .email(request.getEmail())
                 .name(request.getName())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role("USER")
+                .role(com.cloudpool.model.enums.Role.USER)
                 .active(true)
                 .build();
 
@@ -68,7 +69,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElse(null);
 
@@ -114,7 +115,7 @@ public class AuthController {
     }
 
     @PostMapping("/oauth-credentials")
-    public ResponseEntity<?> saveOAuthCredentials(@RequestBody OAuthCredentialsRequest request) {
+    public ResponseEntity<?> saveOAuthCredentials(@Valid @RequestBody OAuthCredentialsRequest request) {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (!(principal instanceof User)) {
             return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
@@ -132,20 +133,37 @@ public class AuthController {
 
     @Data
     public static class OAuthCredentialsRequest {
+        @jakarta.validation.constraints.NotBlank
+
         private String clientId;
+        @jakarta.validation.constraints.NotBlank
         private String clientSecret;
     }
 
     @Data
     public static class RegisterRequest {
+        @jakarta.validation.constraints.NotBlank
+
+        @jakarta.validation.constraints.Email
+
         private String email;
+        @jakarta.validation.constraints.NotBlank
+        @jakarta.validation.constraints.Size(min=8)
         private String password;
+        @jakarta.validation.constraints.NotBlank
         private String name;
     }
 
     @Data
     public static class LoginRequest {
+        @jakarta.validation.constraints.NotBlank
+
+        @jakarta.validation.constraints.Email
+
         private String email;
+        @jakarta.validation.constraints.NotBlank
+        @jakarta.validation.constraints.Size(min=8)
         private String password;
     }
 }
+

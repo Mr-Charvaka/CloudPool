@@ -7,13 +7,14 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/dev/emails")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class EmailController {
 
     private final EmailService emailService;
@@ -35,7 +36,7 @@ public class EmailController {
     }
 
     @PostMapping("/send-test")
-    public ResponseEntity<?> sendTestEmail(@RequestBody TestEmailRequest request) {
+    public ResponseEntity<?> sendTestEmail(@Valid @RequestBody TestEmailRequest request) {
         if (request.getTo() == null || request.getTo().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Recipient email address ('to') is required"));
         }
@@ -53,7 +54,7 @@ public class EmailController {
     }
 
     @PostMapping("/send-direct")
-    public ResponseEntity<?> sendDirectEmail(@RequestBody TestEmailRequest request) {
+    public ResponseEntity<?> sendDirectEmail(@Valid @RequestBody TestEmailRequest request) {
         if (request.getTo() == null || request.getTo().trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Recipient email address ('to') is required"));
         }
@@ -68,7 +69,9 @@ public class EmailController {
     @Data
     public static class TestEmailRequest {
         private String to;
+        @jakarta.validation.constraints.NotBlank
         private String subject;
+        @jakarta.validation.constraints.NotBlank
         private String body;
     }
 }

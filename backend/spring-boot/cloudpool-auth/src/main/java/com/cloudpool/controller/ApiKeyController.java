@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 import com.cloudpool.service.AuditLogService;
 
 import java.nio.charset.StandardCharsets;
@@ -21,7 +22,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/keys")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class ApiKeyController {
 
     private final ApiKeyRepository apiKeyRepository;
@@ -42,7 +43,7 @@ public class ApiKeyController {
     }
 
     @PostMapping("/generate")
-    public ResponseEntity<?> generateKey(@RequestBody GenerateKeyRequest request) {
+    public ResponseEntity<?> generateKey(@Valid @RequestBody GenerateKeyRequest request) {
         User user = getAuthenticatedUser();
         
         // Generate plain key: cp_live_ + 32 random alphanumeric characters
@@ -129,14 +130,17 @@ public class ApiKeyController {
             byte[] hash = digest.digest(apiKeyRaw.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
-            throw new RuntimeException("SHA-256 algorithm not available", e);
+            throw new com.cloudpool.exception.CloudPoolException("SHA-256 algorithm not available", e);
         }
     }
 
     @Data
     public static class GenerateKeyRequest {
+        @jakarta.validation.constraints.NotBlank
+
         private String name;
         private String description;
         private int daysToLive;
     }
 }
+

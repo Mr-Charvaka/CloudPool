@@ -15,7 +15,7 @@ import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
+
 public class OAuthController {
 
     private final GoogleDriveService googleDriveService;
