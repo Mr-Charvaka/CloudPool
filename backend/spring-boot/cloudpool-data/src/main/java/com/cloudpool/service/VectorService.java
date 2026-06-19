@@ -38,6 +38,7 @@ public class VectorService {
     /**
      * Search across uploaded files semantically
      */
+    @Transactional(readOnly = true)
     public List<VectorSearchResult> search(String query, User user) {
         List<FileMetadata> files = fileMetadataRepository.findByUserId(user.getId());
         List<VectorSearchResult> results = new ArrayList<>();
@@ -214,6 +215,7 @@ public class VectorService {
         return documentRepository.save(doc);
     }
 
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> searchCollection(UUID collectionId, String query, int limit, UUID userId) {
         VectorCollection collection = collectionRepository.findById(collectionId)
                 .orElseThrow(() -> new NoSuchElementException("Collection not found"));
@@ -274,7 +276,9 @@ public class VectorService {
                             Object metaRaw = obj.get("metadata");
                             if (metaRaw instanceof String metaStr && !metaStr.isBlank()) {
                                 try { res.put("metadata", objectMapper.readValue(metaStr, Map.class)); }
-                                catch (Exception ignored) {}
+                                catch (Exception e) {
+                                    log.warn("Failed to parse metadata JSON from Weaviate: {}", e.getMessage());
+                                }
                             }
                             weaviateResults.add(res);
                         }
@@ -310,7 +314,9 @@ public class VectorService {
                 if (doc.getMetadata() != null) {
                     res.put("metadata", objectMapper.readValue(doc.getMetadata(), Map.class));
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.warn("Failed to parse metadata JSON from JPA: {}", e.getMessage());
+            }
             results.add(res);
         }
 
