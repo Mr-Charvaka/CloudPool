@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import com.cloudpool.model.DatabaseConnection;
 import com.cloudpool.util.EncryptionUtil;
 import com.cloudpool.util.SpringContextHolder;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
  
 @Slf4j
 public class DatabaseConnectionEncryptionListener {
@@ -19,8 +21,8 @@ public class DatabaseConnectionEncryptionListener {
         EncryptionUtil util = getEncryptionUtil();
         String plainPassword = connection.getDecryptedPassword();
         if (util != null && plainPassword != null && !plainPassword.isBlank()) {
-            String encrypted = util.encrypt(plainPassword);
-            connection.setEncryptedPassword(encrypted);
+            byte[] encrypted = util.encrypt(plainPassword.getBytes(StandardCharsets.UTF_8));
+            connection.setEncryptedPassword(Base64.getEncoder().encodeToString(encrypted));
             log.debug("DatabaseConnection password encrypted successfully");
         }
     }
@@ -31,8 +33,9 @@ public class DatabaseConnectionEncryptionListener {
         String encryptedPassword = connection.getEncryptedPassword();
         if (util != null && encryptedPassword != null && !encryptedPassword.isBlank()) {
             try {
-                String decrypted = util.decrypt(encryptedPassword);
-                connection.setDecryptedPassword(decrypted);
+                byte[] decoded = Base64.getDecoder().decode(encryptedPassword);
+                byte[] decrypted = util.decrypt(decoded);
+                connection.setDecryptedPassword(new String(decrypted, StandardCharsets.UTF_8));
                 log.debug("DatabaseConnection password decrypted successfully");
             } catch (Exception e) {
                 log.error("Failed to decrypt database connection password: {}", e.getMessage());
