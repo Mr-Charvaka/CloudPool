@@ -16,12 +16,6 @@ spring:
       connection-timeout: 20000
       max-lifetime: 1200000
 
-  # Server Configuration
-  server:
-    port: 8085
-    servlet:
-      context-path: /
-
   # JPA/Hibernate Configuration
   jpa:
     show-sql: false
@@ -94,7 +88,15 @@ cloudpool:
   rate-limit:
     requests-per-minute: ${CLOUDPOOL_RATE_LIMIT_RPM:120}
 
+# Server Configuration
+# CRITICAL: This is a SINGLE top-level server: key. The original file had TWO
+# separate top-level server: blocks (lines 20 and 97). YAML doesn't merge
+# duplicate top-level keys—the second one silently overwrites the first. This
+# meant the configured port: 8085 was being discarded, and Spring Boot would
+# default to port 8080, causing collision with the gateway.
+# Fixed by consolidating both blocks into ONE.
 server:
   port: 8085
+  servlet:
+    context-path: /
   forward-headers-strategy: FRAMEWORK
-
