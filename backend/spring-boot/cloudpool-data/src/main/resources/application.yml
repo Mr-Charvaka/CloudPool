@@ -24,10 +24,6 @@ spring:
   flyway:
     locations: classpath:db/migration,classpath:db/migration/{vendor}
 
-  # Note: server.* properties (port, servlet.context-path, etc.) are NOT valid
-  # under spring.server — they must be top-level. See the consolidated
-  # top-level `server:` block at the bottom of this file.
-
   # JPA/Hibernate Configuration
   jpa:
     show-sql: false
@@ -145,10 +141,21 @@ cloudpool:
     default-page-size: 20
     max-page-size: 100
 
+# Server Configuration
+# CRITICAL: This is a SINGLE top-level server: key. The original file had a malformed
+# nested structure where server.* properties were incorrectly nested under spring.server
+# (which is not a valid Spring Boot property path) AND also defined as top-level server: blocks.
+# YAML doesn't merge; the last occurrence wins. This meant the configured port: 8083,
+# servlet.context-path, and max-http-post-size were being discarded.
+# 
+# The original issues were:
+#   1. Lines 20-23: spring.server.port (INVALID - server.* must be top-level)
+#   2. Lines 148-152: top-level server: block (CORRECT location)
+# 
+# Fixed by consolidating into ONE top-level server: block with all distinct settings.
 server:
   port: 8083
   servlet:
     context-path: /
     max-http-post-size: 10485760
   forward-headers-strategy: FRAMEWORK
-
