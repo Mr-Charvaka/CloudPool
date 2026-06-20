@@ -87,6 +87,14 @@ cloudpool:
  
   encryption:
     master-key: ${CLOUDPOOL_ENCRYPTION_MASTER_KEY}
+    # Required by EncryptionUtil's HKDF key derivation. Must be the SAME
+    # value across all four services (auth/network/data/compute) — they
+    # share a database, and a value encrypted by one service must be
+    # decryptable by any other that reads the same column. Generate once
+    # with: openssl rand -base64 32  — then set identically everywhere
+    # this app is deployed. Do not regenerate per-service or per-environment
+    # without a coordinated re-encryption of existing data.
+    salt: ${CLOUDPOOL_ENCRYPTION_SALT}
  
   rate-limit:
     requests-per-minute: ${CLOUDPOOL_RATE_LIMIT_RPM:120}
@@ -101,7 +109,5 @@ cloudpool:
 
 server:
   port: 8082
-
-server:
   forward-headers-strategy: FRAMEWORK
 

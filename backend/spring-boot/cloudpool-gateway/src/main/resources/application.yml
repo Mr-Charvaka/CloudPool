@@ -1,5 +1,6 @@
 server:
   port: 8080
+  forward-headers-strategy: FRAMEWORK
 
 spring:
   application:
@@ -48,6 +49,3 @@ spring:
 logging:
   level:
     org.springframework.cloud.gateway: DEBUG
-
-server:
-  forward-headers-strategy: FRAMEWORK

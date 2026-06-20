@@ -16,12 +16,17 @@ spring:
       connection-timeout: 20000
       max-lifetime: 1200000
 
-  # Server Configuration
-  server:
-    port: 8083
-    servlet:
-      context-path: /
-      max-http-post-size: 10485760
+  # Flyway Configuration
+  # {vendor} resolves automatically to the active JDBC driver (h2 or postgresql).
+  # Migrations that use Postgres-only features (ROW LEVEL SECURITY, current_setting(),
+  # ALTER ROLE/DATABASE session defaults) live under db/migration/postgresql and are
+  # skipped entirely when running against H2 in local/dev mode.
+  flyway:
+    locations: classpath:db/migration,classpath:db/migration/{vendor}
+
+  # Note: server.* properties (port, servlet.context-path, etc.) are NOT valid
+  # under spring.server — they must be top-level. See the consolidated
+  # top-level `server:` block at the bottom of this file.
 
   # JPA/Hibernate Configuration
   jpa:
@@ -95,6 +100,9 @@ cloudpool:
  
   encryption:
     master-key: ${CLOUDPOOL_ENCRYPTION_MASTER_KEY}
+    # Must match the value used in every other CloudPool service exactly —
+    # see cloudpool-auth/application.yml for the full explanation.
+    salt: ${CLOUDPOOL_ENCRYPTION_SALT}
  
   rate-limit:
     requests-per-minute: ${CLOUDPOOL_RATE_LIMIT_RPM:120}
@@ -139,7 +147,8 @@ cloudpool:
 
 server:
   port: 8083
-
-server:
+  servlet:
+    context-path: /
+    max-http-post-size: 10485760
   forward-headers-strategy: FRAMEWORK
 

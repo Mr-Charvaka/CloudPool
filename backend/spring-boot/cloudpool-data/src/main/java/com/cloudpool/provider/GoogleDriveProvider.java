@@ -1,4 +1,4 @@
-﻿package com.cloudpool.provider;
+package com.cloudpool.provider;
 
 import com.cloudpool.model.Bucket;
 import com.cloudpool.model.FileMetadata;

@@ -87,13 +87,14 @@ cloudpool:
  
   encryption:
     master-key: ${CLOUDPOOL_ENCRYPTION_MASTER_KEY}
+    # Must match the value used in every other CloudPool service exactly —
+    # see cloudpool-auth/application.yml for the full explanation.
+    salt: ${CLOUDPOOL_ENCRYPTION_SALT}
  
   rate-limit:
     requests-per-minute: ${CLOUDPOOL_RATE_LIMIT_RPM:120}
 
 server:
   port: 8085
-
-server:
   forward-headers-strategy: FRAMEWORK
 

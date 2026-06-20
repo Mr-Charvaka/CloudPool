@@ -1,0 +1,32 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:cloudpool_auth_test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+  autoconfigure:
+    # No message broker is available in the test environment, and this
+    # test slice only exercises auth + project CRUD, neither of which
+    # depends on RabbitMQ.
+    exclude: org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+
+cloudpool:
+  jwt:
+    secret: "test-only-secret-key-must-be-at-least-64-characters-long-for-hs512-xxxxxxxxxxxxxxxx"
+    expiration-ms: 3600000
+  encryption:
+    # Test-only values. These must be valid Base64 for the salt (decoded
+    # directly) and any non-empty string for the master key (it's run
+    # through HKDF, not used as a raw key), but the actual values don't
+    # matter for tests — nothing here asserts on specific ciphertext, only
+    # that encrypt/decrypt round-trips correctly via EncryptionUtil.
+    master-key: "test-only-master-key-not-for-production-use"
+    salt: "dGVzdC1vbmx5LXNhbHQtdmFsdWUtMzItYnl0ZXMtbG9uZyEh"
