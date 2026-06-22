@@ -19,6 +19,7 @@ pub struct ControlConnection {
     connector: TlsConnector,
     addr: String,
     framed: Option<Framed<TlsStream<TcpStream>, DrapCodec>>,
+    auth_token: String,
     
     // Maps Subdomain -> Port
     tunnels: HashMap<String, u16>,
@@ -31,21 +32,17 @@ pub struct ControlConnection {
 }
 
 impl ControlConnection {
-    pub async fn new(addr: &str) -> Result<Self> {
-        let mut config = rustls::ClientConfig::builder()
-            .dangerous()
-            .with_custom_certificate_verifier(Arc::new(NoCertificateVerification))
-            .with_no_client_auth();
-            
-        config.alpn_protocols = vec![b"drap/1".to_vec()];
+    pub async fn new(addr: &str, danger_accept_invalid_certs: bool, auth_token: String) -> Result<Self> {
+        let connector = build_tls_connector(addr, danger_accept_invalid_certs)?;
 
         let (to_tunnel_tx, to_tunnel_rx) = mpsc::channel(100);
         let (close_stream_tx, close_stream_rx) = mpsc::channel(100);
 
         Ok(Self {
-            connector: TlsConnector::from(Arc::new(config)),
+            connector,
             addr: addr.to_string(),
             framed: None,
+            auth_token,
             tunnels: HashMap::new(),
             active_streams: HashMap::new(),
             to_tunnel_tx,
@@ -60,8 +57,9 @@ impl ControlConnection {
             .await
             .with_context(|| format!("Failed to connect to {}", self.addr))?;
 
-        let domain = rustls::pki_types::ServerName::try_from("localhost")
-            .map_err(|_| anyhow::anyhow!("Invalid domain"))?;
+        let hostname = self.addr.split(':').next().unwrap_or(&self.addr);
+        let domain = rustls::pki_types::ServerName::try_from(hostname)
+            .map_err(|_| anyhow::anyhow!("Invalid domain: {}", hostname))?;
 
         let mut stream: TlsStream<TcpStream> = self.connector.connect(domain, stream).await?;
         info!("TLS handshake successful");
@@ -84,7 +82,7 @@ impl ControlConnection {
         let mut framed = Framed::new(stream, DrapCodec);
 
         // --- Auth (Structured Binary Handshake Sec 9.2) ---
-        let token = "my-secret-token";
+        let token = &self.auth_token;
         let mut auth_payload = bytes::BytesMut::with_capacity(32 + token.len());
         
         // 1. Token Length (2 bytes)
@@ -318,11 +316,14 @@ impl ControlConnection {
     }
 }
 
-#[derive(Debug)]
-struct NoCertificateVerification;
-impl rustls::client::danger::ServerCertVerifier for NoCertificateVerification {
-    fn verify_server_cert(&self, _e: &rustls::pki_types::CertificateDer<'_>, _i: &[rustls::pki_types::CertificateDer<'_>], _s: &rustls::pki_types::ServerName<'_>, _o: &[u8], _n: rustls::pki_types::UnixTime) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> { Ok(rustls::client::danger::ServerCertVerified::assertion()) }
-    fn verify_tls12_signature(&self, _m: &[u8], _c: &rustls::pki_types::CertificateDer<'_>, _d: &rustls::DigitallySignedStruct) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> { Ok(rustls::client::danger::HandshakeSignatureValid::assertion()) }
-    fn verify_tls13_signature(&self, _m: &[u8], _c: &rustls::pki_types::CertificateDer<'_>, _d: &rustls::DigitallySignedStruct) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> { Ok(rustls::client::danger::HandshakeSignatureValid::assertion()) }
-    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> { rustls::crypto::ring::default_provider().signature_verification_algorithms.supported_schemes() }
+fn build_tls_connector(addr: &str, _danger_accept_invalid_certs: bool) -> Result<TlsConnector> {
+    let _hostname = addr.split(':').next().unwrap_or("localhost");
+
+    let mut root_store = rustls::RootCertStore::empty();
+    root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    let mut config = rustls::ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
+    config.alpn_protocols = vec![b"drap/1".to_vec()];
+    Ok(TlsConnector::from(Arc::new(config)))
 }
