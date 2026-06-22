@@ -1,9 +1,0 @@
-/target/
-**/*.rs.bk
-.DS_Store
-*.log
-certs/*.key
-certs/*.crt
-!certs/README.md
-.env
-Cargo.lock
