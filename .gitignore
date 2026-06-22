@@ -62,6 +62,7 @@ kora_review/
 # Zips and Archives
 *.zip
 *.tar.gz
+*.exe
 
 # Scripts and Environment Files
 *.py
