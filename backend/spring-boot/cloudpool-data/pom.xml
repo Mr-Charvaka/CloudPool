@@ -28,6 +28,12 @@
             <artifactId>cloudpool-common</artifactId>
             <version>0.1.0-SNAPSHOT</version>
         </dependency>
+        <!-- Network module (for ProjectService, QuotaService) -->
+        <dependency>
+            <groupId>com.cloudpool</groupId>
+            <artifactId>cloudpool-network</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+        </dependency>
 
         <!-- Spring Boot Starters -->
         <dependency>
@@ -89,6 +95,13 @@
             <groupId>com.google.oauth-client</groupId>
             <artifactId>google-oauth-client</artifactId>
             <version>1.34.1</version>
+        </dependency>
+
+        <!-- Stripe API -->
+        <dependency>
+            <groupId>com.stripe</groupId>
+            <artifactId>stripe-java</artifactId>
+            <version>24.3.0</version>
         </dependency>
 
         <!-- Weaviate Vector DB -->
