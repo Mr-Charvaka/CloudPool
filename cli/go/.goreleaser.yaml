@@ -1,0 +1,88 @@
+version: 2
+
+project_name: cloudpool
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod verify
+
+builds:
+  - id: cloudpool
+    main: .
+    binary: cloudpool
+    ldflags:
+      - -s -w
+      - -X github.com/cloudpool/cli/pkg/version.Version={{.Version}}
+      - -X github.com/cloudpool/cli/pkg/version.Commit={{.Commit}}
+      - -X github.com/cloudpool/cli/pkg/version.Date={{.Date}}
+      - -X github.com/cloudpool/cli/pkg/version.BuiltBy=goreleaser
+      - -X github.com/cloudpool/cli/pkg/version.GoVersion={{.Env.GOVERSION}}
+    env:
+      - CGO_ENABLED=0
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - linux
+      - darwin
+      - windows
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "arm64" }}aarch64
+      {{- else }}{{ .Arch }}{{ end }}
+    files:
+      - README.md
+      - completions/*
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: '{{ .ProjectName }}_checksums.txt'
+
+snapshot:
+  name_template: '{{ .Version }}-SNAPSHOT-{{ .ShortCommit }}'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch
+
+brews:
+  - repository:
+      owner: cloudpool
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://cloudpool.dev
+    description: CloudPool CLI - AI-Native Backend Platform
+    license: MIT
+    test: |
+      system "#{bin}/cloudpool version"
+
+nfpms:
+  - id: packages
+    package_name: cloudpool
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    homepage: https://cloudpool.dev
+    description: CloudPool CLI - AI-Native Backend Platform
+    maintainer: CloudPool <support@cloudpool.dev>
+    license: MIT
+    formats:
+      - deb
+      - rpm
+      - apk

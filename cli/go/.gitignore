@@ -1,0 +1,26 @@
+# Build output
+/build/
+/coverage.out
+/coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Binaries
+*.exe
+*.test
+cloudpool
+
+# Completions (generated)
+/completions/
+
+# Config
+config.yaml
+credentials.json

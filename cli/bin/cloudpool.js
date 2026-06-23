@@ -41,7 +41,7 @@ function loadConfig() {
 }
 
 function saveConfig(config) {
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { encoding: 'utf8', mode: 0o600 });
 }
 
 function ensureAuthenticated(config) {
@@ -81,16 +81,21 @@ async function request(method, endpoint, body = null, spinnerMsg = null) {
     spinner = ora(chalk.cyan(spinnerMsg)).start();
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
   try {
     const options = {
       method,
-      headers
+      headers,
+      signal: controller.signal
     };
     if (body) {
       options.body = typeof body === 'string' ? body : JSON.stringify(body);
     }
 
     const res = await fetch(url, options);
+    clearTimeout(timeoutId);
     
     if (spinner) {
       if (res.ok) {
@@ -115,6 +120,7 @@ async function request(method, endpoint, body = null, spinnerMsg = null) {
 
     return responseData;
   } catch (err) {
+    clearTimeout(timeoutId);
     if (spinner) {
       spinner.fail();
     }
@@ -180,9 +186,10 @@ async function handleLogout() {
     const config = loadConfig();
     ensureAuthenticated(config);
     await request('POST', '/api/auth/logout', null, 'Logging out...');
-    config.token = null;
-    config.email = null;
-    config.name = null;
+    delete config.token;
+    delete config.email;
+    delete config.name;
+    delete config.projectId;
     saveConfig(config);
     console.log(chalk.green.bold(`\n[SUCCESS] Logged out successfully.`));
   } catch (err) {
