@@ -5,6 +5,7 @@ target/
 logs/
 *.log
 LOG_PATH_IS_UNDEFINED/
+backend/spring-boot/**/logs/
 
 # Database
 *.db
@@ -17,10 +18,12 @@ data/
 *.env
 application-local.yml
 
-# Exclude package/tsconfig configs from global *.json ignore
+# Exclude package/tsconfig/Cargo configs from global *.json ignore
 !package.json
 !tsconfig.json
 !package-lock.json
+!tsconfig.app.json
+!tsconfig.node.json
 
 # IDE
 .idea/
@@ -64,8 +67,20 @@ kora_review/
 *.tar.gz
 *.exe
 
-# Scripts and Environment Files
-*.py
+# Compiled Python artifacts — not source files (SDK uses .py as source language)
 *.pyc
 __pycache__/
 *.env.example
+
+# Architecture-specific native binaries — must be built per-platform via CI
+backend/spring-boot/cloudpool-data/src/main/resources/libcloudpool_rust.so
+backend/spring-boot/cloudpool-network/src/main/resources/libcloudpool_rust.so
+# Security and Scratch files
+*.env
+.env.*
+scratch_*
+*.ps1
+append_test.py
+test.md
+*.pem
+*.key
