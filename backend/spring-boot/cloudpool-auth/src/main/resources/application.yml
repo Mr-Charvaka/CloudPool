@@ -5,13 +5,13 @@ spring:
 
   # Datasource Configuration
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:../data/cloudpooldb;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}
-    username: ${SPRING_DATASOURCE_USERNAME:sa}
-    password: ${SPRING_DATASOURCE_PASSWORD:password}
-    driver-class-name: org.h2.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/cloudpool}
+    username: ${SPRING_DATASOURCE_USERNAME:cloudpool}
+    password: ${SPRING_DATASOURCE_PASSWORD:cloudpool}
+    driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 50
-      minimum-idle: 10
+      maximum-pool-size: 10
+      minimum-idle: 5
       idle-timeout: 300000
       connection-timeout: 20000
       max-lifetime: 1200000
@@ -29,6 +29,10 @@ spring:
         order_inserts: true
         order_updates: true
         generate_statistics: false
+
+  # Flyway disabled — schema managed by cloudpool-data module
+  flyway:
+    enabled: false
 
   # Jackson Configuration
   jackson:
@@ -101,13 +105,6 @@ cloudpool:
       - https://www.googleapis.com/auth/drive.file
       - https://www.googleapis.com/auth/drive.metadata.readonly
 
-# Server Configuration
-# CRITICAL: This is a SINGLE top-level server: key. The original file had TWO
-# separate top-level server: blocks (lines 20 and 110). YAML doesn't merge
-# duplicate top-level keys—the second one silently overwrites the first.
-# This meant the configured port: 8082 was being discarded, and the service would
-# default to port 8080, causing port collision with the gateway and other services.
-# Fixed by consolidating both blocks into ONE, preserving all distinct settings.
 server:
   port: 8082
   servlet:

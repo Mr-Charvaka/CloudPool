@@ -7,8 +7,6 @@ use reqwest::multipart;
 use cloudpool_rust::config::CliConfig;
 use cloudpool_rust::crypto::CryptoUtil;
 
-const DEFAULT_KEY: &str = "d1f88c8078c1db294e82b71be5e8f6e80b2a75ffca79b9e6e6a1a8c3d6e5a6b0c2e3f4g5h6j7k8l9m0n1p2q3r4s5t6u7v8w9x0y1z2a3b4c5d6e7f8g9";
-
 #[derive(Parser)]
 #[command(name = "cloudpool")]
 #[command(about = "CloudPool High-Performance CLI & Encryption Service", version = "0.1.0")]
@@ -88,9 +86,12 @@ enum DbCommands {
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     
-    // Resolve Master Key from env or fallback
     let master_key = std::env::var("CLOUDPOOL_ENCRYPTION_MASTER_KEY")
-        .unwrap_or_else(|_| DEFAULT_KEY.to_string());
+        .map_err(|_| "CLOUDPOOL_ENCRYPTION_MASTER_KEY must be set to a 64-character hex string".to_string())?;
+
+    if master_key.len() != 64 || !master_key.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err("CLOUDPOOL_ENCRYPTION_MASTER_KEY must be a 64-character hex string (32 bytes)".into());
+    }
 
     match cli.command {
         Commands::Login { url, email, password } => {
@@ -109,8 +110,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             if !res.status().is_success() {
                 let err_text = res.text().await?;
-                eprintln!("Login failed: {}", err_text);
-                std::process::exit(1);
+                return Err(format!("Login failed: {}", err_text).into());
             }
 
             let res_json: Value = res.json().await?;
@@ -163,8 +163,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             if !res.status().is_success() {
                 let err_text = res.text().await?;
-                eprintln!("Upload failed: {}", err_text);
-                std::process::exit(1);
+                return Err(format!("Upload failed: {}", err_text).into());
             }
 
             let metadata: Value = res.json().await?;
@@ -185,8 +184,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             if !res.status().is_success() {
                 let err_text = res.text().await?;
-                eprintln!("Download failed: {}", err_text);
-                std::process::exit(1);
+                return Err(format!("Download failed: {}", err_text).into());
             }
 
             let mut file_bytes = res.bytes().await?.to_vec();
@@ -216,8 +214,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             if !res.status().is_success() {
                 let err_text = res.text().await?;
-                eprintln!("Search failed: {}", err_text);
-                std::process::exit(1);
+                return Err(format!("Search failed: {}", err_text).into());
             }
 
             let results: Value = res.json().await?;
@@ -248,8 +245,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                     if !res.status().is_success() {
                         let err_text = res.text().await?;
-                        eprintln!("Table creation failed: {}", err_text);
-                        std::process::exit(1);
+                        return Err(format!("Table creation failed: {}", err_text).into());
                     }
 
                     let table: Value = res.json().await?;
@@ -265,8 +261,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                     if !res.status().is_success() {
                         let err_text = res.text().await?;
-                        eprintln!("Query failed: {}", err_text);
-                        std::process::exit(1);
+                        return Err(format!("Query failed: {}", err_text).into());
                     }
 
                     let records: Value = res.json().await?;

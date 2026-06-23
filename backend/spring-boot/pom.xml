@@ -19,14 +19,40 @@
     <name>CloudPool Parent</name>
     <description>Decentralized BaaS Platform - Parent POM</description>
 
-    <modules>
-        <module>cloudpool-common</module>
-        <module>cloudpool-gateway</module>
-        <module>cloudpool-auth</module>
-        <module>cloudpool-data</module>
-        <module>cloudpool-compute</module>
-        <module>cloudpool-network</module>
-    </modules>
+    <profiles>
+        <profile>
+            <id>student</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <modules>
+                <module>cloudpool-common</module>
+                <module>cloudpool-gateway</module>
+                <module>cloudpool-auth</module>
+                <module>cloudpool-data</module>
+                <module>cloudpool-compute</module>
+                <module>cloudpool-network</module>
+            </modules>
+            <properties>
+                <cloudpool.profile>student</cloudpool.profile>
+            </properties>
+        </profile>
+        <profile>
+            <id>enterprise</id>
+            <modules>
+                <module>cloudpool-common</module>
+                <module>cloudpool-gateway</module>
+                <module>cloudpool-auth</module>
+                <module>cloudpool-data</module>
+                <module>cloudpool-compute</module>
+                <module>cloudpool-network</module>
+                <module>cloudpool-enterprise-plugin</module>
+            </modules>
+            <properties>
+                <cloudpool.profile>enterprise</cloudpool.profile>
+            </properties>
+        </profile>
+    </profiles>
 
     <properties>
         <java.version>17</java.version>
@@ -35,6 +61,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-cloud.version>2022.0.4</spring-cloud.version>
         <lombok.version>1.18.38</lombok.version>
+        <opentelemetry.version>1.31.0</opentelemetry.version>
     </properties>
 
     <dependencyManagement>
@@ -44,6 +71,14 @@
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
                 <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        <!-- OpenTelemetry BOM for distributed tracing -->
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-bom</artifactId>
+                <version>${opentelemetry.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

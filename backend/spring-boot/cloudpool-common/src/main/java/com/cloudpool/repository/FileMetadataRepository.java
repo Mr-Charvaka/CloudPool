@@ -16,6 +16,9 @@ public interface FileMetadataRepository extends JpaRepository<FileMetadata, UUID
     @Query("SELECT f FROM FileMetadata f WHERE f.bucket.user.id = :userId")
     List<FileMetadata> findByUserId(@Param("userId") UUID userId);
 
+    @Query("SELECT f FROM FileMetadata f WHERE f.bucket.user.id IN :userIds")
+    List<FileMetadata> findAllByUserIdIn(@Param("userIds") List<UUID> userIds);
+
     @Query("SELECT f FROM FileMetadata f WHERE f.bucket.user.id = :userId AND LOWER(f.originalName) LIKE LOWER(CONCAT('%', :query, '%'))")
     List<FileMetadata> searchFiles(@Param("userId") UUID userId, @Param("query") String query);
 }

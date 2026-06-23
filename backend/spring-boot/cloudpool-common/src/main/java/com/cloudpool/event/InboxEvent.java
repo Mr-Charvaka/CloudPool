@@ -6,7 +6,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "inbox_events")
+@Table(name = "inbox_events", indexes = {
+    @Index(name = "idx_inbox_processed_at", columnList = "processedAt")
+})
 @Data
 @Builder
 @NoArgsConstructor

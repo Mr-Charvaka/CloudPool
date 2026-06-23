@@ -14,14 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.cloudpool.util.FileUploadValidator;
 
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,15 +36,23 @@ public class StorageService {
     private final QuotaService quotaService;
     private final FileUploadValidator fileUploadValidator;
     private final MetricsService metricsService;
+    private final NativeProcessor nativeProcessor;
+    private final java.util.Optional<com.cloudpool.service.S3Service> s3Service;
 
     @Value("${cloudpool.storage.local-dir:./storage}")
     private String localDir;
 
+    @Value("${cloudpool.aws.s3.enabled:false}")
+    private boolean isS3Enabled;
+
+    @Value("${cloudpool.storage.compression-enabled:false}")
+    private boolean compressionEnabled;
+
+    private static final String COMPRESSED_SUFFIX = ".cpz";
+
     public FileMetadata uploadFile(MultipartFile file, String bucketName, User user) throws IOException {
-        // Validate file uploads first
         fileUploadValidator.validateFile(file);
- 
-        // Reserve quota first (isolated write-locked transaction)
+
         boolean reserved = quotaService.reserveQuota(user.getId(), file.getSize());
         if (!reserved) {
             throw new IllegalArgumentException("Storage quota exceeded. Cannot upload file.");
@@ -62,7 +68,6 @@ public class StorageService {
                     return bucketRepository.save(newBucket);
                 });
 
-        // Extract extension
         String originalFilename = file.getOriginalFilename();
         String extension = "";
         if (originalFilename != null && originalFilename.contains(".")) {
@@ -72,15 +77,30 @@ public class StorageService {
         String driveFileId = null;
         String driveLocation = null;
         String name = null;
+        String checksum = null;
 
-        try {
+        try (InputStream inputStream = file.getInputStream()) {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            
             if (user.getGoogleRefreshToken() != null) {
-                // Upload directly to Google Drive!
                 driveFileId = googleDriveService.uploadFile(file, user);
                 driveLocation = "Google Drive";
                 name = driveFileId;
+                try (InputStream is = file.getInputStream();
+                     java.security.DigestInputStream dis = new java.security.DigestInputStream(is, digest)) {
+                    byte[] buffer = new byte[8192];
+                    while (dis.read(buffer) != -1) {}
+                }
+            } else if (isS3Enabled && s3Service.isPresent()) {
+                driveFileId = s3Service.get().uploadFile(file, user);
+                driveLocation = "AWS S3";
+                name = driveFileId;
+                try (InputStream is = file.getInputStream();
+                     java.security.DigestInputStream dis = new java.security.DigestInputStream(is, digest)) {
+                    byte[] buffer = new byte[8192];
+                    while (dis.read(buffer) != -1) {}
+                }
             } else {
-                // Ensure local storage directory exists
                 Path uploadPath = Paths.get(localDir).toAbsolutePath().normalize();
                 if (!Files.exists(uploadPath)) {
                     Files.createDirectories(uploadPath);
@@ -92,11 +112,28 @@ public class StorageService {
                 if (!targetLocation.startsWith(uploadPath)) {
                     throw new SecurityException("Invalid target file path (path traversal attempt)");
                 }
-                Files.copy(file.getInputStream(), targetLocation);
-                driveLocation = targetLocation.toString();
+
+                if (compressionEnabled) {
+                    Path compressedPath = Paths.get(targetLocation + COMPRESSED_SUFFIX);
+                    try (java.io.OutputStream os = Files.newOutputStream(compressedPath);
+                         java.util.zip.GZIPOutputStream gzipOs = new java.util.zip.GZIPOutputStream(os);
+                         InputStream is = file.getInputStream();
+                         java.security.DigestInputStream dis = new java.security.DigestInputStream(is, digest)) {
+                        dis.transferTo(gzipOs);
+                    }
+                    driveLocation = compressedPath.toString();
+                } else {
+                    try (java.io.OutputStream os = Files.newOutputStream(targetLocation);
+                         InputStream is = file.getInputStream();
+                         java.security.DigestInputStream dis = new java.security.DigestInputStream(is, digest)) {
+                        dis.transferTo(os);
+                    }
+                    driveLocation = targetLocation.toString();
+                }
             }
+
+            checksum = java.util.HexFormat.of().formatHex(digest.digest());
         } catch (Exception e) {
-            // Rollback quota reservation on upload failure
             quotaService.releaseQuota(user.getId(), file.getSize());
             if (e instanceof IOException) {
                 throw (IOException) e;
@@ -113,14 +150,14 @@ public class StorageService {
                 .extension(extension)
                 .driveLocation(driveLocation)
                 .driveFileId(driveFileId)
+                .checksum(checksum)
                 .build();
 
         FileMetadata saved = fileMetadataRepository.save(metadata);
 
-        // Record Audit Log
         auditLogService.log(user, AuditLogService.ACTION_FILE_UPLOAD, "FILE", saved.getId().toString(),
-                String.format("Uploaded file '%s' (%d bytes) to pool '%s' (Storage: %s)", 
-                        saved.getOriginalName(), saved.getSize(), bucket.getName(), driveFileId != null ? "Google Drive" : "Local Disk"));
+                String.format("Uploaded file '%s' (%d bytes) to pool '%s' (Storage: %s)",
+                        saved.getOriginalName(), saved.getSize(), bucket.getName(), driveLocation));
 
         metricsService.incrementFileUploads();
         return saved;
@@ -130,14 +167,13 @@ public class StorageService {
         FileMetadata metadata = fileMetadataRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("File not found"));
 
-        // Auth check: file must belong to user
         if (!metadata.getBucket().getUser().getId().equals(user.getId())) {
             throw new SecurityException("Unauthorized to share this file");
         }
 
         String token = UUID.randomUUID().toString().replace("-", "");
-        LocalDateTime expiresAt = expiryHours != null && expiryHours > 0 
-                ? LocalDateTime.now().plusHours(expiryHours) 
+        LocalDateTime expiresAt = expiryHours != null && expiryHours > 0
+                ? LocalDateTime.now().plusHours(expiryHours)
                 : null;
 
         FileShare fileShare = FileShare.builder()
@@ -150,10 +186,9 @@ public class StorageService {
 
         FileShare savedShare = fileShareRepository.save(fileShare);
 
-        // Record Audit Log
         auditLogService.log(user, "SHARE_FILE", "FILE", fileId.toString(),
-                String.format("Shared file '%s' via token (Shared with: %s, Expires: %s)", 
-                        metadata.getOriginalName(), 
+                String.format("Shared file '%s' via token (Shared with: %s, Expires: %s)",
+                        metadata.getOriginalName(),
                         sharedWithEmail != null ? sharedWithEmail : "Anyone with link",
                         expiresAt != null ? expiresAt.toString() : "Never"));
 
@@ -161,12 +196,22 @@ public class StorageService {
     }
 
     public org.springframework.core.io.Resource downloadFileDirectly(FileMetadata metadata) throws IOException {
-        if (metadata.getDriveFileId() != null) {
-            // Download directly from Google Drive!
+        if ("Google Drive".equals(metadata.getDriveLocation()) && metadata.getDriveFileId() != null) {
             byte[] data = googleDriveService.downloadFile(metadata.getDriveFileId(), metadata.getBucket().getUser());
+            return new org.springframework.core.io.ByteArrayResource(data);
+        } else if ("AWS S3".equals(metadata.getDriveLocation()) && metadata.getDriveFileId() != null && s3Service.isPresent()) {
+            byte[] data = s3Service.get().downloadFile(metadata.getDriveFileId());
             return new org.springframework.core.io.ByteArrayResource(data);
         } else {
             Path filePath = Paths.get(metadata.getDriveLocation());
+            if (!Files.exists(filePath)) {
+                throw new IOException("File not found on storage: " + filePath);
+            }
+            if (filePath.toString().endsWith(COMPRESSED_SUFFIX)) {
+                byte[] fileBytes = Files.readAllBytes(filePath);
+                fileBytes = nativeProcessor.decompress(fileBytes);
+                return new org.springframework.core.io.ByteArrayResource(fileBytes);
+            }
             return new org.springframework.core.io.FileSystemResource(filePath);
         }
     }
@@ -175,14 +220,12 @@ public class StorageService {
         FileMetadata metadata = fileMetadataRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("File not found"));
 
-        // Auth check: file must belong to user unless public
         if (!metadata.isPublic() && !metadata.getBucket().getUser().getId().equals(user.getId())) {
             throw new SecurityException("Unauthorized access to file");
         }
 
         org.springframework.core.io.Resource data = downloadFileDirectly(metadata);
 
-        // Audit Log
         auditLogService.log(user, AuditLogService.ACTION_FILE_DOWNLOAD, "FILE", metadata.getId().toString(),
                 String.format("Downloaded file '%s'", metadata.getOriginalName()));
 
@@ -190,8 +233,12 @@ public class StorageService {
         return data;
     }
 
-    public Page<FileMetadata> listUserFiles(User user, Pageable pageable) {
-        return fileMetadataRepository.findByUserId(user.getId(), pageable);
+    public List<FileMetadata> listUserFiles(User user) {
+        return fileMetadataRepository.findByUserId(user.getId());
+    }
+
+    public List<FileMetadata> listUserFiles(User user, org.springframework.data.domain.Pageable pageable) {
+        return fileMetadataRepository.findByUserId(user.getId());
     }
 
     public List<Bucket> listUserBuckets(User user) {

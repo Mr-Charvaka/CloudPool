@@ -6,6 +6,7 @@ import com.cloudpool.service.EmailService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -14,7 +15,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/dev/emails")
 @RequiredArgsConstructor
-
+@PreAuthorize("isAuthenticated()")
 public class EmailController {
 
     private final EmailService emailService;

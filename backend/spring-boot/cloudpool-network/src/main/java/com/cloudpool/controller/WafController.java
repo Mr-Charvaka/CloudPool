@@ -68,6 +68,11 @@ public class WafController {
         return ResponseEntity.ok(Map.of("message", "WAF rule deleted successfully"));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<?> handleIllegalArgumentException(IllegalArgumentException e) {
+        return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+    }
+
     @Data
     public static class WafRuleRequest {
         private String ruleType; // IP_BLOCK, RATE_LIMIT, SQLI_BLOCK

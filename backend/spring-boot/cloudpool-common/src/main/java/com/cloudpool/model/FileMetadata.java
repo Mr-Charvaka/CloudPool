@@ -40,11 +40,16 @@ public class FileMetadata {
 
     private String driveFileId;
 
+    private String providerFileId;
+
     @Builder.Default
     private boolean isPublic = false;
 
     @Builder.Default
     private boolean isEncrypted = false;
+
+    @Column(columnDefinition = "TEXT")
+    private String checksum;
 
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

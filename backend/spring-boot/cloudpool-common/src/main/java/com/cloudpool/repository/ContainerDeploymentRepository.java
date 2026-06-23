@@ -16,6 +16,7 @@ import java.util.UUID;
 public interface ContainerDeploymentRepository extends TenantAwareRepository<ContainerDeployment, UUID> {
     List<ContainerDeployment> findByUser(User user);
     Optional<ContainerDeployment> findByUserAndName(User user, String name);
+    long countByUser(User user);
 
     @Override
     @Query("select c from ContainerDeployment c where c.id = :id and c.user.id = :#{T(java.util.UUID).fromString(T(com.cloudpool.context.TenantContextHolder).getTenantId())}")

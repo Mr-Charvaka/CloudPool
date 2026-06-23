@@ -33,7 +33,14 @@ public class VectorService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // Cache file embeddings to avoid calling OpenAI on every search
-    private final Map<UUID, float[]> fileEmbeddingCache = new ConcurrentHashMap<>();
+    private final Map<UUID, float[]> fileEmbeddingCache = Collections.synchronizedMap(
+        new LinkedHashMap<UUID, float[]>(1000, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<UUID, float[]> eldest) {
+                return size() > 1000;
+            }
+        }
+    );
 
     /**
      * Search across uploaded files semantically
@@ -50,11 +57,20 @@ public class VectorService {
         log.info("Performing real-time semantic search for query: '{}' over {} files", query, files.size());
         float[] queryEmbedding = embeddingService.generateEmbedding(query);
 
+        // Batch pre-compute embeddings for all files that are not yet cached
+        List<FileMetadata> uncached = files.stream()
+                .filter(f -> !fileEmbeddingCache.containsKey(f.getId()))
+                .toList();
+        if (!uncached.isEmpty()) {
+            batchGenerateEmbeddings(uncached);
+        }
+
         for (FileMetadata file : files) {
-            float[] fileEmbedding = getOrGenerateFileEmbedding(file);
+            float[] fileEmbedding = fileEmbeddingCache.get(file.getId());
+            if (fileEmbedding == null) continue;
+
             double similarity = cosineSimilarity(queryEmbedding, fileEmbedding);
-            
-            // Apply a minor boost if the filename itself contains query terms
+
             double nameBoost = 0.0;
             String nameLower = file.getOriginalName().toLowerCase();
             for (String term : query.toLowerCase().split("\\s+")) {
@@ -64,7 +80,7 @@ public class VectorService {
             }
 
             double score = similarity + nameBoost;
-            if (score > 0.3) { // Similarity threshold
+            if (score > 0.3) {
                 results.add(new VectorSearchResult(file, score));
             }
         }
@@ -73,18 +89,15 @@ public class VectorService {
         return results;
     }
 
-    private float[] getOrGenerateFileEmbedding(FileMetadata file) {
-        return fileEmbeddingCache.computeIfAbsent(file.getId(), id -> {
+    private void batchGenerateEmbeddings(List<FileMetadata> files) {
+        for (FileMetadata file : files) {
             String contentToEmbed = file.getOriginalName();
             String ext = file.getExtension() != null ? file.getExtension().toLowerCase() : "";
-            
-            // Read content if text file
             if ("txt".equalsIgnoreCase(ext) && file.getDriveLocation() != null) {
                 try {
                     Path path = Paths.get(file.getDriveLocation());
                     if (Files.exists(path)) {
                         String text = new String(Files.readAllBytes(path));
-                        // Take first 500 characters of file
                         if (text.length() > 500) {
                             text = text.substring(0, 500);
                         }
@@ -94,9 +107,13 @@ public class VectorService {
                     log.warn("Could not read text content for embedding: {}", e.getMessage());
                 }
             }
-
-            return embeddingService.generateEmbedding(contentToEmbed);
-        });
+            try {
+                float[] embedding = embeddingService.generateEmbedding(contentToEmbed);
+                fileEmbeddingCache.put(file.getId(), embedding);
+            } catch (Exception e) {
+                log.warn("Failed to generate embedding for file {}: {}", file.getId(), e.getMessage());
+            }
+        }
     }
 
     // ── CUSTOM DEVELOPER VECTOR COLLECTIONS CRUD ──
@@ -328,13 +345,16 @@ public class VectorService {
 
     public static double cosineSimilarity(float[] vectorA, float[] vectorB) {
         if (vectorA == null || vectorB == null || vectorA.length != vectorB.length) return 0.0;
+        if (com.cloudpool.util.RustBridge.isLibraryLoaded()) {
+            return com.cloudpool.util.RustBridge.cosineSimilarity(vectorA, vectorB);
+        }
         double dotProduct = 0.0;
         double normA = 0.0;
         double normB = 0.0;
         for (int i = 0; i < vectorA.length; i++) {
             dotProduct += vectorA[i] * vectorB[i];
-            normA += Math.pow(vectorA[i], 2);
-            normB += Math.pow(vectorB[i], 2);
+            normA += vectorA[i] * vectorA[i];
+            normB += vectorB[i] * vectorB[i];
         }
         if (normA == 0.0 || normB == 0.0) return 0.0;
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));

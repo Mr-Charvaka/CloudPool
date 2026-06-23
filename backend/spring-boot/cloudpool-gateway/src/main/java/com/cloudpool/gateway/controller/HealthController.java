@@ -31,6 +31,9 @@ public class HealthController {
     @Value("${cloudpool.services.network.url:http://localhost:8085}")
     private String networkUrl;
 
+    @Value("${cloudpool.weaviate.url:http://localhost:8081}")
+    private String weaviateUrl;
+
     public HealthController(WebClient.Builder webClientBuilder) {
         this.webClient = webClientBuilder
                 .codecs(c -> c.defaultCodecs().maxInMemorySize(256 * 1024))
@@ -70,14 +73,14 @@ public class HealthController {
         systemStats.put("jvmUsedMemory", formatBytes(totalMemory - freeMemory));
 
         // Fan-out service health pings concurrently via WebClient (reactive, no blocking)
-        Mono<Map<String, Object>> authHealth    = pingService("auth",    authUrl    + "/actuator/health");
-        Mono<Map<String, Object>> dataHealth    = pingService("data",    dataUrl    + "/actuator/health");
-        Mono<Map<String, Object>> computeHealth = pingService("compute", computeUrl + "/actuator/health");
-        Mono<Map<String, Object>> networkHealth = pingService("network", networkUrl + "/actuator/health");
+        Mono<Map<String, Object>> authHealth    = pingService("auth",    authUrl       + "/actuator/health");
+        Mono<Map<String, Object>> dataHealth    = pingService("data",    dataUrl       + "/actuator/health");
+        Mono<Map<String, Object>> computeHealth = pingService("compute", computeUrl    + "/actuator/health");
+        Mono<Map<String, Object>> networkHealth = pingService("network", networkUrl    + "/actuator/health");
+        Mono<Map<String, Object>> weaviateHealth = pingService("weaviate", weaviateUrl + "/v1/.well-known/ready");
 
-        return Mono.zip(authHealth, dataHealth, computeHealth, networkHealth)
+        return Mono.zip(authHealth, dataHealth, computeHealth, networkHealth, weaviateHealth)
                 .map(tuple -> {
-                    // Build response entirely inside the lambda — no shared mutable state
                     Map<String, Object> response = new HashMap<>();
                     response.put("status", "UP");
                     response.put("uptime", formatUptime(uptimeMs));
@@ -86,10 +89,11 @@ public class HealthController {
                     response.put("system", systemStats);
 
                     Map<String, Object> services = new HashMap<>();
-                    services.put("auth",    tuple.getT1());
-                    services.put("data",    tuple.getT2());
-                    services.put("compute", tuple.getT3());
-                    services.put("network", tuple.getT4());
+                    services.put("auth",     tuple.getT1());
+                    services.put("data",     tuple.getT2());
+                    services.put("compute",  tuple.getT3());
+                    services.put("network",  tuple.getT4());
+                    services.put("weaviate", tuple.getT5());
                     response.put("services", services);
                     return response;
                 });

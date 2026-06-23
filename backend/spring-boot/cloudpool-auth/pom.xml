@@ -28,6 +28,12 @@
             <artifactId>cloudpool-common</artifactId>
             <version>0.1.0-SNAPSHOT</version>
         </dependency>
+        <!-- Network module (for ProjectService, GoogleDriveService) -->
+        <dependency>
+            <groupId>com.cloudpool</groupId>
+            <artifactId>cloudpool-network</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+        </dependency>
 
         <!-- Spring Boot Starters -->
         <dependency>
@@ -125,6 +131,9 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <classifier>exec</classifier>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

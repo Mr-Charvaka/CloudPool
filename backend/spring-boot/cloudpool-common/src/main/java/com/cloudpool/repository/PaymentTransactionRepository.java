@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -21,4 +22,6 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
 
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM PaymentTransaction t WHERE t.gateway.id = :gatewayId AND t.status = 'SUCCESS'")
     BigDecimal sumSuccessfulAmountByGatewayId(@Param("gatewayId") UUID gatewayId);
+
+    Optional<PaymentTransaction> findByIdempotencyKey(String idempotencyKey);
 }

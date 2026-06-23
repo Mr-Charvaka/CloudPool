@@ -67,7 +67,7 @@ public class FileController {
     }
 
     @GetMapping
-    public ResponseEntity<org.springframework.data.domain.Page<FileMetadata>> listFiles(
+    public ResponseEntity<List<FileMetadata>> listFiles(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         User user = getAuthenticatedUser();
@@ -140,7 +140,7 @@ public class FileController {
 
             return ResponseEntity.ok()
                     .contentType(mediaType)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + metadata.getOriginalName() + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + java.nio.file.Paths.get(metadata.getOriginalName() != null ? metadata.getOriginalName() : "download").getFileName().toString() + "\"")
                     .body(data);
         } catch (Exception e) {
             return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));

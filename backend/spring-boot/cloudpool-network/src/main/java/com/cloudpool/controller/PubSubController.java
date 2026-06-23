@@ -10,6 +10,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
+import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 import java.util.UUID;
 
@@ -48,7 +49,10 @@ public class PubSubController {
 
     @Data
     public static class BroadcastRequest {
+        @NotBlank(message = "Channel cannot be blank")
         private String channel;
+        
+        @NotBlank(message = "Payload JSON cannot be blank")
         private String payloadJson; // Must be valid JSON string
     }
 }

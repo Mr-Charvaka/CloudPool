@@ -5,13 +5,13 @@ spring:
 
   # Datasource Configuration
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:h2:file:../data/cloudpooldb;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}
-    username: ${SPRING_DATASOURCE_USERNAME:sa}
-    password: ${SPRING_DATASOURCE_PASSWORD:password}
-    driver-class-name: org.h2.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/cloudpool}
+    username: ${SPRING_DATASOURCE_USERNAME:cloudpool}
+    password: ${SPRING_DATASOURCE_PASSWORD:cloudpool}
+    driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 50
-      minimum-idle: 10
+      maximum-pool-size: 10
+      minimum-idle: 5
       idle-timeout: 300000
       connection-timeout: 20000
       max-lifetime: 1200000
@@ -121,6 +121,7 @@ cloudpool:
 
   storage:
     max-file-size: 5368709120
+    compression-enabled: ${CLOUDPOOL_STORAGE_COMPRESSION_ENABLED:false}
     allowed-extensions:
       - pdf
       - doc
@@ -141,18 +142,6 @@ cloudpool:
     default-page-size: 20
     max-page-size: 100
 
-# Server Configuration
-# CRITICAL: This is a SINGLE top-level server: key. The original file had a malformed
-# nested structure where server.* properties were incorrectly nested under spring.server
-# (which is not a valid Spring Boot property path) AND also defined as top-level server: blocks.
-# YAML doesn't merge; the last occurrence wins. This meant the configured port: 8083,
-# servlet.context-path, and max-http-post-size were being discarded.
-# 
-# The original issues were:
-#   1. Lines 20-23: spring.server.port (INVALID - server.* must be top-level)
-#   2. Lines 148-152: top-level server: block (CORRECT location)
-# 
-# Fixed by consolidating into ONE top-level server: block with all distinct settings.
 server:
   port: 8083
   servlet:

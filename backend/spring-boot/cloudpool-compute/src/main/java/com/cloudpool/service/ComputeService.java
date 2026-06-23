@@ -7,30 +7,19 @@ import com.cloudpool.exception.CloudPoolException;
 import com.cloudpool.policy.QuotaPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.scheduling.annotation.Async;
 
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.LocalDateTime;
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.HostAccess;
+import org.graalvm.polyglot.PolyglotAccess;
+import org.graalvm.polyglot.Value;
+
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import javax.annotation.PostConstruct;
+import java.util.concurrent.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -45,20 +34,13 @@ public class ComputeService {
     private final GraphQLSubscriptionService subscriptionService;
     private final QuotaPolicy quotaPolicy;
     private final ObjectMapper objectMapper;
+    private final KubernetesDeploymentService kubernetesDeploymentService;
 
-    // Warm worker pool for serverless functions (Nashorn/GraalVM)
-    private final BlockingQueue<ScriptEngine> scriptEnginePool = new ArrayBlockingQueue<>(10);
+    private static final int EXECUTION_TIMEOUT_SECONDS = 10;
 
-    @PostConstruct
-    public void initWorkerPool() {
-        ScriptEngineManager manager = new ScriptEngineManager();
-        for (int i = 0; i < 10; i++) {
-            ScriptEngine engine = manager.getEngineByName("JavaScript");
-            if (engine != null) {
-                scriptEnginePool.offer(engine);
-            }
-        }
-    }
+    private final ExecutorService sandboxExecutor = new ThreadPoolExecutor(
+            4, 16, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(100),
+            new ThreadPoolExecutor.AbortPolicy());
 
     @Transactional
     public StaticSite deployStaticSite(User user, String name, String bucketName, String domain) {
@@ -152,6 +134,7 @@ public class ComputeService {
         containerDeploymentRepository.delete(deployment);
     }
 
+    @Async
     public void processContainerDeploymentAsync(ContainerDeployment deployment) {
         BackgroundJob job = BackgroundJob.builder()
                 .jobType("CONTAINER_DEPLOYMENT")
@@ -162,48 +145,21 @@ public class ComputeService {
         subscriptionService.publishJobUpdate(job);
 
         try {
-            log.info("Provisioning infrastructure for container: {}", deployment.getName());
-            
-            // Actually run the container with quotas, non-root user, and hard-kill timeout
-            ProcessBuilder pb = new ProcessBuilder(
-                "docker", "run", "-d", 
-                "--name", "deploy_" + deployment.getId(),
-                "--user", "1000:1000", // Run as non-root user
-                "--storage-opt", "size=2G", // Enforce storage quotas
-                "--memory", deployment.getMemory() + "m", 
-                "--cpus", String.valueOf(deployment.getCpu()), 
-                deployment.getDockerImage()
-            );
-            
-            Process process = pb.start();
-            boolean finished = process.waitFor(60, TimeUnit.SECONDS); // Hard-kill timeout for provisioning
-            
-            if (!finished) {
-                process.destroyForcibly();
-                throw new CloudPoolException("Docker provisioning timed out and was forcibly killed.");
-            }
-            
-            int exitCode = process.exitValue();
-            if (exitCode != 0) {
-                throw new CloudPoolException("Docker run failed with exit code " + exitCode);
-            }
+            log.info("Deploying container via Kubernetes: {}", deployment.getName());
+            deployment.setStatus(com.cloudpool.model.enums.ContainerStatus.DEPLOYING);
+            containerDeploymentRepository.save(deployment);
 
-            ContainerDeployment active = containerDeploymentRepository.findById(deployment.getId()).orElse(null);
-            if (active != null) {
-                active.setStatus(com.cloudpool.model.enums.ContainerStatus.LIVE);
-                active.setLogs(active.getLogs() + "Container successfully started and live.\n");
-                containerDeploymentRepository.save(active);
-            }
+            kubernetesDeploymentService.deployContainer(deployment);
 
             job.setStatus(com.cloudpool.model.enums.BackgroundJobStatus.COMPLETED);
             backgroundJobRepository.save(job);
             subscriptionService.publishJobUpdate(job);
-        } catch (InterruptedException e) {
-            log.error("Container deployment interrupted", e);
+        } catch (Exception e) {
+            log.error("Container deployment failed for {}: {}", deployment.getName(), e.getMessage());
             ContainerDeployment active = containerDeploymentRepository.findById(deployment.getId()).orElse(null);
             if (active != null) {
                 active.setStatus(com.cloudpool.model.enums.ContainerStatus.FAILED);
-                active.setLogs(active.getLogs() + "Deployment aborted: " + e.getMessage() + "\n");
+                active.setLogs(active.getLogs() + "Deployment failed: " + e.getMessage() + "\n");
                 containerDeploymentRepository.save(active);
             }
             job.setStatus(com.cloudpool.model.enums.BackgroundJobStatus.FAILED);
@@ -213,32 +169,42 @@ public class ComputeService {
     }
 
     private String executeSandbox(String code, String paramsJson) {
-        ScriptEngine engine = null;
+        Object paramsObj;
         try {
-            engine = scriptEnginePool.poll(5, TimeUnit.SECONDS);
-            if (engine == null) {
-                throw new CloudPoolException("No warm workers available for execution.");
-            }
-            
-            // Securely evaluate params using ObjectMapper to avoid JS Injection
-            Object paramsObj = objectMapper.readValue(paramsJson != null && !paramsJson.isBlank() ? paramsJson : "{}", Object.class);
-            engine.put("params", paramsObj);
-            
-            // Execute the code inside the warm engine
-            String script = "const res = (function(args) { " + code + " })(params); res;";
-            Object result = engine.eval(script);
-            
-            return objectMapper.writeValueAsString(result);
-            
+            paramsObj = objectMapper.readValue(
+                paramsJson != null && !paramsJson.isBlank() ? paramsJson : "{}", Object.class);
+        } catch (Exception e) {
+            throw new CloudPoolException("Invalid params JSON: " + e.getMessage());
+        }
+
+        Context context = Context.newBuilder("js")
+            .allowHostAccess(HostAccess.NONE)
+            .allowIO(false)
+            .allowCreateThread(false)
+            .allowNativeAccess(false)
+            .allowPolyglotAccess(PolyglotAccess.NONE)
+            .option("js.sandbox", "true")
+            .option("js.stackoverflow", "true")
+            .option("js.ecmascript-version", "2022")
+            .build();
+
+        try {
+            context.getBindings("js").putMember("params", paramsObj);
+
+            Future<Value> future = sandboxExecutor.submit(() ->
+                context.eval("js", "(function(args) { " + code + " })(params)"));
+
+            Value result = future.get(EXECUTION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            return objectMapper.writeValueAsString(result.as(Object.class));
+
+        } catch (TimeoutException e) {
+            context.close(true);
+            throw new CloudPoolException("Execution timed out after " + EXECUTION_TIMEOUT_SECONDS + "s");
         } catch (Exception e) {
             log.error("Error executing serverless function sandbox", e);
             throw new CloudPoolException("Sandbox Execution Error: " + e.getMessage());
         } finally {
-            if (engine != null) {
-                // Wipe state if possible, then return to pool
-                engine.put("params", null);
-                scriptEnginePool.offer(engine);
-            }
+            context.close(true);
         }
     }
 }

@@ -27,4 +27,5 @@ public final class RustBridge {
     public static native byte[] compress(byte[] data);
     public static native byte[] decompress(byte[] data);
     public static native byte[] convertToWebp(byte[] data);
+    public static native float cosineSimilarity(float[] vec1, float[] vec2);
 }

@@ -29,6 +29,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final com.cloudpool.filter.LoginRateLimiterFilter loginRateLimiterFilter;
     private final com.cloudpool.filter.RateLimitFilter rateLimitFilter;
+    private final com.cloudpool.filter.GraphQLRateLimitFilter graphQLRateLimitFilter;
 
     @Value("${cloudpool.cors.allowed-origins:http://localhost:3000,http://localhost:8080}")
     private String allowedOrigins;
@@ -50,10 +51,12 @@ public class SecurityConfig {
             .csrf(csrf -> csrf
                 .csrfTokenRepository(org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse())
                 .ignoringRequestMatchers(
-                    AntPathRequestMatcher.antMatcher("/api/**"),
-                    AntPathRequestMatcher.antMatcher("/graphql")
-                    // H2 console csrf ignored only in dev
-                    // handled conditionally below
+                    AntPathRequestMatcher.antMatcher("/api/auth/login"),
+                    AntPathRequestMatcher.antMatcher("/api/auth/register"),
+                    AntPathRequestMatcher.antMatcher("/api/auth/refresh"),
+                    AntPathRequestMatcher.antMatcher("/api/auth/refresh-cookie"),
+                    AntPathRequestMatcher.antMatcher("/api/auth/csrf"),
+                    AntPathRequestMatcher.antMatcher("/api/files/shared/**")
                 )
             );
 
@@ -85,6 +88,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated();
         })
             .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(graphQLRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(loginRateLimiterFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(new TenantFilter(), JwtAuthenticationFilter.class);
@@ -95,11 +99,12 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         List<String> origins = Arrays.asList(allowedOrigins.split(","));
+        boolean hasWildcard = origins.contains("*") || origins.contains(".*");
         configuration.setAllowedOriginPatterns(origins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-API-KEY", "X-Project-Id"));
         configuration.setExposedHeaders(Arrays.asList("Authorization"));
-        configuration.setAllowCredentials(true);
+        configuration.setAllowCredentials(!hasWildcard);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

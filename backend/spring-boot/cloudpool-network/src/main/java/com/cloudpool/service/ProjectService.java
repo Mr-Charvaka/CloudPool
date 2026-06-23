@@ -2,6 +2,7 @@ package com.cloudpool.service;
 
 import com.cloudpool.model.*;
 import com.cloudpool.repository.*;
+import com.cloudpool.util.EncryptionUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
@@ -9,7 +10,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -27,6 +27,7 @@ public class ProjectService {
     private final DevTableFieldRepository devTableFieldRepository;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final EncryptionUtil encryptionUtil;
 
     @org.springframework.beans.factory.annotation.Value("${spring.datasource.url:jdbc:h2:file:./data/cloudpooldb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}")
     private String datasourceUrl;
@@ -102,8 +103,7 @@ public class ProjectService {
     public ProjectSecret addSecret(UUID projectId, String key, String value, UUID userId) {
         Project project = getProject(projectId, userId);
 
-        // Simple obfuscation/encryption using Base64 for the DB
-        String encryptedValue = Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+        String encryptedValue = Base64.getEncoder().encodeToString(encryptionUtil.encrypt(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
 
         // Check if secret key already exists, overwrite if yes
         Optional<ProjectSecret> existing = projectSecretRepository.findByProjectIdAndSecretKey(projectId, key.trim());
@@ -127,8 +127,8 @@ public class ProjectService {
         List<ProjectSecret> secrets = projectSecretRepository.findByProjectId(projectId);
         secrets.forEach(s -> {
             try {
-                String decrypted = new String(Base64.getDecoder().decode(s.getSecretValue()), StandardCharsets.UTF_8);
-                s.setSecretValue(decrypted);
+                byte[] decrypted = encryptionUtil.decrypt(Base64.getDecoder().decode(s.getSecretValue()));
+                s.setSecretValue(new String(decrypted, java.nio.charset.StandardCharsets.UTF_8));
             } catch (Exception e) {
                 s.setSecretValue("[DECRYPTION_ERROR]");
             }
@@ -217,7 +217,7 @@ public class ProjectService {
             conn.setPort(port);
             conn.setDatabaseName(databaseName);
             conn.setUsername(username);
-            conn.setPassword(password);
+            conn.setPassword(encryptConnectionPassword(password));
             conn.setActive(active);
         } else {
             conn = DatabaseConnection.builder()
@@ -227,7 +227,7 @@ public class ProjectService {
                     .port(port)
                     .databaseName(databaseName)
                     .username(username)
-                    .password(password)
+                    .password(encryptConnectionPassword(password))
                     .active(active)
                     .build();
         }
@@ -431,6 +431,13 @@ public class ProjectService {
                 .orElseThrow(() -> new NoSuchElementException("Snapshot not found"));
         getProject(snapshot.getProject().getId(), userId); // check auth
         projectSnapshotRepository.delete(snapshot);
+    }
+
+    private String encryptConnectionPassword(String rawPassword) {
+        if (rawPassword == null || rawPassword.isEmpty()) {
+            return rawPassword;
+        }
+        return Base64.getEncoder().encodeToString(encryptionUtil.encrypt(rawPassword.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     }
 
     // ── HELPER DTO STATES FOR SERIALIZATION ──

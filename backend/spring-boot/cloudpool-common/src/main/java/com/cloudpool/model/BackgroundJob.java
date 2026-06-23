@@ -23,6 +23,8 @@ public class BackgroundJob {
     @Column(nullable = false)
     private com.cloudpool.model.enums.BackgroundJobStatus status; // PENDING, RUNNING, COMPLETED, FAILED
 
+    private UUID referenceId;
+
     @Column(columnDefinition = "TEXT")
     private String payload; // serialized JSON payload
 

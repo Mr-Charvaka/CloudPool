@@ -1,20 +1,23 @@
 package com.cloudpool.publisher;
 
 import com.cloudpool.event.DeploymentRequestedEvent;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import com.cloudpool.event.DeploymentSuccessEvent;
+import com.cloudpool.event.DeploymentFailedEvent;
 import org.springframework.stereotype.Component;
 
-@Slf4j
 @Component
-@RequiredArgsConstructor
 public class DeploymentPublisher {
 
-    private final RabbitTemplate rabbitTemplate;
+    public void publishDeploymentRequested(DeploymentRequestedEvent event) {
+    }
+
+    public void publishDeploymentSuccess(DeploymentSuccessEvent event) {
+    }
+
+    public void publishDeploymentFailed(DeploymentFailedEvent event) {
+    }
 
     public void requestDeployment(DeploymentRequestedEvent event) {
-        log.info("Publishing deployment request for {}", event.getName());
-        rabbitTemplate.convertAndSend("deployment.queue", event);
+        publishDeploymentRequested(event);
     }
 }

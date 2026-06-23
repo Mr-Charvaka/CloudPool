@@ -37,10 +37,12 @@ public class DatabaseConnection {
  
     private String username;
  
-    @Column(name = "password")
+    @Column(name = "encrypted_password")
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private String encryptedPassword;
  
     @Transient
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
     private transient String decryptedPassword;
  
     private boolean active = true;
@@ -64,6 +66,7 @@ public class DatabaseConnection {
         this.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
     }
  
+    @com.fasterxml.jackson.annotation.JsonIgnore
     public String getPassword() {
         return this.decryptedPassword != null ? this.decryptedPassword : this.encryptedPassword;
     }

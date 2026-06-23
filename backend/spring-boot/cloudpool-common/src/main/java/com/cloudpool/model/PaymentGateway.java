@@ -96,6 +96,15 @@ public class PaymentGateway {
         this.updatedAt = LocalDateTime.now();
     }
 
+    // Convenience: returns the decrypted (plaintext) key if available, else the encrypted DB value
+    public String getSecretKey() {
+        return plainSecretKey != null ? plainSecretKey : encryptedSecretKey;
+    }
+
+    public String getApiKey() {
+        return plainApiKey != null ? plainApiKey : encryptedApiKey;
+    }
+
     // Safe masked representation for API responses
     public String getMaskedApiKey() {
         String key = plainApiKey != null ? plainApiKey : encryptedApiKey;

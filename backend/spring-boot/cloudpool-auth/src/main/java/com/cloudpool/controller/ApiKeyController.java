@@ -11,11 +11,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+import com.cloudpool.common.util.ApiKeyUtils;
 import com.cloudpool.service.AuditLogService;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -34,12 +32,24 @@ public class ApiKeyController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ApiKey>> listKeys() {
+    public ResponseEntity<?> listKeys() {
         User user = getAuthenticatedUser();
         List<ApiKey> keys = apiKeyRepository.findByUser(user);
-        // Clear hashes before returning for safety
-        keys.forEach(k -> k.setKeyHash("[REDACTED]"));
-        return ResponseEntity.ok(keys);
+        
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (ApiKey k : keys) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", k.getId());
+            map.put("name", k.getName());
+            map.put("description", k.getDescription());
+            map.put("active", k.isActive());
+            map.put("createdAt", k.getCreatedAt());
+            map.put("expiresAt", k.getExpiresAt());
+            map.put("keyHash", "[REDACTED]");
+            result.add(map);
+        }
+        
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/generate")
@@ -47,8 +57,13 @@ public class ApiKeyController {
         User user = getAuthenticatedUser();
         
         // Generate plain key: cp_live_ + 32 random alphanumeric characters
-        String plainKey = "cp_live_" + generateRandomString(32);
-        String hashedKey = hashApiKey(plainKey);
+        String plainKey = "cp_live_" + ApiKeyUtils.generateRandomString(32);
+        String hashedKey = ApiKeyUtils.hashApiKey(plainKey);
+
+        int days = request.getDaysToLive();
+        if (days <= 0 || days > 90) {
+            days = 90;
+        }
 
         ApiKey apiKey = ApiKey.builder()
                 .user(user)
@@ -57,7 +72,7 @@ public class ApiKeyController {
                 .keyHash(hashedKey)
                 .active(true)
                 .createdAt(LocalDateTime.now())
-                .expiresAt(request.getDaysToLive() > 0 ? LocalDateTime.now().plusDays(request.getDaysToLive()) : null)
+                .expiresAt(LocalDateTime.now().plusDays(days))
                 .build();
 
         ApiKey saved = apiKeyRepository.save(apiKey);
@@ -112,26 +127,6 @@ public class ApiKeyController {
     public ResponseEntity<List<Map<String, Object>>> getAnalyticsByEndpoint() {
         User user = getAuthenticatedUser();
         return ResponseEntity.ok(apiKeyUsageService.getUsageByEndpoint(user));
-    }
-
-    private String generateRandomString(int length) {
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        SecureRandom random = new SecureRandom();
-        StringBuilder sb = new StringBuilder(length);
-        for (int i = 0; i < length; i++) {
-            sb.append(chars.charAt(random.nextInt(chars.length())));
-        }
-        return sb.toString();
-    }
-
-    private String hashApiKey(String apiKeyRaw) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(apiKeyRaw.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new com.cloudpool.exception.CloudPoolException("SHA-256 algorithm not available", e);
-        }
     }
 
     @Data

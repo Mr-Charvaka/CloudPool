@@ -1,6 +1,7 @@
 package com.cloudpool.dto;
 
 import com.cloudpool.model.BackgroundJob;
+import com.cloudpool.model.enums.BackgroundJobStatus;
 import lombok.Builder;
 import lombok.Data;
 
@@ -11,7 +12,7 @@ import java.util.UUID;
 public class BackgroundJobDTO {
     private UUID id;
     private String jobType;
-    private String status;
+    private BackgroundJobStatus status;
     private String payload;
 
     public static BackgroundJobDTO fromEntity(BackgroundJob job) {

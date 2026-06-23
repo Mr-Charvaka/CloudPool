@@ -21,6 +21,9 @@ import org.springframework.data.redis.core.script.RedisScript;
 @Component
 public class LoginRateLimiterFilter implements Filter {
 
+    private static final int MAX_ATTEMPTS = 5;
+    private static final long WINDOW_MS = 60000;
+
     private final RedisTemplate<String, Object> redisTemplate;
     
     private static final String LUA_SCRIPT =
@@ -31,7 +34,8 @@ public class LoginRateLimiterFilter implements Filter {
             "return count";
     private final RedisScript<Long> script = new DefaultRedisScript<>(LUA_SCRIPT, Long.class);
 
-    private final Map<String, Long> localAttempts = new ConcurrentHashMap<>();
+    private final Map<String, IpWindow> localAttempts = new ConcurrentHashMap<>();
+    private final Object localLock = new Object();
 
     public LoginRateLimiterFilter(Optional<RedisTemplate<String, Object>> redisTemplate) {
         this.redisTemplate = redisTemplate.orElse(null);
@@ -63,20 +67,34 @@ public class LoginRateLimiterFilter implements Filter {
         if (redisTemplate != null) {
             try {
                 Long count = redisTemplate.execute(script, Collections.singletonList(key), 60);
-                return count != null && count > 5; // Allow 5 attempts per minute
+                return count != null && count > MAX_ATTEMPTS;
             } catch (Exception e) {
                 log.debug("Redis rate limiting error, falling back to local storage: {}", e.getMessage());
             }
         }
 
-        // Local in-memory fallback
         long now = System.currentTimeMillis();
-        localAttempts.entrySet().removeIf(entry -> now - entry.getValue() > 60000);
-        long count = localAttempts.keySet().stream().filter(k -> k.startsWith(ip)).count();
-        if (count >= 5) {
-            return true;
+        synchronized (localLock) {
+            IpWindow window = localAttempts.get(ip);
+            if (window == null || now - window.windowStart > WINDOW_MS) {
+                window = new IpWindow(now, 0);
+                localAttempts.put(ip, window);
+            }
+            window.count++;
+            if (window.count > MAX_ATTEMPTS) {
+                return true;
+            }
         }
-        localAttempts.put(ip + "_" + now, now);
         return false;
+    }
+
+    private static class IpWindow {
+        final long windowStart;
+        int count;
+
+        IpWindow(long windowStart, int count) {
+            this.windowStart = windowStart;
+            this.count = count;
+        }
     }
 }

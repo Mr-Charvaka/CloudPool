@@ -7,7 +7,6 @@ import com.cloudpool.service.PaymentService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -150,7 +149,7 @@ public class PaymentController {
         UUID userId = currentUser().getId();
         try {
             Pageable pageable = PageRequest.of(page, Math.min(size, 100));
-            Page<PaymentTransaction> txns = paymentService.getTransactions(userId, gatewayId, pageable);
+            List<PaymentTransaction> txns = paymentService.getTransactions(userId, gatewayId, pageable);
             return ResponseEntity.ok(txns);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();

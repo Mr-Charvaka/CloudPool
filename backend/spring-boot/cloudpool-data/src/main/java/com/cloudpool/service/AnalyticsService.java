@@ -1,6 +1,7 @@
 package com.cloudpool.service;
 
 import com.cloudpool.model.AnalyticsApiLog;
+import com.cloudpool.model.User;
 import com.cloudpool.repository.AnalyticsApiLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,11 +39,19 @@ public class AnalyticsService {
         });
     }
 
+    public List<AnalyticsApiLog> getRecentLogs(UUID projectId, User user) {
+        return getRecentLogs(projectId);
+    }
+
     public List<AnalyticsApiLog> getRecentLogs(UUID projectId) {
         if (projectId != null) {
             return logRepository.findByProjectIdOrderByTimestampDesc(projectId);
         }
         return logRepository.findAllByOrderByTimestampDesc();
+    }
+
+    public Map<String, Object> getSummary(UUID projectId, User user) {
+        return getSummary(projectId);
     }
 
     public Map<String, Object> getSummary(UUID projectId) {

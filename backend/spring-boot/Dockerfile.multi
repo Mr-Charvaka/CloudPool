@@ -1,0 +1,27 @@
+# backend/spring-boot/Dockerfile.multi
+# Multi-stage build for CloudPool backend modules.
+# Requires the build argument `MODULE` to identify which module to package and run.
+
+# STAGE 1: Build the Maven Project
+FROM maven:3.9.9-eclipse-temurin-17 AS builder
+WORKDIR /build
+
+# Copy the entire source code
+COPY . .
+
+# Package all modules (skipping tests for speed)
+RUN mvn clean package -DskipTests
+
+# STAGE 2: Create the minimal runtime image
+FROM eclipse-temurin:17-jre-noble
+ARG MODULE
+ENV MODULE_ENV=${MODULE}
+
+WORKDIR /app
+# Copy only the compiled fat jar for the requested module
+COPY --from=builder /build/${MODULE}/target/*.jar app.jar
+
+EXPOSE 8080
+
+# Execute the application
+ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -18,7 +18,7 @@ public class WafGlobalFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        String uri = exchange.getRequest().getURI().toString();
+        String uri = java.net.URLDecoder.decode(exchange.getRequest().getURI().toString(), java.nio.charset.StandardCharsets.UTF_8);
         
         if (XSS_PATTERN.matcher(uri).find() || SQLI_PATTERN.matcher(uri).find()) {
             exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);

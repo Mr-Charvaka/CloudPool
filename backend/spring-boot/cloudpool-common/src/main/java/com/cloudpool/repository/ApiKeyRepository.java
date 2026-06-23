@@ -3,9 +3,12 @@ package com.cloudpool.repository;
 import com.cloudpool.model.ApiKey;
 import com.cloudpool.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,4 +21,9 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, UUID> {
     // Eagerly loads User to avoid LazyInitializationException in security filters
     @Query("SELECT k FROM ApiKey k JOIN FETCH k.user WHERE k.keyHash = :keyHash")
     Optional<ApiKey> findByKeyHashWithUser(@Param("keyHash") String keyHash);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE ApiKey k SET k.lastUsedAt = :timestamp WHERE k.id = :id")
+    void updateLastUsedAt(@Param("id") UUID id, @Param("timestamp") LocalDateTime timestamp);
 }

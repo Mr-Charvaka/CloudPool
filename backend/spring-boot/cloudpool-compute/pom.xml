@@ -27,6 +27,18 @@
             <artifactId>cloudpool-common</artifactId>
             <version>0.1.0-SNAPSHOT</version>
         </dependency>
+        <!-- Network module (for ProjectService) -->
+        <dependency>
+            <groupId>com.cloudpool</groupId>
+            <artifactId>cloudpool-network</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+        </dependency>
+        <!-- Data module (for StorageService) -->
+        <dependency>
+            <groupId>com.cloudpool</groupId>
+            <artifactId>cloudpool-data</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+        </dependency>
 
         <!-- Spring Boot Starters -->
         <dependency>
@@ -60,6 +72,21 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- GraalVM Polyglot API (JS sandboxing). Runtime must match the JDK
+             (e.g. GraalVM JDK distribution provides the JS engine natively). -->
+        <dependency>
+            <groupId>org.graalvm.polyglot</groupId>
+            <artifactId>polyglot</artifactId>
+            <version>23.1.2</version>
+        </dependency>
+
+        <!-- Kubernetes Client for container orchestration -->
+        <dependency>
+            <groupId>io.fabric8</groupId>
+            <artifactId>kubernetes-client</artifactId>
+            <version>6.9.2</version>
         </dependency>
 
         <!-- Embedded SMTP Receiver -->
@@ -123,6 +150,9 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <classifier>exec</classifier>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

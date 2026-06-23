@@ -3,7 +3,7 @@ package com.cloudpool.service;
 import com.cloudpool.dto.BackgroundJobDTO;
 import com.cloudpool.model.BackgroundJob;
 import com.cloudpool.repository.BackgroundJobRepository;
-import com.cloudpool.config.RabbitMQConfig;
+import com.cloudpool.common.config.RabbitMQConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;

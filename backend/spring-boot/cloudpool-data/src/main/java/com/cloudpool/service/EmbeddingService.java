@@ -99,10 +99,11 @@ public class EmbeddingService {
                     Thread.sleep(backoffMs);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    throw new com.cloudpool.exception.CloudPoolException(ie);
+                    throw new com.cloudpool.exception.CloudPoolException("Embedding generation interrupted", ie);
                 }
                 backoffMs *= 2;
             }
+        }
         throw new com.cloudpool.exception.CloudPoolException("Embedding service is unavailable.");
     }
 }

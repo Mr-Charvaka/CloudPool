@@ -7,30 +7,75 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.About;
 import com.google.api.services.drive.model.File;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
+import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 @Service
 public class GoogleDriveService {
 
+    @Value("${cloudpool.google-drive.client-id:}")
+    private String clientId;
+
+    @Value("${cloudpool.google-drive.client-secret:}")
+    private String clientSecret;
+
+    @Value("${cloudpool.google-drive.redirect-uri:}")
+    private String redirectUri;
+
     protected Drive getDriveClient(User user) {
-        // In a real scenario, this uses the user's saved OAuth tokens.
-        // We provide a skeleton client here.
-        return new Drive.Builder(new NetHttpTransport(), new GsonFactory(), request -> {})
+        if (user == null || user.getGoogleAccessToken() == null) {
+            throw new IllegalArgumentException("User Google credentials are required");
+        }
+
+        GoogleCredential credential = new GoogleCredential.Builder()
+                .setTransport(new NetHttpTransport())
+                .setJsonFactory(new GsonFactory())
+                .setClientSecrets(clientId, clientSecret)
+                .build()
+                .setRefreshToken(user.getGoogleRefreshToken())
+                .setAccessToken(user.getGoogleAccessToken());
+
+        return new Drive.Builder(new NetHttpTransport(), new GsonFactory(), credential)
                 .setApplicationName("CloudPool")
                 .build();
     }
 
     public String getAuthorizationUrl(User user) {
-        return "https://accounts.google.com/o/oauth2/auth?client_id=mock-id&response_type=code&scope=https://www.googleapis.com/auth/drive";
+        String scope = URLEncoder.encode("https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly", StandardCharsets.UTF_8);
+        return "https://accounts.google.com/o/oauth2/auth"
+            + "?client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
+            + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+            + "&response_type=code"
+            + "&scope=" + scope
+            + "&access_type=offline";
     }
 
     public void exchangeCodeForTokens(String code, User user) {
-        // Implementation for OAuth code exchange
+        try {
+            GoogleTokenResponse response = new GoogleAuthorizationCodeTokenRequest(
+                    new NetHttpTransport(), new GsonFactory(),
+                    "https://oauth2.googleapis.com/token",
+                    clientId, clientSecret,
+                    code, redirectUri)
+                    .execute();
+            
+            user.setGoogleAccessToken(response.getAccessToken());
+            if (response.getRefreshToken() != null) {
+                user.setGoogleRefreshToken(response.getRefreshToken());
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to exchange code for tokens", e);
+        }
     }
 
     public String uploadFile(MultipartFile file, User user) {

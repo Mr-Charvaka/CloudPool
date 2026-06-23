@@ -55,14 +55,11 @@ impl VectorService {
 
     /// Find k nearest neighbors
     pub fn knn(query_vector: &[f32], vectors: &[Vec<f32>], k: usize) -> Result<Vec<(usize, f32)>> {
-        let mut distances: Vec<(usize, f32)> = vectors
-            .iter()
-            .enumerate()
-            .map(|(idx, vec)| {
-                let dist = Self::cosine_similarity(query_vector, vec).unwrap_or(0.0);
-                (idx, dist)
-            })
-            .collect();
+        let mut distances: Vec<(usize, f32)> = Vec::with_capacity(vectors.len());
+        for (idx, vec) in vectors.iter().enumerate() {
+            let dist = Self::cosine_similarity(query_vector, vec)?;
+            distances.push((idx, dist));
+        }
 
         distances.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 

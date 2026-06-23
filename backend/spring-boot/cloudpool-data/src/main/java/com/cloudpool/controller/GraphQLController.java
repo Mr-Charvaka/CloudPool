@@ -22,9 +22,7 @@ import org.springframework.graphql.data.method.annotation.SubscriptionMapping;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
+import com.cloudpool.common.util.ApiKeyUtils;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -68,7 +66,7 @@ public class GraphQLController {
         User user = getAuthenticatedUser();
         int pageNum = (page != null && page >= 0) ? page : 0;
         int pageSize = (size != null && size > 0) ? size : 20;
-        return storageService.listUserFiles(user, org.springframework.data.domain.PageRequest.of(pageNum, pageSize)).getContent();
+        return storageService.listUserFiles(user, org.springframework.data.domain.PageRequest.of(pageNum, pageSize));
     }
 
     @QueryMapping
@@ -182,8 +180,8 @@ public class GraphQLController {
             @Argument String description,
             @Argument int daysToLive) {
         User user = getAuthenticatedUser();
-        String plainKey = "cp_live_" + generateRandomString(32);
-        String hashedKey = hashApiKey(plainKey);
+        String plainKey = "cp_live_" + ApiKeyUtils.generateRandomString(32);
+        String hashedKey = ApiKeyUtils.hashApiKey(plainKey);
 
         ApiKey apiKey = ApiKey.builder()
                 .user(user)
@@ -208,26 +206,6 @@ public class GraphQLController {
             fields.add(new KeyValueResult(k, v != null ? String.valueOf(v) : null));
         });
         return new RecordMap(id, fields);
-    }
-
-    private String generateRandomString(int length) {
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        SecureRandom random = new SecureRandom();
-        StringBuilder sb = new StringBuilder(length);
-        for (int i = 0; i < length; i++) {
-            sb.append(chars.charAt(random.nextInt(chars.length())));
-        }
-        return sb.toString();
-    }
-
-    private String hashApiKey(String apiKeyRaw) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(apiKeyRaw.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new com.cloudpool.exception.CloudPoolException("SHA-256 algorithm not available", e);
-        }
     }
 
     @Data

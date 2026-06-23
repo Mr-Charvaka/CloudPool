@@ -51,7 +51,16 @@ impl CliConfig {
             std::fs::create_dir_all(parent)?;
         }
         let content = serde_json::to_string_pretty(self)?;
-        std::fs::write(path, content)?;
+        std::fs::write(&path, &content)?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+        }
+        // On Windows, file permissions inherit from the parent directory.
+        // Users should ensure their home directory has appropriate ACLs.
+
         Ok(())
     }
 }

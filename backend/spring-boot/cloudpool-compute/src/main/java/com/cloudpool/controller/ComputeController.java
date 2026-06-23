@@ -76,7 +76,7 @@ public class ComputeController {
     @PostMapping("/serverless")
     public ResponseEntity<ServerlessFunction> deployServerlessFunction(@Valid @RequestBody ServerlessRequest request) {
         User user = getAuthenticatedUser();
-        ServerlessFunction saved = computeService.deployServerlessFunction(user, request.getName(), request.getTriggerRoute(), request.getCode());
+        ServerlessFunction saved = computeService.deployServerlessFunction(user.getId(), request.getName(), request.getTriggerRoute(), request.getCode());
         return ResponseEntity.ok(saved);
     }
 
@@ -110,7 +110,7 @@ public class ComputeController {
     @DeleteMapping("/serverless/{id}")
     public ResponseEntity<?> deleteServerlessFunction(@PathVariable("id") UUID id) {
         User user = getAuthenticatedUser();
-        computeService.deleteServerlessFunction(user, id);
+        computeService.deleteServerlessFunction(user.getId(), id);
         return ResponseEntity.ok(Map.of("message", "Serverless function deleted"));
     }
 
@@ -146,7 +146,7 @@ public class ComputeController {
     @DeleteMapping("/container/{id}")
     public ResponseEntity<?> deleteContainer(@PathVariable("id") UUID id) {
         User user = getAuthenticatedUser();
-        computeService.deleteContainer(user, id);
+        computeService.deleteContainer(user.getId(), id);
         return ResponseEntity.ok(Map.of("message", "Container deleted"));
     }
 

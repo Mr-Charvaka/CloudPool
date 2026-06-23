@@ -2,6 +2,7 @@ package com.cloudpool.service;
 
 import com.cloudpool.model.OutboxEmail;
 import com.cloudpool.model.ReceivedEmail;
+import com.cloudpool.model.enums.EmailStatus;
 import com.cloudpool.repository.OutboxEmailRepository;
 import com.cloudpool.repository.ReceivedEmailRepository;
 import lombok.RequiredArgsConstructor;
@@ -55,14 +56,14 @@ public class EmailService {
                 .subject(subject)
                 .body(body)
                 .sentAt(LocalDateTime.now())
-                .status("QUEUED")
+                .status(EmailStatus.QUEUED)
                 .build();
 
         outboxEmail = outboxEmailRepository.save(outboxEmail);
 
         if (sandboxMode) {
             log.info("[SANDBOX EMAIL] Stored email ID: {} in sandbox log (no network call)", outboxEmail.getId());
-            outboxEmail.setStatus("SENT");
+            outboxEmail.setStatus(EmailStatus.SENT);
             return outboxEmailRepository.save(outboxEmail);
         }
 
@@ -89,11 +90,11 @@ public class EmailService {
 
             Transport.send(message);
 
-            outboxEmail.setStatus("SENT");
+            outboxEmail.setStatus(EmailStatus.SENT);
             log.info("Email sent successfully to {}", to);
         } catch (Exception e) {
             log.error("Failed to send email via SMTP: {}", e.getMessage(), e);
-            outboxEmail.setStatus("FAILED");
+            outboxEmail.setStatus(EmailStatus.FAILED);
             outboxEmail.setErrorMessage(e.getMessage());
         }
 
@@ -116,7 +117,7 @@ public class EmailService {
                 .subject(subject)
                 .body(body)
                 .sentAt(LocalDateTime.now())
-                .status("QUEUED")
+                .status(EmailStatus.QUEUED)
                 .build();
         outboxEmail = outboxEmailRepository.save(outboxEmail);
 
@@ -157,12 +158,12 @@ public class EmailService {
             transport.sendMessage(message, message.getAllRecipients());
             transport.close();
 
-            outboxEmail.setStatus("DELIVERED");
+            outboxEmail.setStatus(EmailStatus.DELIVERED);
             log.info("Email DIRECTLY delivered to {} via MX host {}", to, mxHost);
 
         } catch (Exception e) {
             log.error("Direct MX delivery failed to {}: {}", to, e.getMessage(), e);
-            outboxEmail.setStatus("FAILED");
+            outboxEmail.setStatus(EmailStatus.FAILED);
             outboxEmail.setErrorMessage(e.getMessage());
         }
 

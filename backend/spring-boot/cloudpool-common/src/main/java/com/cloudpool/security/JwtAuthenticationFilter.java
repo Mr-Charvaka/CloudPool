@@ -6,6 +6,7 @@ import com.cloudpool.repository.ApiKeyRepository;
 import com.cloudpool.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -17,13 +18,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.cloudpool.common.util.ApiKeyUtils;
 import com.cloudpool.service.ApiKeyUsageService;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -58,7 +57,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // Check X-API-KEY header
                 String apiKeyRaw = request.getHeader("X-API-KEY");
                 if (StringUtils.hasText(apiKeyRaw)) {
-                    String hashedKey = hashApiKey(apiKeyRaw);
+                    String hashedKey = ApiKeyUtils.hashApiKey(apiKeyRaw);
                     Optional<ApiKey> apiKeyOpt = apiKeyRepository.findByKeyHashWithUser(hashedKey);
 
                     if (apiKeyOpt.isPresent() && apiKeyOpt.get().isActive()) {
@@ -66,9 +65,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         if (apiKey.getExpiresAt() == null || apiKey.getExpiresAt().isAfter(LocalDateTime.now())) {
                             User user = apiKey.getUser();
                             
-                            // Update last used timestamp
-                            apiKey.setLastUsedAt(LocalDateTime.now());
-                            apiKeyRepository.save(apiKey);
+                            // Update last used timestamp with optimistic locking via native query
+                            apiKeyRepository.updateLastUsedAt(apiKey.getId(), LocalDateTime.now());
 
                             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                                     user, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole())));
@@ -82,7 +80,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception e) {
-            logger.error("Cannot set user authentication: {}", e);
+            logger.error("Cannot set user authentication: {}", e.getClass().getSimpleName());
+            response.setContentType("application/json");
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"Invalid or expired authentication token\"}");
+            return;
         }
 
         try {
@@ -110,17 +112,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
             return headerAuth.substring(7);
         }
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("cp_token".equals(cookie.getName())) {
+                    String value = cookie.getValue();
+                    if (StringUtils.hasText(value)) {
+                        return value;
+                    }
+                }
+            }
+        }
         return null;
     }
 
-    private String hashApiKey(String apiKeyRaw) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(apiKeyRaw.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new com.cloudpool.exception.CloudPoolException("SHA-256 algorithm not available", e);
-        }
-    }
 }
 
