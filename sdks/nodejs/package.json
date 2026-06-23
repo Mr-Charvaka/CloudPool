@@ -6,14 +6,24 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "lint": "tsc --noEmit",
+    "test": "echo 'No tests configured'",
     "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "keywords": [
     "cloudpool",
     "sdk",
     "client",
     "vector",
-    "database"
+    "database",
+    "compute",
+    "network",
+    "payments",
+    "kv",
+    "email"
   ],
   "author": "CloudPool Contributors",
   "license": "MIT",

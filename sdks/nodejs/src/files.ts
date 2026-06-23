@@ -6,12 +6,12 @@ export class FilesClient {
   /**
    * Upload a file to a specific storage bucket.
    */
-  public async upload(file: Blob | File, bucket: string = 'default-pool'): Promise<any> {
+  public async upload<T = unknown>(file: Blob | File, bucket: string = 'default-pool'): Promise<T> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('bucket', bucket);
 
-    const response = await this.client.request('POST', 'files/upload', {
+    const response = await this.client.request('POST', '/api/files/upload', {
       body: formData,
     });
     return response.json();
@@ -20,32 +20,32 @@ export class FilesClient {
   /**
    * List all metadata records of the user's files.
    */
-  public async list(): Promise<any[]> {
-    const response = await this.client.request('GET', 'files');
+  public async list<T = unknown>(): Promise<T[]> {
+    const response = await this.client.request('GET', '/api/files');
     return response.json();
   }
 
   /**
    * Download a file by ID. Returns a Blob containing the binary data.
    */
-  public async download(fileId: string): Promise<Blob> {
-    const response = await this.client.request('GET', `files/download/${fileId}`);
+  public async download<T = unknown>(fileId: string): Promise<Blob> {
+    const response = await this.client.request('GET', `/api/files/download/${fileId}`);
     return response.blob();
   }
 
   /**
    * Share a file with an email address or generate a public link.
    */
-  public async share(
+  public async share<T = unknown>(
     fileId: string,
     sharedWithEmail?: string,
     expiryHours?: number
-  ): Promise<any> {
+  ): Promise<T> {
     const body: Record<string, any> = {};
     if (sharedWithEmail) body.sharedWithEmail = sharedWithEmail;
     if (expiryHours !== undefined) body.expiryHours = expiryHours;
 
-    const response = await this.client.request('POST', `files/${fileId}/share`, {
+    const response = await this.client.request('POST', `/api/files/${fileId}/share`, {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
@@ -55,8 +55,8 @@ export class FilesClient {
   /**
    * Download a shared file anonymously via share token. Returns a Blob.
    */
-  public async downloadShared(token: string): Promise<Blob> {
-    const response = await this.client.request('GET', `files/shared/${token}`);
+  public async downloadShared<T = unknown>(token: string): Promise<Blob> {
+    const response = await this.client.request('GET', `/api/files/shared/${token}`);
     return response.blob();
   }
 }

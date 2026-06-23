@@ -1,0 +1,106 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "cloudpool-sdk"
+version = "0.1.0"
+description = "CloudPool Python SDK — AI-Native Backend Platform"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+
+authors = [
+    { name = "CloudPool", email = "support@cloudpool.dev" },
+]
+
+maintainers = [
+    { name = "CloudPool SDK Team", email = "sdk@cloudpool.dev" },
+]
+
+keywords = [
+    "cloudpool", "baas", "backend", "cloud", "sdk", "api",
+    "file-storage", "database", "vector-search", "serverless",
+    "authentication",
+]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP",
+    "Typing :: Typed",
+]
+
+dependencies = [
+    "requests>=2.28",
+]
+
+[project.optional-dependencies]
+async = [
+    "aiohttp>=3.9",
+]
+all = [
+    "cloudpool-sdk[async]",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "keyring>=24.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
+    "pytest-vcr>=1.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+    "pre-commit>=3.0",
+    "tox>=4.0",
+    "responses>=0.25",
+]
+
+[project.urls]
+Homepage = "https://cloudpool.dev"
+Documentation = "https://cloudpool.dev/docs/sdk/python"
+Repository = "https://github.com/cloudpool/cloudpool"
+Changelog = "https://github.com/cloudpool/cloudpool/blob/main/sdks/python/CHANGELOG.md"
+Issues = "https://github.com/cloudpool/cloudpool/issues"
+
+[project.entry-points."cloudpool"]
+sdk = "cloudpool:CloudPool"
+
+[tool.setuptools.packages.find]
+include = ["cloudpool*"]
+exclude = ["tests*", "docs*", "examples*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+addopts = "-v --cov=cloudpool --cov-report=term-missing"
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "ARG"]
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+ignore_missing_imports = true
+disallow_untyped_defs = true
+
+[tool.coverage.run]
+source = ["cloudpool"]
+omit = ["*/tests/*", "*/docs/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80

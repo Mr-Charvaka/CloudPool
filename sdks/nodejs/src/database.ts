@@ -12,13 +12,13 @@ export class DatabaseClient {
   /**
    * Provision a new dynamic relational database table.
    */
-  public async createTable(
+  public async createTable<T = unknown>(
     name: string,
     displayName: string,
     description: string,
     fields: FieldDefinition[],
     projectId?: string
-  ): Promise<any> {
+  ): Promise<T> {
     const body: Record<string, any> = {
       name,
       displayName,
@@ -29,7 +29,7 @@ export class DatabaseClient {
       body.projectId = projectId;
     }
 
-    const response = await this.client.request('POST', 'v1/db/tables', {
+    const response = await this.client.request('POST', '/api/v1/db/tables', {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
@@ -39,8 +39,8 @@ export class DatabaseClient {
   /**
    * List all custom/dynamic database tables.
    */
-  public async listTables(projectId?: string): Promise<any[]> {
-    const path = projectId ? `v1/db/tables?projectId=${encodeURIComponent(projectId)}` : 'v1/db/tables';
+  public async listTables<T = unknown>(projectId?: string): Promise<T[]> {
+    const path = projectId ? `/api/v1/db/tables?projectId=${encodeURIComponent(projectId)}` : '/api/v1/db/tables';
     const response = await this.client.request('GET', path);
     return response.json();
   }
@@ -48,24 +48,24 @@ export class DatabaseClient {
   /**
    * Get specific custom table definition metadata by ID.
    */
-  public async getTable(tableId: string): Promise<any> {
-    const response = await this.client.request('GET', `v1/db/tables/${tableId}`);
+  public async getTable<T = unknown>(tableId: string): Promise<T> {
+    const response = await this.client.request('GET', `/api/v1/db/tables/${tableId}`);
     return response.json();
   }
 
   /**
    * Delete custom relational table and drops database structure.
    */
-  public async deleteTable(tableId: string): Promise<any> {
-    const response = await this.client.request('DELETE', `v1/db/tables/${tableId}`);
+  public async deleteTable<T = unknown>(tableId: string): Promise<T> {
+    const response = await this.client.request('DELETE', `/api/v1/db/tables/${tableId}`);
     return response.json();
   }
 
   /**
    * Insert record row into a dynamic custom database table.
    */
-  public async insertRecord(tableId: string, record: Record<string, any>): Promise<any> {
-    const response = await this.client.request('POST', `v1/db/tables/${tableId}/records`, {
+  public async insertRecord<T = unknown>(tableId: string, record: Record<string, any>): Promise<T> {
+    const response = await this.client.request('POST', `/api/v1/db/tables/${tableId}/records`, {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(record),
     });
@@ -75,8 +75,8 @@ export class DatabaseClient {
   /**
    * Query and list all records inside a custom relational database table.
    */
-  public async queryRecords(tableId: string): Promise<any[]> {
-    const response = await this.client.request('GET', `v1/db/tables/${tableId}/records`);
+  public async queryRecords<T = unknown>(tableId: string): Promise<T[]> {
+    const response = await this.client.request('GET', `/api/v1/db/tables/${tableId}/records`);
     return response.json();
   }
 }
