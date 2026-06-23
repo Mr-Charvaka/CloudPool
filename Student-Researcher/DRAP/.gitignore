@@ -1,0 +1,10 @@
+/target/
+**/*.rs.bk
+.DS_Store
+*.log
+certs/*.pem
+certs/*.key
+certs/*.crt
+!certs/README.md
+.env
+Cargo.lock

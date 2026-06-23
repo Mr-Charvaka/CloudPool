@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: cloudpool-enterprise-postgres
+    environment:
+      POSTGRES_DB: cloudpool
+      POSTGRES_USER: cloudpool
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cloudpool}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudpool"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: cloudpool-enterprise-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  weaviate:
+    image: semitechnologies/weaviate:latest
+    container_name: cloudpool-enterprise-weaviate
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'text2vec-openai'
+    ports:
+      - "8081:8080"
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: cloudpool-enterprise-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-cloudpool}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-cloudpool}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: cloudpool-enterprise-jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: cloudpool-enterprise-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: cloudpool-enterprise-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  redis_data:
+  weaviate_data:
+  prometheus_data:

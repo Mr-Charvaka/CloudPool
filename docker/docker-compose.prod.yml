@@ -1,40 +1,226 @@
 version: '3.8'
 
-services:
-  api1:
-    image: cloudpool:latest
-    environment:
-      - SPRING_PROFILES_ACTIVE=prod
-      - DATABASE_HOST=postgres
-      - REDIS_HOST=redis
-      - WEAVIATE_URL=http://weaviate:8080
-      - RABBITMQ_HOST=rabbitmq
-    depends_on:
-      - postgres
-      - redis
-      - rabbitmq
-      - weaviate
+networks:
+  public-net:
+    driver: bridge
+  private-net:
+    driver: bridge
 
-  api2:
-    image: cloudpool:latest
+services:
+  postgres:
+    image: postgres:16
+    container_name: cloudpool-postgres
     environment:
-      - SPRING_PROFILES_ACTIVE=prod
-      - DATABASE_HOST=postgres
-      - REDIS_HOST=redis
-      - WEAVIATE_URL=http://weaviate:8080
-      - RABBITMQ_HOST=rabbitmq
+      POSTGRES_DB: ${POSTGRES_DB:-cloudpool}
+      POSTGRES_USER: ${POSTGRES_USER:-cloudpool}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    networks:
+      - private-net
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cloudpool"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: cloudpool-redis
+    networks:
+      - private-net
+    volumes:
+      - redis_data_prod:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: cloudpool-rabbitmq
+    networks:
+      - private-net
+    volumes:
+      - rabbitmq_data_prod:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  weaviate:
+    image: semitechnologies/weaviate:1.21.2
+    container_name: cloudpool-weaviate
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'false'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      ENABLE_MODULES: ''
+    networks:
+      - private-net
+    volumes:
+      - weaviate_data_prod:/var/lib/weaviate
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/v1/.well-known/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ../backend/spring-boot
+      dockerfile: Dockerfile.multi
+      args:
+        MODULE: cloudpool-gateway
+    container_name: cloudpool-gateway-prod
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      CLOUDPOOL_SERVICES_AUTH_URL: http://auth:8082
+      CLOUDPOOL_SERVICES_DATA_URL: http://data:8083
+      CLOUDPOOL_SERVICES_COMPUTE_URL: http://compute:8084
+      CLOUDPOOL_SERVICES_NETWORK_URL: http://network:8085
+    networks:
+      - public-net
+      - private-net
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
-      - weaviate
+      - auth
+      - data
+      - compute
+      - network
+    restart: unless-stopped
+
+  auth:
+    build:
+      context: ../backend/spring-boot
+      dockerfile: Dockerfile.multi
+      args:
+        MODULE: cloudpool-auth
+    container_name: cloudpool-auth-prod
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-cloudpool}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-cloudpool}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_RABBITMQ_HOST: rabbitmq
+    networks:
+      - private-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  data:
+    build:
+      context: ../backend/spring-boot
+      dockerfile: Dockerfile.multi
+      args:
+        MODULE: cloudpool-data
+    container_name: cloudpool-data-prod
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-cloudpool}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-cloudpool}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_RABBITMQ_HOST: rabbitmq
+      WEAVIATE_URL: http://weaviate:8080
+    networks:
+      - private-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      weaviate:
+        condition: service_healthy
+    restart: unless-stopped
+
+  compute:
+    build:
+      context: ../backend/spring-boot
+      dockerfile: Dockerfile.multi
+      args:
+        MODULE: cloudpool-compute
+    container_name: cloudpool-compute-prod
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-cloudpool}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-cloudpool}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_RABBITMQ_HOST: rabbitmq
+    networks:
+      - private-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  network:
+    build:
+      context: ../backend/spring-boot
+      dockerfile: Dockerfile.multi
+      args:
+        MODULE: cloudpool-network
+    container_name: cloudpool-network-prod
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-cloudpool}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-cloudpool}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_RABBITMQ_HOST: rabbitmq
+    networks:
+      - private-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
 
   nginx:
     image: nginx:alpine
+    container_name: cloudpool-nginx-prod
     ports:
       - "80:80"
+      - "443:443"
+    networks:
+      - public-net
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
-      - api1
-      - api2
+      - gateway
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  postgres_data_prod:
+  redis_data_prod:
+  rabbitmq_data_prod:
+  weaviate_data_prod:

@@ -62,41 +62,9 @@ def run_k6_load_test(target_url="http://localhost:8080"):
                 sys.exit(1)
 
     print("[-] Error: 'k6' executable not found in standard paths.")
-    print("[*] Simulating benchmark results using calibrated hardware metrics for demonstration...")
-    return get_simulated_k6_output()
-
-def get_simulated_k6_output():
-    # Simulated k6 summary when k6 CLI is not installed locally
-    return r"""
-          /\      |‾‾| /‾‾/   /‾‾/   
-     /\  /  \     |  |/  /   /  /    
-    /  \/    \    |     (   /   ‾‾\  
-   /          \   |  |\  \ |  (‾)  | 
-  / __________ \  |__| \__\ \_____/ .io
-
-  execution: local
-     script: tests/load/load.js
-     output: -
-
-  scenarios: (100.00%) 1 scenario, 50 max VUs, 30s max duration (including ramp-up)
-
-     data_received..................: 1.2 MB  40 kB/s
-     data_sent......................: 185 kB  6.2 kB/s
-     http_req_blocked...............: avg=0.15ms  min=0.01ms med=0.08ms p(95)=0.45ms p(99)=1.12ms
-     http_req_connecting............: avg=0.05ms  min=0.00ms med=0.00ms p(95)=0.18ms p(99)=0.55ms
-     http_req_duration..............: avg=21.4ms  min=1.22ms med=18.4ms p(95)=42.1ms p(99)=67.5ms
-       { expected_response:true }...: avg=21.4ms  min=1.22ms med=18.4ms p(95)=42.1ms p(99)=67.5ms
-     http_req_failed................: 0.00%   ✓ 0         ✗ 5430
-     http_req_receiving.............: avg=0.22ms  min=0.01ms med=0.10ms p(95)=0.52ms p(99)=1.35ms
-     http_req_sending...............: avg=0.08ms  min=0.01ms med=0.04ms p(95)=0.18ms p(99)=0.42ms
-     http_req_tls_handshaking.......: avg=0.00ms  min=0.00ms med=0.00ms p(95)=0.00ms p(99)=0.00ms
-     http_req_waiting...............: avg=21.1ms  min=1.18ms med=18.1ms p(95)=41.8ms p(99)=66.8ms
-     http_reqs......................: 5430    181/s
-     iteration_duration.............: avg=1.02s   min=1.00s  med=1.02s  p(95)=1.05s  p(99)=1.09s
-     iterations.....................: 5430    181/s
-     vus............................: 1       min=1       max=50
-     vus_max........................: 50      min=50      max=50
-"""
+    print("[-] k6 load testing tool is required but not installed.")
+    print("[*] Install k6 from https://k6.io/docs/getting-started/installation/")
+    sys.exit(1)
 
 def parse_k6_metrics(output):
     # Regex to extract statistics from k6 stdout

@@ -23,6 +23,7 @@ class CloudPoolChaosTester:
         self.total_requests = 0
         self.success_count = 0
         self.error_count = 0
+        self._lock = threading.Lock()
 
     def check_services(self):
         """Check if Gateway and Toxiproxy are reachable."""
@@ -36,7 +37,9 @@ class CloudPoolChaosTester:
                     self.server_active = True
                     print("[+] Gateway is ONLINE.")
         except Exception as e:
-            print(f"[-] Gateway check failed: {e} (will run in simulated mode).")
+            print(f"[-] Gateway check failed: {e}")
+            print("[-] Gateway server is required. Exiting.")
+            sys.exit(1)
 
         # Check Toxiproxy
         try:
@@ -51,8 +54,12 @@ class CloudPoolChaosTester:
                 print("[+] Toxiproxy is ONLINE.")
             else:
                 print(f"[-] Toxiproxy responded with error code: {e.code}")
+                print("[-] Toxiproxy is required. Exiting.")
+                sys.exit(1)
         except Exception as e:
-            print(f"[-] Toxiproxy is OFFLINE: {e} (will run in simulated mode).")
+            print(f"[-] Toxiproxy is OFFLINE: {e}")
+            print("[-] Toxiproxy is required. Exiting.")
+            sys.exit(1)
 
     def call_api(self, url, method="GET", headers=None, data=None):
         """Helper to make HTTP calls."""
@@ -105,8 +112,7 @@ class CloudPoolChaosTester:
     def set_toxic(self, type_name, attributes):
         """Apply a network toxic to postgres_proxy."""
         if not self.toxiproxy_active:
-            print(f"    [Simulated] Set toxic '{type_name}' with attributes {attributes}")
-            return
+            raise RuntimeError("Toxiproxy is not active but set_toxic was called")
             
         # First remove existing toxic of same type to avoid conflicts
         try:
@@ -160,10 +166,7 @@ class CloudPoolChaosTester:
     def setup_tenants(self):
         """Create and authenticate Tenant A and Tenant B."""
         if not self.server_active:
-            self.tenant_a_token = "dummy-token-a-tenant"
-            self.tenant_b_token = "dummy-token-b-tenant"
-            print("[*] Dummy tokens generated for Tenant A and Tenant B.")
-            return
+            raise RuntimeError("Server is not active but setup_tenants was called")
 
         print("[*] Initializing Tenant A and Tenant B accounts...")
         # Register and login Tenant A
@@ -200,27 +203,19 @@ class CloudPoolChaosTester:
 
     def run_tenant_request(self, tenant_name, token, expected_tenant_tag):
         """Make an API request and check if data from another tenant leaks."""
-        self.total_requests += 1
+        with self._lock:
+            self.total_requests += 1
         headers = {"Authorization": f"Bearer {token}"}
         
         if not self.server_active:
-            # Simulation Mode
-            time.sleep(random.uniform(0.01, 0.05))
-            # Simulate chance of query failure under connection drops
-            if getattr(self, "_active_toxic", None) == "timeout":
-                self.error_count += 1
-                return
-            
-            # Context and data isolation check simulation
-            # 100% guarantee that tenant data is isolated
-            self.success_count += 1
-            return
+            raise RuntimeError("Server is not active but run_tenant_request was called")
 
         # Real Mode API validation
         status, resp = self.call_api(f"{GATEWAY_URL}/files", "GET", headers=headers)
         
         if status == 200:
-            self.success_count += 1
+            with self._lock:
+                self.success_count += 1
             # Verify that response files do not belong to the other tenant
             # We enforce this by checking metadata tag patterns if present
             if isinstance(resp, list):
@@ -228,9 +223,11 @@ class CloudPoolChaosTester:
                     owner_email = file_obj.get("ownerEmail", "")
                     if owner_email and owner_email != expected_tenant_tag:
                         print(f"[!] DANGER: Tenant leak detected! {tenant_name} saw file of owner {owner_email}")
-                        self.isolation_failures += 1
+                        with self._lock:
+                            self.isolation_failures += 1
         else:
-            self.error_count += 1
+            with self._lock:
+                self.error_count += 1
 
     def run_concurrent_workload(self, concurrent_users=10, requests_per_user=5):
         """Run interleaved concurrent tenant requests."""
@@ -252,43 +249,43 @@ class CloudPoolChaosTester:
         print("          CLOUDPOOL MULTI-TENANT CHAOS SUITE")
         print("="*60)
         
-        # Test Case 1: Baseline (No Toxics)
-        print("\n[Test Case 1] Baseline Operations (0ms Latency, 100% Reliability)")
-        self._active_toxic = None
-        self.run_concurrent_workload()
-        print(f"--> Done. Success: {self.success_count}, Errors: {self.error_count}, Leaks: {self.isolation_failures}")
+        try:
+            # Test Case 1: Baseline (No Toxics)
+            print("\n[Test Case 1] Baseline Operations (0ms Latency, 100% Reliability)")
+            self._active_toxic = None
+            self.run_concurrent_workload()
+            print(f"--> Done. Success: {self.success_count}, Errors: {self.error_count}, Leaks: {self.isolation_failures}")
 
-        # Test Case 2: 100ms Latency
-        print("\n[Test Case 2] Latency Simulation: 100ms Delay")
-        self._active_toxic = "latency"
-        self.set_toxic("latency", {"latency": 100})
-        self.run_concurrent_workload()
-        print(f"--> Done. Success: {self.success_count}, Errors: {self.error_count}, Leaks: {self.isolation_failures}")
+            # Test Case 2: 100ms Latency
+            print("\n[Test Case 2] Latency Simulation: 100ms Delay")
+            self._active_toxic = "latency"
+            self.set_toxic("latency", {"latency": 100})
+            self.run_concurrent_workload()
+            print(f"--> Done. Success: {self.success_count}, Errors: {self.error_count}, Leaks: {self.isolation_failures}")
 
-        # Test Case 3: 500ms Latency
-        print("\n[Test Case 3] Latency Simulation: 500ms Delay")
-        self._active_toxic = "latency"
-        self.set_toxic("latency", {"latency": 500})
-        self.run_concurrent_workload()
-        print(f"--> Done. Success: {self.success_count}, Errors: {self.error_count}, Leaks: {self.isolation_failures}")
+            # Test Case 3: 500ms Latency
+            print("\n[Test Case 3] Latency Simulation: 500ms Delay")
+            self._active_toxic = "latency"
+            self.set_toxic("latency", {"latency": 500})
+            self.run_concurrent_workload()
+            print(f"--> Done. Success: {self.success_count}, Errors: {self.error_count}, Leaks: {self.isolation_failures}")
 
-        # Test Case 4: Packet Loss
-        print("\n[Test Case 4] Packet Loss Simulation: Slicing / Fragmentation")
-        self._active_toxic = "slicer"
-        self.set_toxic("slicer", {"average_size": 256, "delay": 2000}) # Slice data packet payload
-        self.run_concurrent_workload()
-        print(f"--> Done. Success: {self.success_count}, Errors: {self.error_count}, Leaks: {self.isolation_failures}")
+            # Test Case 4: Packet Loss
+            print("\n[Test Case 4] Packet Loss Simulation: Slicing / Fragmentation")
+            self._active_toxic = "slicer"
+            self.set_toxic("slicer", {"average_size": 256, "delay": 2000}) # Slice data packet payload
+            self.run_concurrent_workload()
+            print(f"--> Done. Success: {self.success_count}, Errors: {self.error_count}, Leaks: {self.isolation_failures}")
 
-        # Test Case 5: Connection Drops
-        print("\n[Test Case 5] Connection Drops Simulation: Immediate Timeout")
-        self._active_toxic = "timeout"
-        self.set_toxic("timeout", {"timeout": 1}) # Drop connection immediately
-        self.run_concurrent_workload()
-        print(f"--> Done. Success: {self.success_count}, Errors: {self.error_count}, Leaks: {self.isolation_failures}")
-
-        # Cleanup
-        self.clear_toxics()
-        self._active_toxic = None
+            # Test Case 5: Connection Drops
+            print("\n[Test Case 5] Connection Drops Simulation: Immediate Timeout")
+            self._active_toxic = "timeout"
+            self.set_toxic("timeout", {"timeout": 1}) # Drop connection immediately
+            self.run_concurrent_workload()
+            print(f"--> Done. Success: {self.success_count}, Errors: {self.error_count}, Leaks: {self.isolation_failures}")
+        finally:
+            self.clear_toxics()
+            self._active_toxic = None
 
         # Print Report
         print("\n" + "="*60)

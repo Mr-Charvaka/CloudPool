@@ -12,19 +12,20 @@ scrape_configs:
 
   - job_name: 'postgres'
     static_configs:
-      - targets: ['postgres:5432']
+      - targets: ['postgres_exporter:9187']
 
   - job_name: 'redis'
     static_configs:
-      - targets: ['redis:6379']
+      - targets: ['redis_exporter:9121']
 
   - job_name: 'weaviate'
     static_configs:
       - targets: ['weaviate:8080']
 
   - job_name: 'rabbitmq'
+    metrics_path: '/metrics'
     static_configs:
-      - targets: ['rabbitmq:15672']
+      - targets: ['rabbitmq:15692']
 
 rule_files:
   - 'alerts.yml'

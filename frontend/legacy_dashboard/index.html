@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CloudPool — Developer Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- AUTH OVERLAY -->
+<div id="authOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;">
+  <div style="width:320px;border:1px solid #000;padding:24px;display:flex;flex-direction:column;gap:14px;">
+    <div style="font-size:13px;font-weight:700;letter-spacing:.12em;text-align:center;margin-bottom:8px;">CLOUDPOOL // DEV_AUTH</div>
+    
+    <div id="loginForm">
+      <div style="margin-bottom:8px;"><div class="field-label">EMAIL ADDRESS</div><input type="text" id="authEmail" placeholder="admin@cloudpool.local"/></div>
+      <div style="margin-bottom:14px;"><div class="field-label">PASSWORD</div><input type="password" id="authPassword" placeholder="••••••••"/></div>
+      <button class="btn" style="width:100%;justify-content:center;" onclick="performAuth('login')">PROCEED TO CONSOLE</button>
+      <div style="text-align:center;margin-top:12px;font-size:9px;color:var(--muted);cursor:pointer;" onclick="toggleAuthMode(false)">CREATE AN ACCOUNT</div>
+    </div>
+
+    <div id="registerForm" style="display:none;">
+      <div style="margin-bottom:8px;"><div class="field-label">FULL NAME</div><input type="text" id="regName" placeholder="Developer"/></div>
+      <div style="margin-bottom:8px;"><div class="field-label">EMAIL ADDRESS</div><input type="text" id="regEmail" placeholder="developer@cloudpool.local"/></div>
+      <div style="margin-bottom:14px;"><div class="field-label">PASSWORD</div><input type="password" id="regPassword" placeholder="••••••••"/></div>
+      <button class="btn" style="width:100%;justify-content:center;" onclick="performAuth('register')">INITIALIZE ACCOUNT</button>
+      <div style="text-align:center;margin-top:12px;font-size:9px;color:var(--muted);cursor:pointer;" onclick="toggleAuthMode(true)">ALREADY REGISTERED? SIGN IN</div>
+    </div>
+
+    <div id="authError" style="font-size:9px;color:#000;font-weight:700;text-align:center;margin-top:4px;display:none;"></div>
+  </div>
+</div>
+
+<!-- SHARE MODAL -->
+<div id="shareModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.85);z-index:10000;display:none;align-items:center;justify-content:center;">
+  <div style="width:360px;border:1px solid #000;background:#fff;padding:24px;display:flex;flex-direction:column;gap:14px;">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.1em;border-bottom:1px solid #000;padding-bottom:8px;" id="shareModalTitle">SHARE FILE</div>
+    
+    <div>
+      <div class="field-label">SHARE WITH USER EMAIL (OPTIONAL)</div>
+      <input type="text" id="shareEmail" placeholder="user@example.com"/>
+    </div>
+    
+    <div>
+      <div class="field-label">EXPIRY TIME (HOURS, OPTIONAL)</div>
+      <input type="text" id="shareExpiry" placeholder="e.g. 24 (leave blank for unlimited)"/>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button class="btn" style="flex:1;justify-content:center" onclick="submitShare()">CREATE LINK</button>
+      <button class="btn btn-outline" style="flex:1;justify-content:center" onclick="closeShareModal()">CANCEL</button>
+    </div>
+
+    <div id="shareResultBox" style="display:none;margin-top:10px;border:1px solid #000;padding:10px;background:#f9f9f9;flex-direction:column;gap:6px;">
+      <div class="field-label">SHAREABLE LINK (SECURE TOKEN)</div>
+      <textarea id="shareLinkVal" readonly style="height:55px;font-size:9px;word-break:break-all;"></textarea>
+      <button class="btn btn-outline" style="margin-top:6px;width:100%;justify-content:center" onclick="copyShareLink()">COPY LINK</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW PROJECT MODAL -->
+<div id="projectModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.85);z-index:10000;display:none;align-items:center;justify-content:center;">
+  <div style="width:340px;border:1px solid #000;background:#fff;padding:24px;display:flex;flex-direction:column;gap:14px;">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.1em;border-bottom:1px solid #000;padding-bottom:8px;">INITIALIZE NEW PROJECT</div>
+    <div>
+      <div class="field-label">PROJECT NAME</div>
+      <input type="text" id="newProjName" placeholder="e.g. e-commerce-prod" />
+    </div>
+    <div>
+      <div class="field-label">DESCRIPTION</div>
+      <input type="text" id="newProjDesc" placeholder="e.g. Main production cluster" />
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button class="btn" style="flex:1;justify-content:center" onclick="submitNewProject()">CREATE PROJECT</button>
+      <button class="btn btn-outline" style="flex:1;justify-content:center" onclick="closeProjectModal()">CANCEL</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div><div class="brand">CLOUDPOOL</div><div class="ver">V0.1.0_SNAPSHOT</div></div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div style="display:flex;align-items:center;gap:6px;border-right:1px solid var(--border2);padding-right:16px;">
+      <span style="font-size:9px;color:var(--muted);letter-spacing:.08em;">PROJECT:</span>
+      <select id="projectSelector" style="width:130px;height:20px;padding:2px;font-size:9px;" onchange="switchProject(this.value)"></select>
+      <button class="btn" style="padding:2px 8px;font-size:8px;height:20px;" onclick="openNewProjectPrompt()">+ NEW</button>
+    </div>
+    <div style="font-size:9px;color:var(--muted)" id="userDisplay">DEVELOPER</div>
+    <button class="btn btn-outline" style="padding:2px 8px;font-size:8px" onclick="logout()">LOGOUT</button>
+    <div class="badge" id="topBadge">POOL_CONNECTED_ONLINE</div>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div id="layout">
+
+  <!-- SIDEBAR -->
+  <nav id="sidebar">
+    <div class="nav-item active" data-page="dashboard" onclick="goTo('dashboard',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="3.5" height="3.5"/><rect x="5.5" y="1" width="3.5" height="3.5"/><rect x="1" y="5.5" width="3.5" height="3.5"/><rect x="5.5" y="5.5" width="3.5" height="3.5"/></svg>
+      DASHBOARD
+    </div>
+    <div class="nav-item" data-page="filepool" onclick="goTo('filepool',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 2h8M1 5h8M1 8h8"/></svg>
+      FILE POOL
+    </div>
+    <div class="nav-item" data-page="database" onclick="goTo('database',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="5" cy="3" rx="4" ry="1.5"/><path d="M1 3v4c0 .83 1.79 1.5 4 1.5s4-.67 4-1.5V3"/></svg>
+      DATABASE
+    </div>
+    <div class="nav-item" data-page="topology" onclick="goTo('topology',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="3" height="3"/><rect x="6" y="1" width="3" height="3"/><rect x="1" y="6" width="3" height="3"/><rect x="6" y="6" width="3" height="3"/><path d="M4 2.5h2M2.5 4h5M4 7.5h2"/></svg>
+      PROJECT TOPOLOGY
+    </div>
+    <div class="nav-item" data-page="provisioner" onclick="goTo('provisioner',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="2" width="8" height="6" rx="1"/><line x1="3" y1="5" x2="7" y2="5"/></svg>
+      DB PROVISIONER
+    </div>
+    <div class="nav-item" data-page="vector" onclick="goTo('vector',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="5" r="1"/><path d="M1.5 5h2M6.5 5h2M5 1.5v2M5 6.5v2"/></svg>
+      VECTOR SEARCH
+    </div>
+    <div class="nav-item" data-page="compute" onclick="goTo('compute',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 1h6a1 1 0 011 1v6a1 1 0 01-1 1H2a1 1 0 01-1-1V2a1 1 0 011-1zM2 4h6M4 1v8"/></svg>
+      PaaS COMPUTE
+    </div>
+    <div class="nav-item" data-page="apikeys" onclick="goTo('apikeys',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="8" height="5" rx=".5"/><path d="M3 3V2a2 2 0 014 0v1"/></svg>
+      API KEYS
+    </div>
+    <div class="nav-item" data-page="analytics" onclick="goTo('analytics',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,7 3,4 5,5.5 7,2.5 9,3.5"/></svg>
+      ANALYTICS
+    </div>
+    <div class="nav-item" data-page="emails" onclick="goTo('emails',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="2" width="8" height="6" rx="1"/><path d="M1 2l4 3.5L9 2"/></svg>
+      EMAIL SANDBOX
+    </div>
+    <div class="nav-item" data-page="settings" onclick="goTo('settings',this)">
+      <svg class="nav-icon" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="5" r="1.5"/><path d="M5 1v1.5M5 7.5V9M1 5h1.5M7.5 5H9M2.1 2.1l1.1 1.1M6.8 6.8l1.1 1.1M7.9 2.1L6.8 3.2M3.2 6.8L2.1 7.9"/></svg>
+      SETTINGS
+    </div>
+    <div class="sidebar-spacer"></div>
+    <div class="sys-status">
+      <div class="lbl">SYSTEM_STATUS</div>
+      <div class="val"><span class="dot"></span>ONLINE / SECURE</div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <div id="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div>
+        <div class="page-title">FILE POOL INTERFACE</div>
+        <div class="page-sub">Manage file uploads to your pooled storage. Select a pool, configure parameters, and push to the distributed storage layer.</div>
+      </div>
+      <div class="pool-row" id="dashboardPools">
+        <!-- Loaded dynamically -->
+      </div>
+      <div class="panels">
+        <div class="panel panel-left">
+          <div class="panel-header"><div class="panel-title">FILE UPLOAD INTERFACE</div><div class="panel-badge">POOL_AUTH_ENABLED</div></div>
+          <form class="panel-body" id="uploadForm" onsubmit="event.preventDefault();">
+            <div class="field"><div class="field-label">FILE IDENTIFIER (NAME)</div><input type="text" id="fileId" placeholder="Click browse to select a file..."/></div>
+            <div class="field-row">
+              <div class="field"><div class="field-label">TARGET POOL</div><select id="poolSelect"></select></div>
+              <div class="field"><div class="field-label">VISIBILITY</div><select id="fileVisibility"><option value="PRIVATE">PRIVATE</option><option value="SHARED">SHARED</option><option value="PUBLIC">PUBLIC</option></select></div>
+            </div>
+            <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+              <div class="dz-icon"> Blunt Upload ⬆ </div><div class="dz-text">DROP FILE OR CLICK TO BROWSE</div>
+              <div class="dz-sub">MAX 5 GB · PDF, DOCX, PNG, ZIP, CSV, TXT SUPPORTED</div>
+              <input type="file" id="fileInput" style="display:none" onchange="handleFile(event)"/>
+            </div>
+            <div><button type="button" class="btn" onclick="uploadFile()">⬆ PUSH TO POOL INSTANCE</button></div>
+          </form>
+        </div>
+        <div class="panel panel-right">
+          <div class="panel-header"><div class="panel-title">POOL EXECUTION STATUS</div><div class="panel-badge" id="statusBadge">ACTIVE</div></div>
+          <div class="panel-body">
+            <div>
+              <div class="stat-row"><div class="stat-key">ACTIVE POOL</div><div class="stat-val" id="activePanelPool">default-pool</div></div>
+              <div class="stat-row"><div class="stat-key">TOTAL USER FILES</div><div class="stat-val" id="mFilesCount">0</div></div>
+              <div class="stat-row"><div class="stat-key">LAST SYNC</div><div class="stat-val">JUST NOW</div></div>
+              <div class="stat-row"><div class="stat-key">ENCRYPTION</div><div class="stat-val">AES-256 EMULATED</div></div>
+            </div>
+            <div class="console-wrap">
+              <div class="console-label">POOL OPERATION LOG</div>
+              <div class="console-box" id="consoleBox">
+                <!-- Log lines -->
+              </div>
+            </div>
+          </div>
+          <div class="metric-strip">
+            <div class="metric-cell"><div class="m-val" id="mStatus">OK</div><div class="m-lbl">STATUS</div></div>
+            <div class="metric-cell"><div class="m-val" id="mLatency">0ms</div><div class="m-lbl">LATENCY P95</div></div>
+            <div class="metric-cell"><div class="m-val" id="mIndexedCount">0</div><div class="m-lbl">FILES INDEXED</div></div>
+            <div class="metric-cell"><div class="m-val" id="mUserMail">@</div><div class="m-lbl">ACTIVE DEV</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FILE POOL -->
+    <div class="page" id="page-filepool">
+      <div>
+        <div class="page-title">FILE POOL EXPLORER</div>
+        <div class="page-sub">Browse, search, and manage files across all storage pools.</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+        <div class="search-bar" style="flex:1">
+          <input type="text" id="searchFilesInput" placeholder="Search files..."/>
+          <button class="btn" style="border:1px solid #000" onclick="loadFilesList()">SEARCH</button>
+        </div>
+      </div>
+      <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;border:1px solid var(--border)">
+        <div class="panel-header">
+          <div class="panel-title">FILE INDEX</div>
+        </div>
+        <div style="overflow-y:auto;flex:1">
+          <table class="tbl">
+            <thead><tr><th>FILE NAME</th><th>POOL</th><th>SIZE</th><th>TYPE</th><th>UPLOADED</th><th>VISIBILITY</th><th>ACTIONS</th></tr></thead>
+            <tbody id="fileTable">
+              <!-- Files rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- DATABASE -->
+    <div class="page" id="page-database">
+      <!-- Database Landing/Selection Screen -->
+      <div id="dbSelectionScreen" style="display:flex; flex-direction:column; gap:16px; flex:1;">
+        <div>
+          <div class="page-title">DATABASE SELECTION HUB</div>
+          <div class="page-sub">Select a database instance to connect, execute queries, and inspect schemas.</div>
+        </div>
+        
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-top:20px;">
+          <!-- H2 Card -->
+          <div class="pool-card" style="padding:18px 16px; display:flex; flex-direction:column; gap:8px;" onclick="selectActiveDB('H2')">
+            <div class="tag">LOCAL</div>
+            <div class="name" style="font-size:12px;">H2 LOCAL ENGINE</div>
+            <div class="drives">Active in-memory / local file relational store. Perfect for rapid prototyping.</div>
+            <div style="margin-top:auto; padding-top:10px;"><button class="btn btn-outline" style="width:100%; justify-content:center;">CONNECT INSTANCE</button></div>
+          </div>
+
+          <!-- PostgreSQL Card -->
+          <div class="pool-card" style="padding:18px 16px; display:flex; flex-direction:column; gap:8px;" onclick="selectActiveDB('POSTGRESQL')">
+            <div class="tag">RDS_ACTIVE</div>
+            <div class="name" style="font-size:12px;">POSTGRESQL INSTANCE</div>
+            <div class="drives">Production-grade relational server. Supports advanced indexing and replication.</div>
+            <div style="margin-top:auto; padding-top:10px;"><button class="btn btn-outline" style="width:100%; justify-content:center;">CONNECT INSTANCE</button></div>
+          </div>
+
+          <!-- Redis Card -->
+          <div class="pool-card" style="padding:18px 16px; display:flex; flex-direction:column; gap:8px;" onclick="selectActiveDB('REDIS')">
+            <div class="tag">KVS_ACTIVE</div>
+            <div class="name" style="font-size:12px;">REDIS KEY-VALUE CACHE</div>
+            <div class="drives">In-memory data structure store. Used as database, cache, and message broker.</div>
+            <div style="margin-top:auto; padding-top:10px;"><button class="btn btn-outline" style="width:100%; justify-content:center;">CONNECT INSTANCE</button></div>
+          </div>
+
+          <!-- GraphQL Card -->
+          <div class="pool-card" style="padding:18px 16px; display:flex; flex-direction:column; gap:8px;" onclick="selectActiveDB('GRAPHQL')">
+            <div class="tag">API_LAYER</div>
+            <div class="name" style="font-size:12px;">GRAPHQL ENGINE</div>
+            <div class="drives">Unified schema endpoint console. Execute object-graph traversal queries.</div>
+            <div style="margin-top:auto; padding-top:10px;"><button class="btn btn-outline" style="width:100%; justify-content:center;">CONNECT CONSOLE</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Database Query Console Workspace (hidden by default) -->
+      <div id="dbQueryWorkspace" style="display:none; flex-direction:column; gap:16px; flex:1;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div class="page-title" id="dbWorkspaceTitle">DATABASE QUERY INTERFACE — H2</div>
+            <div class="page-sub" id="dbWorkspaceSub">Execute SQL queries directly against the connected database instance.</div>
+          </div>
+          <button class="btn btn-outline" style="padding:4px 12px;" onclick="backToDBSelection()">← SWITCH DATABASE</button>
+        </div>
+        <div class="panels">
+          <div class="panel panel-left">
+            <div class="panel-header"><div class="panel-title">QUERY EXECUTOR</div><div class="panel-badge" id="dbBadgeStatus">DB_CONNECTED</div></div>
+            <div class="panel-body">
+              <!-- Connection Config Form (visible for PostgreSQL & Redis) -->
+              <div id="dbConnectionConfigBox" style="display:none; border:1px solid var(--border); padding:12px; background:#f9f9f9; flex-direction:column; gap:8px; margin-bottom:12px;">
+                <div class="panel-title" style="font-size:9px; margin-bottom:4px;" id="configBoxTitle">DATABASE CONNECTION SETTINGS</div>
+                <div class="field-row">
+                  <div class="field"><div class="field-label">HOST</div><input type="text" id="connHost" placeholder="127.0.0.1" /></div>
+                  <div class="field"><div class="field-label">PORT</div><input type="text" id="connPort" placeholder="5432" /></div>
+                </div>
+                <div class="field-row" id="connDatabaseRow">
+                  <div class="field"><div class="field-label">DATABASE NAME</div><input type="text" id="connDatabase" placeholder="postgres" /></div>
+                </div>
+                <div class="field-row" id="connAuthRow">
+                  <div class="field"><div class="field-label">USERNAME</div><input type="text" id="connUser" placeholder="postgres" /></div>
+                  <div class="field"><div class="field-label">PASSWORD</div><input type="password" id="connPassword" placeholder="••••••••" /></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                  <label style="display:flex; align-items:center; gap:4px; font-size:9px; cursor:pointer;">
+                    <input type="checkbox" id="connActive" checked /> ROUTE PLATFORM SCHEMAS TO THIS CONNECTION
+                  </label>
+                </div>
+                <div style="display:flex; gap:8px; margin-top:4px;">
+                  <button class="btn btn-outline" style="flex:1; justify-content:center" onclick="testDBConnection()">TEST CONNECTION</button>
+                  <button class="btn" style="flex:1; justify-content:center" onclick="saveDBConnection()">SAVE & APPLY</button>
+                </div>
+              </div>
+
+              <div>
+                <div class="field-label" id="queryEditorLabel">SQL QUERY EDITOR</div>
+                <textarea class="code-editor" id="sqlEditor" style="height:140px">SELECT id, email, name, role, active, created_at FROM users;</textarea>
+              </div>
+              <div style="display:flex; gap:8px">
+                <button class="btn" onclick="runActiveQuery()">▶ EXECUTE QUERY</button>
+              </div>
+              <div style="border:1px solid var(--border2);overflow-y:auto;flex:1">
+                <table class="tbl" id="queryResults">
+                  <thead id="queryHeaders"></thead>
+                  <tbody id="queryRows"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="panel panel-right">
+            <div class="panel-header"><div class="panel-title">EXECUTION STATUS</div><div class="panel-badge" id="dbBadge">IDLE</div></div>
+            <div class="panel-body">
+              <div class="console-wrap">
+                <div class="console-label">QUERY EXECUTION LOG</div>
+                <div class="console-box" id="dbLog">
+                  <!-- Log lines -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROJECT TOPOLOGY -->
+    <div class="page" id="page-topology">
+      <div>
+        <div class="page-title">PROJECT TOPOLOGY & INFRASTRUCTURE</div>
+        <div class="page-sub">Manage project secrets, view topology state, and take versioned infrastructure snapshots.</div>
+      </div>
+      <div class="panels">
+        <!-- Left: Secrets Vault -->
+        <div class="panel panel-left">
+          <div class="panel-header">
+            <div class="panel-title">ENVIRONMENT SECRETS VAULT</div>
+            <div class="panel-badge">SECURE_VAULT</div>
+          </div>
+          <div class="panel-body">
+            <div style="border:1px solid var(--border2); overflow-y:auto; flex:1; max-height:220px;">
+              <table class="tbl">
+                <thead><tr><th>SECRET KEY</th><th>OBFUSCATED VALUE</th><th>ACTIONS</th></tr></thead>
+                <tbody id="secretsTableBody">
+                  <!-- secrets -->
+                </tbody>
+              </table>
+            </div>
+
+            <div style="border-top:1px solid var(--border2); padding-top:10px; display:flex; flex-direction:column; gap:8px;">
+              <div class="panel-title" style="font-size:9px;">ADD OR UPDATE VARIABLE</div>
+              <div class="field-row">
+                <div class="field"><div class="field-label">KEY (uppercase alphanumeric)</div><input type="text" id="secretKeyInput" placeholder="DATABASE_URL" /></div>
+                <div class="field"><div class="field-label">VALUE</div><input type="password" id="secretValueInput" placeholder="supersecret..." /></div>
+              </div>
+              <div><button class="btn" onclick="saveSecret()">⚡ ADD/UPDATE SECRET</button></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Versioned Snapshots Rollback Engine -->
+        <div class="panel panel-right">
+          <div class="panel-header">
+            <div class="panel-title">INFRASTRUCTURE SNAPSHOTS (ROLLBACK ENGINE)</div>
+            <div class="panel-badge">VERSIONED</div>
+          </div>
+          <div class="panel-body">
+            <div style="border:1px solid var(--border2); overflow-y:auto; flex:1; max-height:220px;">
+              <table class="tbl">
+                <thead><tr><th>SNAPSHOT NAME</th><th>CREATED</th><th>ACTIONS</th></tr></thead>
+                <tbody id="snapshotsTableBody">
+                  <!-- snapshots -->
+                </tbody>
+              </table>
+            </div>
+
+            <div style="border-top:1px solid var(--border2); padding-top:10px; display:flex; flex-direction:column; gap:8px;">
+              <div class="panel-title" style="font-size:9px;">CREATE NEW BACKUP SNAPSHOT</div>
+              <div class="field"><div class="field-label">SNAPSHOT LABEL</div><input type="text" id="snapshotNameInput" placeholder="e.g. snapshot-v1-stable" /></div>
+              <div><button class="btn" onclick="createSnapshot()">📸 TAKE SNAPSHOT</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DB PROVISIONER -->
+    <div class="page" id="page-provisioner">
+      <div>
+        <div class="page-title">DATABASE PROVISIONER</div>
+        <div class="page-sub">Provision dynamic tables, design schemas with types, and perform CRUD operations.</div>
+      </div>
+      <div class="panels" style="flex: 0 0 auto; min-height: 380px;">
+        <!-- Table builder panel -->
+        <div class="panel panel-left">
+          <div class="panel-header">
+            <div class="panel-title">PROVISION NEW TABLE</div>
+            <div class="panel-badge">RDS_PROVISIONER</div>
+          </div>
+          <div class="panel-body">
+            <!-- Mode Switcher Tabs -->
+            <div style="display:flex; border-bottom: 1px solid var(--border2); margin-bottom: 12px; gap: 8px; padding-bottom: 6px;">
+              <span id="tabVisualMode" class="chip active" style="cursor:pointer;" onclick="setProvMode('visual')">VISUAL BUILDER</span>
+              <span id="tabJsonMode" class="chip" style="cursor:pointer;" onclick="setProvMode('json')">JSON SCHEMA EDITOR</span>
+            </div>
+
+            <!-- Visual Form Container -->
+            <div id="visualProvForm" style="display:flex; flex-direction:column; gap:11px; flex:1;">
+              <div class="field">
+                <div class="field-label">TABLE NAME (PHYSICAL NAME)</div>
+                <input type="text" id="provTableName" placeholder="customer_leads" />
+              </div>
+              <div class="field">
+                <div class="field-label">DISPLAY NAME</div>
+                <input type="text" id="provTableDisplay" placeholder="Customer Leads" />
+              </div>
+              <div class="field">
+                <div class="field-label">DESCRIPTION</div>
+                <input type="text" id="provTableDesc" placeholder="Table for storing incoming sales leads" />
+              </div>
+              
+              <div style="border-top: 1px solid var(--border2); padding-top: 10px; margin-top: 5px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                  <div class="field-label" style="margin-bottom:0">SCHEMA FIELDS (id is automatically added)</div>
+                  <button type="button" class="btn btn-outline" style="padding:2px 8px; font-size:8px" onclick="addSchemaFieldRow()">+ ADD FIELD</button>
+                </div>
+                <div id="schemaFieldsContainer" style="display:flex; flex-direction:column; gap:6px; max-height: 120px; overflow-y: auto; padding-right: 4px;">
+                  <!-- Dynamic field rows -->
+                </div>
+              </div>
+            </div>
+
+            <!-- JSON Schema Editor Container -->
+            <div id="jsonProvForm" style="display:none; flex-direction:column; gap:8px; flex:1;">
+              <div class="field-label">JSON SCHEMA DEFINITION (RAW CODE)</div>
+              <textarea class="code-editor" id="jsonSchemaEditor" style="height:240px; font-family:var(--font); font-size:9px; line-height:1.4;">{
+  "name": "customer_leads",
+  "displayName": "Customer Leads",
+  "description": "Table for storing incoming sales leads",
+  "fields": [
+    {
+      "fieldName": "email",
+      "fieldType": "VARCHAR",
+      "isRequired": true
+    },
+    {
+      "fieldName": "annual_revenue",
+      "fieldType": "DOUBLE",
+      "isRequired": false
+    },
+    {
+      "fieldName": "lead_score",
+      "fieldType": "INTEGER",
+      "isRequired": false
+    },
+    {
+      "fieldName": "is_active",
+      "fieldType": "BOOLEAN",
+      "isRequired": false
+    },
+    {
+      "fieldName": "notes",
+      "fieldType": "TEXT",
+      "isRequired": false
+    }
+  ]
+}</textarea>
+            </div>
+
+            <div style="margin-top: auto; padding-top: 10px;">
+              <button class="btn" style="width:100%; justify-content:center" onclick="provisionTable()">⚡ PROVISION TABLE</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Tables panel -->
+        <div class="panel panel-right">
+          <div class="panel-header">
+            <div class="panel-title">ACTIVE PROVISIONED TABLES</div>
+            <div class="panel-badge" id="provTablesCount">0 TABLES</div>
+          </div>
+          <div class="panel-body" style="gap:8px; overflow-y: auto;" id="activeTablesList">
+            <!-- Active table list elements -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Record Viewer panel (shows when a table is selected) -->
+      <div class="panel" id="tableRecordViewerPanel" style="display:none; margin-top:12px; flex: 1; min-height: 300px;">
+        <div class="panel-header">
+          <div class="panel-title" id="selectedTableTitle">TABLE RECORDS: customer_leads</div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-outline" style="padding:3px 10px; font-size:9px" onclick="showAddRecordForm()">+ ADD RECORD</button>
+            <button class="btn" style="padding:3px 10px; font-size:9px; background:#000; color:#fff" onclick="closeRecordViewer()">CLOSE</button>
+          </div>
+        </div>
+        <div class="panel-body" style="padding: 0; overflow-y: auto; display: flex; flex-direction: column;">
+          <!-- Insert Record inline form -->
+          <div id="addRecordFormWrap" style="display:none; padding:12px; border-bottom:1px solid var(--border); background:#f9f9f9; display:flex; flex-direction:column; gap:8px;">
+            <div class="panel-title" style="font-size:9px; margin-bottom:4px;">NEW RECORD PROPERTIES</div>
+            <div id="dynamicRecordFields" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px;">
+              <!-- Dynamic inputs per field -->
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <button class="btn" onclick="submitNewRecord()">SAVE RECORD</button>
+              <button class="btn btn-outline" onclick="hideAddRecordForm()">CANCEL</button>
+            </div>
+          </div>
+
+          <div style="flex:1; overflow-y:auto;">
+            <table class="tbl">
+              <thead id="recordTableHeaders">
+                <!-- headers -->
+              </thead>
+              <tbody id="recordTableBody">
+                <!-- rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VECTOR SEARCH -->
+    <div class="page" id="page-vector">
+      <div>
+        <div class="page-title">VECTOR SEARCH ENGINE</div>
+        <div class="page-sub">Perform relevance-based semantic searches across files.</div>
+      </div>
+      <div class="panels">
+        <div class="panel panel-left">
+          <div class="panel-header"><div class="panel-title">SEMANTIC QUERY INTERFACE</div><div class="panel-badge">LOCAL_INDEX</div></div>
+          <div class="panel-body">
+            <div class="field">
+              <div class="field-label">QUERY TERM</div>
+              <textarea style="height:64px" id="vectorQuery" placeholder="Search keywords..."></textarea>
+            </div>
+            <div><button class="btn" onclick="runVector()">⊙ EXECUTE VECTOR SEARCH</button></div>
+            <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px" id="vectorResults">
+              <!-- Results -->
+            </div>
+          </div>
+        </div>
+        <div class="panel panel-right">
+          <div class="panel-header"><div class="panel-title">INDEX STATUS</div><div class="panel-badge">ACTIVE</div></div>
+          <div class="panel-body">
+            <div class="console-wrap">
+              <div class="console-label">SEARCH EXECUTION LOG</div>
+              <div class="console-box" id="vecLog">
+                <!-- Logs -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PaaS COMPUTE -->
+    <div class="page" id="page-compute">
+      <!-- PaaS Option Selection Screen -->
+      <div id="computeSelectionScreen" style="display:flex; flex-direction:column; gap:16px; flex:1;">
+        <div>
+          <div class="page-title">PaaS COMPUTE HUB</div>
+          <div class="page-sub">Deploy application workloads, serverless functions, and static assets onto CloudPool's hosting platform.</div>
+        </div>
+        
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top:20px;">
+          <!-- Static Card -->
+          <div class="pool-card" style="padding:18px 16px; display:flex; flex-direction:column; gap:8px; cursor:pointer;" onclick="selectComputeOption('static')">
+            <div class="tag" style="background:#ea580c;color:white;width:fit-content;padding:2px 6px;border-radius:4px;font-size:9px;">STATIC</div>
+            <div class="name" style="font-size:14px;font-weight:600;margin-top:4px;">STATIC SITE HOSTING</div>
+            <div class="drives" style="color:#8b949e;font-size:11px;line-height:1.4;">Deploy React, Vue, Next.js exports, or plain HTML/CSS static assets served at sub-millisecond edge latency from storage pools.</div>
+            <div style="margin-top:auto; padding-top:10px;"><button class="btn btn-outline" style="width:100%; justify-content:center;">ENTER STATIC CONSOLE</button></div>
+          </div>
+
+          <!-- Serverless Card -->
+          <div class="pool-card" style="padding:18px 16px; display:flex; flex-direction:column; gap:8px; cursor:pointer;" onclick="selectComputeOption('serverless')">
+            <div class="tag" style="background:#2563eb;color:white;width:fit-content;padding:2px 6px;border-radius:4px;font-size:9px;">EDGE_FUNC</div>
+            <div class="name" style="font-size:14px;font-weight:600;margin-top:4px;">SERVERLESS FUNCTIONS</div>
+            <div class="drives" style="color:#8b949e;font-size:11px;line-height:1.4;">Write serverless logic compiled into isolated WebAssembly runtimes. Execute dynamic backend handlers securely in isolated sandboxes.</div>
+            <div style="margin-top:auto; padding-top:10px;"><button class="btn btn-outline" style="width:100%; justify-content:center;">ENTER FUNCTION CONSOLE</button></div>
+          </div>
+
+          <!-- Container Card -->
+          <div class="pool-card" style="padding:18px 16px; display:flex; flex-direction:column; gap:8px; cursor:pointer;" onclick="selectComputeOption('container')">
+            <div class="tag" style="background:#16a34a;color:white;width:fit-content;padding:2px 6px;border-radius:4px;font-size:9px;">CONTAINERS</div>
+            <div class="name" style="font-size:14px;font-weight:600;margin-top:4px;">CONTAINER HOSTING</div>
+            <div class="drives" style="color:#8b949e;font-size:11px;line-height:1.4;">Deploy full Docker containers or custom backend workloads onto our high-availability Kubernetes runtime environment.</div>
+            <div style="margin-top:auto; padding-top:10px;"><button class="btn btn-outline" style="width:100%; justify-content:center;">ENTER CONTAINER CONSOLE</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Static Hosting Console (Hidden by default) -->
+      <div id="staticConsole" style="display:none; flex-direction:column; gap:16px; flex:1;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div class="page-title">STATIC SITE HOSTING CONSOLE</div>
+            <div class="page-sub">Expose storage pool buckets as static websites mapped to developer domains.</div>
+          </div>
+          <button class="btn btn-outline" style="padding:4px 12px;" onclick="backToComputeSelection()">← SWITCH OPTION</button>
+        </div>
+
+        <div class="panels">
+          <div class="panel panel-left" style="flex:1;">
+            <div class="panel-header"><div class="panel-title">DEPLOY NEW STATIC SITE</div></div>
+            <div class="panel-body" style="display:flex;flex-direction:column;gap:12px;">
+              <div class="field">
+                <div class="field-label">DEPLOYMENT NAME</div>
+                <input type="text" id="staticName" placeholder="my-awesome-frontend" />
+              </div>
+              <div class="field">
+                <div class="field-label">SELECT STORAGE BUCKET</div>
+                <select id="staticBucketSelect" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:8px;outline:none;font-size:12px;cursor:pointer;width:100%;">
+                  <!-- Options filled dynamically -->
+                </select>
+              </div>
+              <div class="field">
+                <div class="field-label">DOMAIN RESOLUTION PROTOCOL</div>
+                <select id="staticDomainType" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:8px;outline:none;font-size:12px;cursor:pointer;width:100%;" onchange="updateDomainPlaceholder()">
+                  <option value="web2">Web2 DNS (.cloudpool.dev)</option>
+                  <option value="web3">Web3 ENS (.cloudpool.eth)</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="field-label">CUSTOM DOMAIN</div>
+                <input type="text" id="staticDomain" placeholder="developer-app.cloudpool.dev" />
+              </div>
+              <div><button class="btn" onclick="deployStaticSite()">⊙ DEPLOY SITE</button></div>
+            </div>
+          </div>
+          <div class="panel panel-right" style="flex:1.5;">
+            <div class="panel-header"><div class="panel-title">ACTIVE STATIC DEPLOYMENTS</div></div>
+            <div class="panel-body">
+              <div style="display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex:1;" id="staticDeploymentsList">
+                <!-- Deployments list filled dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Serverless Console (Hidden by default) -->
+      <div id="serverlessConsole" style="display:none; flex-direction:column; gap:16px; flex:1;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div class="page-title">SERVERLESS FUNCTIONS COMPILER & RUNTIME</div>
+            <div class="page-sub">Write isolated backend services running inside microsecond execution runtimes.</div>
+          </div>
+          <button class="btn btn-outline" style="padding:4px 12px;" onclick="backToComputeSelection()">← SWITCH OPTION</button>
+        </div>
+
+        <div class="panels">
+          <div class="panel panel-left" style="flex:1.4;">
+            <div class="panel-header"><div class="panel-title">CREATE SERVERLESS FUNCTION</div></div>
+            <div class="panel-body" style="display:flex;flex-direction:column;gap:12px;">
+              <div class="field-row" style="display:flex;gap:12px;">
+                <div class="field" style="flex:1;">
+                  <div class="field-label">FUNCTION NAME</div>
+                  <input type="text" id="funcName" placeholder="hello-world" />
+                </div>
+                <div class="field" style="flex:1;">
+                  <div class="field-label">TRIGGER ROUTE</div>
+                  <input type="text" id="funcRoute" placeholder="/api/hello" />
+                </div>
+              </div>
+              <div class="field">
+                <div class="field-label">ISOLATED CODE EDITOR (JavaScript / Rust-like)</div>
+                <textarea id="funcCode" style="height:220px; font-family:monospace; font-size:12px; background:#0d1117; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:10px; outline:none; resize:none;" placeholder="// Write function logic below
+let parsed = JSON.parse(params);
+let name = parsed.name || 'Anonymous Developer';
+'Greetings ' + name + ' from isolated CloudPool Serverless container!'"></textarea>
+              </div>
+              <div><button class="btn" onclick="deployServerless()">⊙ DEPLOY EDGE FUNCTION</button></div>
+            </div>
+          </div>
+          <div class="panel panel-right" style="flex:1.1;">
+            <div class="panel-header"><div class="panel-title">DEPLOYED FUNCTIONS</div></div>
+            <div class="panel-body" style="gap:16px; display:flex; flex-direction:column;">
+              <div style="display:flex;flex-direction:column;gap:8px;overflow-y:auto;max-height:160px;border-bottom:1px solid #30363d;padding-bottom:12px;flex:1;" id="serverlessList">
+                <!-- Dynamic functions list -->
+              </div>
+              <div class="console-wrap" style="flex:1.2; display:flex; flex-direction:column; gap:4px;">
+                <div class="console-header" style="display:flex;justify-content:space-between;align-items:center;">
+                  <div class="console-label">SANDBOX TEST CONSOLE</div>
+                  <button class="btn btn-outline" id="runTestFuncBtn" style="padding:2px 8px;font-size:10px;" onclick="runTestFunction()" disabled>RUN TEST</button>
+                </div>
+                <div class="field" style="margin-top:6px;">
+                  <div class="field-label">TEST PARAMETERS (JSON)</div>
+                  <input type="text" id="testParams" value='{"name":"Developer Alpha"}' style="font-family:monospace;font-size:11px;" />
+                </div>
+                <div class="console-box" id="funcLogs" style="height:100px;font-family:monospace;font-size:11px;overflow-y:auto;">
+                  Select a function, enter parameters, and click RUN TEST to verify sandbox execution.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Container Console (Hidden by default) -->
+      <div id="containerConsole" style="display:none; flex-direction:column; gap:16px; flex:1;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div class="page-title">CONTAINER ORCHESTRATION CONSOLE</div>
+            <div class="page-sub">Deploy long-lived servers, Node.js applications, or Docker containers onto Kubernetes clusters.</div>
+          </div>
+          <button class="btn btn-outline" style="padding:4px 12px;" onclick="backToComputeSelection()">← SWITCH OPTION</button>
+        </div>
+
+        <div class="panels">
+          <div class="panel panel-left" style="flex:1;">
+            <div class="panel-header"><div class="panel-title">PROVISION CONTAINER INSTANCE</div></div>
+            <div class="panel-body" style="display:flex;flex-direction:column;gap:12px;">
+              <div class="field">
+                <div class="field-label">DEPLOYMENT NAME</div>
+                <input type="text" id="containerName" placeholder="api-server-prod" />
+              </div>
+              <div class="field">
+                <div class="field-label">DOCKER IMAGE</div>
+                <input type="text" id="containerImage" placeholder="node:18-alpine" />
+              </div>
+              <div class="field">
+                <div class="field-label">REPLICAS COUNT (<span id="replicasVal">1</span>)</div>
+                <input type="range" id="containerReplicas" min="1" max="10" value="1" oninput="document.getElementById('replicasVal').textContent=this.value" style="width:100%;cursor:pointer;" />
+              </div>
+              <div class="field-row" style="display:flex;gap:12px;">
+                <div class="field" style="flex:1;">
+                  <div class="field-label">CPU (CORES: <span id="cpuVal">0.5</span>)</div>
+                  <input type="range" id="containerCpu" min="0.1" max="4.0" step="0.1" value="0.5" oninput="document.getElementById('cpuVal').textContent=this.value" style="width:100%;cursor:pointer;" />
+                </div>
+                <div class="field" style="flex:1;">
+                  <div class="field-label">MEMORY (MB: <span id="memVal">512</span>)</div>
+                  <input type="range" id="containerMem" min="128" max="4096" step="128" value="512" oninput="document.getElementById('memVal').textContent=this.value" style="width:100%;cursor:pointer;" />
+                </div>
+              </div>
+              <div><button class="btn" onclick="deployContainer()">⊙ LAUNCH WORKLOAD</button></div>
+            </div>
+          </div>
+          <div class="panel panel-right" style="flex:1.3;">
+            <div class="panel-header"><div class="panel-title">RUNNING CONTAINER WORKLOADS</div></div>
+            <div class="panel-body" style="gap:16px; display:flex; flex-direction:column;">
+              <div style="display:flex;flex-direction:column;gap:8px;overflow-y:auto;max-height:160px;border-bottom:1px solid #30363d;padding-bottom:12px;flex:1;" id="containersList">
+                <!-- Dynamic containers list -->
+              </div>
+              <div class="console-wrap" style="flex:1.2; display:flex; flex-direction:column;">
+                <div class="console-label">CONTAINER STDOUT/STDERR TERMINAL</div>
+                <div class="console-box" id="containerLogs" style="height:140px;font-family:monospace;font-size:11px;overflow-y:auto;white-space:pre-wrap;">
+                  Select a container above to review Kubernetes scheduler and deployment logs.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- API KEYS -->
+    <div class="page" id="page-apikeys">
+      <div>
+        <div class="page-title">API KEY MANAGEMENT</div>
+        <div class="page-sub">Create and view API keys for accessing CloudPool routes.</div>
+      </div>
+      <div class="panels">
+        <div class="panel panel-left">
+          <div class="panel-header"><div class="panel-title">ACTIVE API KEYS</div></div>
+          <div class="panel-body" style="gap:8px" id="keysList">
+            <!-- Key rows -->
+          </div>
+        </div>
+        <div class="panel panel-right">
+          <div class="panel-header"><div class="panel-title">GENERATE NEW KEY</div><div class="panel-badge">SECURE</div></div>
+          <div class="panel-body">
+            <div class="field"><div class="field-label">KEY IDENTIFIER (NAME)</div><input type="text" id="newKeyName" placeholder="my-service-key"/></div>
+            <button class="btn" onclick="generateKey()">+ GENERATE API KEY</button>
+            <div id="newKeyBox" style="display:none;border:1px solid #000;padding:10px;font-size:10px;word-break:break-all;line-height:1.6;margin-top:10px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <!-- ANALYTICS -->
+    <div class="page" id="page-analytics">
+      <div>
+        <div class="page-title">REQUEST TRAFFIC ANALYTICS</div>
+        <div class="page-sub">Real-time telemetry, status code distributions, and route metrics for all project API traffic.</div>
+      </div>
+      
+      <!-- Stats Cards -->
+      <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;margin-bottom:4px;">
+        <div class="panel" style="padding:14px;background:linear-gradient(135deg, #1e1e1e 0%, #121212 100%);color:#fff;border-color:#333;">
+          <div style="font-size:8px;color:#888;letter-spacing:.08em;font-weight:700;">TOTAL REQUESTS</div>
+          <div id="analyticsTotalRequests" style="font-size:20px;font-weight:700;margin-top:6px;font-family:'JetBrains Mono',monospace;">0</div>
+        </div>
+        <div class="panel" style="padding:14px;background:linear-gradient(135deg, #1e1e1e 0%, #121212 100%);color:#fff;border-color:#333;">
+          <div style="font-size:8px;color:#888;letter-spacing:.08em;font-weight:700;">AVERAGE LATENCY</div>
+          <div id="analyticsAverageLatency" style="font-size:20px;font-weight:700;margin-top:6px;font-family:'JetBrains Mono',monospace;">0 ms</div>
+        </div>
+        <div class="panel" style="padding:14px;background:linear-gradient(135deg, #1e1e1e 0%, #121212 100%);color:#fff;border-color:#333;">
+          <div style="font-size:8px;color:#888;letter-spacing:.08em;font-weight:700;">SUCCESS RATE</div>
+          <div id="analyticsSuccessRate" style="font-size:20px;font-weight:700;margin-top:6px;color:#66bb6a;font-family:'JetBrains Mono',monospace;">100%</div>
+        </div>
+        <div class="panel" style="padding:14px;background:linear-gradient(135deg, #1e1e1e 0%, #121212 100%);color:#fff;border-color:#333;">
+          <div style="font-size:8px;color:#888;letter-spacing:.08em;font-weight:700;">SERVER ERRORS (5XX)</div>
+          <div id="analyticsErrorRate" style="font-size:20px;font-weight:700;margin-top:6px;color:#ef5350;font-family:'JetBrains Mono',monospace;">0</div>
+        </div>
+      </div>
+
+      <!-- Main Analytics Panels -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0;overflow:hidden;">
+        <!-- Left Panel: Lists and statistics -->
+        <div style="display:flex;flex-direction:column;gap:12px;overflow-y:auto;height:100%;">
+          <!-- Hits By Key (Repurposed for Status Codes) -->
+          <div class="panel" style="flex:1;display:flex;flex-direction:column;min-height:120px;">
+            <div class="panel-header"><div class="panel-title">REQUESTS BY STATUS CODE</div></div>
+            <div class="panel-body" style="padding:0;overflow-y:auto;flex:1;" id="analyticsByKeyList">
+              <!-- Filled dynamically -->
+            </div>
+          </div>
+          
+          <!-- Hits By Endpoint (Repurposed for Paths) -->
+          <div class="panel" style="flex:1;display:flex;flex-direction:column;min-height:120px;">
+            <div class="panel-header"><div class="panel-title">REQUESTS BY PATH</div></div>
+            <div class="panel-body" style="padding:0;overflow-y:auto;flex:1;" id="analyticsByEndpointList">
+              <!-- Filled dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Panel: Live Activity Logs -->
+        <div class="panel" style="height:100%;display:flex;flex-direction:column;">
+          <div class="panel-header">
+            <div class="panel-title">LIVE REQUEST METRIC STREAM</div>
+            <div class="panel-badge">REAL-TIME</div>
+          </div>
+          <div class="panel-body" style="flex:1;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:9px;display:flex;flex-direction:column;gap:4px;" id="analyticsLogsStream">
+            <!-- Scrollable logging entries -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EMAIL SANDBOX -->
+    <div class="page" id="page-emails">
+      <div>
+        <div class="page-title">LOCAL EMAIL SANDBOX</div>
+        <div class="page-sub">Monitor and audit emails dispatched by CloudPool. In Sandbox mode, emails are stored locally instead of sent to external SMTP servers.</div>
+      </div>
+      <div class="panels">
+        <!-- Outbox/Inbox list panel -->
+        <div class="panel panel-left" style="display:flex; flex-direction:column;">
+          <div class="panel-header" style="padding: 0 12px; display: flex; align-items: stretch; height: 32px; flex-shrink:0;">
+            <div style="display: flex; gap: 16px; align-items: stretch;">
+              <div class="email-tab active" id="email-tab-outbox" onclick="switchEmailTab('outbox')" style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; display: flex; align-items: center; border-bottom: 2px solid #000; cursor: pointer; padding: 0 4px; user-select: none;">DISPATCHED OUTBOX</div>
+              <div class="email-tab" id="email-tab-inbox" onclick="switchEmailTab('inbox')" style="font-size: 10px; font-weight: 600; letter-spacing: 0.1em; display: flex; align-items: center; border-bottom: 2px solid transparent; cursor: pointer; padding: 0 4px; user-select: none; color: var(--muted);">RECEIVED INBOX</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <button class="btn btn-outline" id="clearOutboxBtn" style="padding:2px 8px; font-size:8px" onclick="clearEmailOutbox()">CLEAR OUTBOX</button>
+              <button class="btn btn-outline" id="clearInboxBtn" style="padding:2px 8px; font-size:8px; display: none;" onclick="clearEmailInbox()">CLEAR INBOX</button>
+              <button class="btn" id="refreshInboxBtn" style="padding:2px 8px; font-size:8px; display: none;" onclick="loadEmailInbox()">🔄 RELOAD</button>
+            </div>
+          </div>
+          <div class="panel-body" style="padding:0; overflow-y:auto; flex:1;" id="emailsOutboxList">
+            <!-- Loaded dynamically -->
+          </div>
+          <div class="panel-body" style="padding:0; overflow-y:auto; flex:1; display:none;" id="emailsInboxList">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
+
+        <!-- Send test email panel -->
+        <div class="panel panel-right">
+          <div class="panel-header">
+            <div class="panel-title">TRIGGER TEST EMAIL</div>
+            <div class="panel-badge">LOCAL/SMTP</div>
+          </div>
+          <div class="panel-body">
+            <div class="field">
+              <div class="field-label">RECIPIENT EMAIL ADDRESS</div>
+              <input type="text" id="testEmailTo" placeholder="receiver@example.com" />
+            </div>
+            <div class="field">
+              <div class="field-label">EMAIL SUBJECT</div>
+              <input type="text" id="testEmailSubject" placeholder="Welcome to CloudPool!" />
+            </div>
+            <div class="field">
+              <div class="field-label">EMAIL BODY (PLAIN TEXT)</div>
+              <textarea id="testEmailBody" style="height:120px;" placeholder="This is a test notification from your self-hosted CloudPool instance."></textarea>
+            </div>
+            <button class="btn" onclick="sendTestEmail()">⚡ SEND TEST EMAIL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="page-settings">
+      <div>
+        <div class="page-title">SYSTEM SETTINGS</div>
+        <div class="page-sub">Credentials and settings indicators.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex:1">
+        <div class="settings-section">
+          <div class="settings-header">STORAGE PROFILE (LOCAL ENVIRONMENT ACTIVE)</div>
+          <div class="settings-body">
+            <div class="settings-row"><div class="s-label">FALLBACK FOLDER</div><div class="s-val"><input type="text" disabled value="./storage/"/></div></div>
+            <div class="settings-row"><div class="s-label">DATABASE</div><div class="s-val"><input type="text" disabled value="H2 (InMemory)"/></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#main -->
+</div><!-- /#layout -->
+
+<!-- FOOTER -->
+<div id="footer">
+  <div class="f-left">© 2026 CLOUDPOOL SYSTEMS · ALL RIGHTS RESERVED</div>
+  <div class="f-right"><span>API DOCS</span><span>METRICS</span></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

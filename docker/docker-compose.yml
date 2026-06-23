@@ -17,6 +17,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
 
   redis:
     image: redis:7-alpine
@@ -30,6 +36,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.5"
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -37,6 +49,7 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+      - "15692:15692"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -44,6 +57,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1.0"
 
   weaviate:
     image: semitechnologies/weaviate:1.21.2
@@ -63,11 +82,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
 
   gateway:
     build:
-      context: ../backend/spring-boot/cloudpool-gateway
-      dockerfile: Dockerfile
+      context: ../backend/spring-boot
+      dockerfile: Dockerfile.multi
+      args:
+        MODULE: cloudpool-gateway
     container_name: cloudpool-gateway
     ports:
       - "8080:8080"
@@ -82,11 +109,19 @@ services:
       - data
       - compute
       - network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
 
   auth:
     build:
-      context: ../backend/spring-boot/cloudpool-auth
-      dockerfile: Dockerfile
+      context: ../backend/spring-boot
+      dockerfile: Dockerfile.multi
+      args:
+        MODULE: cloudpool-auth
     container_name: cloudpool-auth
     ports:
       - "8082:8082"
@@ -111,11 +146,19 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
 
   data:
     build:
-      context: ../backend/spring-boot/cloudpool-data
-      dockerfile: Dockerfile
+      context: ../backend/spring-boot
+      dockerfile: Dockerfile.multi
+      args:
+        MODULE: cloudpool-data
     container_name: cloudpool-data
     ports:
       - "8083:8083"
@@ -143,11 +186,19 @@ services:
         condition: service_healthy
       weaviate:
         condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
 
   compute:
     build:
-      context: ../backend/spring-boot/cloudpool-compute
-      dockerfile: Dockerfile
+      context: ../backend/spring-boot
+      dockerfile: Dockerfile.multi
+      args:
+        MODULE: cloudpool-compute
     container_name: cloudpool-compute
     ports:
       - "8084:8084"
@@ -172,11 +223,19 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
 
   network:
     build:
-      context: ../backend/spring-boot/cloudpool-network
-      dockerfile: Dockerfile
+      context: ../backend/spring-boot
+      dockerfile: Dockerfile.multi
+      args:
+        MODULE: cloudpool-network
     container_name: cloudpool-network
     ports:
       - "8085:8085"
@@ -201,6 +260,12 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
 
   toxiproxy:
     image: ghcr.io/shopify/toxiproxy:2.5.0
@@ -214,6 +279,46 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.5"
+
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: cloudpool-pgexporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.2"
+
+  redis_exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: cloudpool-redisexporter
+    environment:
+      REDIS_ADDR: "redis:6379"
+    ports:
+      - "9121:9121"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.2"
 
 volumes:
   postgres_data:

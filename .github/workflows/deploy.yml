@@ -28,6 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: check-secrets
     if: needs.check-secrets.outputs.has-kubeconfig == 'true'
+    environment: production
 
     steps:
     - uses: actions/checkout@v4

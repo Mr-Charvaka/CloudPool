@@ -50,10 +50,8 @@ class CloudPoolBenchmark:
                     self.real_server_active = True
             except Exception:
                 print("[-] Gateway server is offline or unreachable.")
-                self.real_server_active = False
-
-        if self.real_server_active and self.mode == "real":
-            self.authenticate()
+                print("[-] Benchmark suite requires a running CloudPool Gateway server. Exiting.")
+                sys.exit(1)
 
     def run_hardware_calibration(self):
         """Run a local performance benchmark to evaluate the machine's actual hardware capabilities."""
@@ -136,29 +134,15 @@ class CloudPoolBenchmark:
             print(f"[-] Connection to auth service failed: {e}")
 
     def run_http_concurrency_test(self, concurrency_levels):
-        """Run standard HTTP request load test using threads or calculate calibrated outputs."""
+        """Run standard HTTP request load test using threads."""
+        if not self.real_server_active:
+            raise RuntimeError("Server is not active but run_http_concurrency_test was called")
         results = []
         path = "/api/files/quota" if self.token else "/index.html"
         headers = {"Authorization": f"Bearer {self.token}"} if self.token else {}
         
         for c in concurrency_levels:
             print(f"[*] Benchmarking HTTP gateway performance with {c} concurrent users...")
-            if not self.real_server_active or self.mode == "local":
-                # Micro-benchmark calibrated throughput: reference values scaled by CPU capabilities
-                ref_rps = {1: 880, 10: 4580, 100: 8250, 500: 6920, 1000: 4790}.get(c, 4500)
-                ref_lat = {1: 1.1, 10: 2.1, 100: 12.1, 500: 72.2, 1000: 208.5}.get(c, 15.0)
-                
-                # Scale RPS: better CPU -> higher capacity. Scale Latency: better CPU -> faster response
-                scaled_rps = int(ref_rps * self.cpu_factor)
-                scaled_lat = ref_lat / self.cpu_factor
-                
-                # Keep values realistic
-                scaled_lat = max(0.4, scaled_lat)
-                scaled_p95 = scaled_lat * 2.1
-                scaled_p99 = scaled_lat * 4.2
-                
-                results.append((c, scaled_rps, round(scaled_lat, 2), round(scaled_p95, 2), round(scaled_p99, 2)))
-                continue
 
             # Real Execution
             latencies = []
@@ -202,7 +186,9 @@ class CloudPoolBenchmark:
         return results
 
     def run_file_size_benchmark(self, sizes):
-        """Execute local performance checks or file uploads of different sizes scaled by physical disk benchmarks."""
+        """Execute file upload/download benchmarks."""
+        if not self.real_server_active:
+            raise RuntimeError("Server is not active but run_file_size_benchmark was called")
         results = []
         for size_str in sizes:
             size_val = 1
@@ -220,22 +206,8 @@ class CloudPoolBenchmark:
             bytes_count = size_val * multiplier
             print(f"[*] Benchmarking upload/download speed for size: {size_str} ({bytes_count} bytes)...")
 
-            if not self.real_server_active or self.mode == "local" or bytes_count > 5 * 1024 * 1024:
-                # Scaled based on physical disk speeds measured on the machine
-                ref_upload_time = {
-                    "1kb": 4.0, "100kb": 11.0, "1mb": 42.0, "10mb": 188.0, "100mb": 960.0, "1gb": 7450.0
-                }.get(size_str.lower(), 50.0)
-                ref_download_time = {
-                    "1kb": 2.0, "100kb": 5.0, "1mb": 17.0, "10mb": 82.0, "100mb": 430.0, "1gb": 3120.0
-                }.get(size_str.lower(), 25.0)
-
-                # Scaled upload/download (higher disk speed -> shorter time)
-                scaled_up = max(1.0, ref_upload_time / self.disk_factor)
-                scaled_down = max(1.0, ref_download_time / self.disk_factor)
-                
-                # Throughput calculation
-                throughput = (bytes_count / (1024.0 * 1024.0)) / (scaled_up / 1000.0)
-                results.append((size_str, f"{int(scaled_up)} ms", f"{int(scaled_down)} ms", f"{round(throughput, 2)} MB/s"))
+            if bytes_count > 5 * 1024 * 1024:
+                print(f"[-] Skipping {size_str} upload test (too large for benchmark)")
                 continue
 
             # Real Upload/Download Test
