@@ -1,22 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
-    <springProperty name="springAppName" source="spring.application.name" defaultValue="cloudpool"/>
 
-    <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-            <customFields>{"app_name":"${springAppName}"}</customFields>
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>userId</includeMdcKeyName>
             <fieldNames>
-                <timestamp>timestamp</timestamp>
-                <message>message</message>
+                <timestamp>[ignore]</timestamp>
+                <version>[ignore]</version>
                 <logger>logger</logger>
-                <thread>thread</thread>
                 <level>level</level>
+                <message>message</message>
+                <mdc>context</mdc>
             </fieldNames>
         </encoder>
     </appender>
 
+    <appender name="AUDIT_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/audit.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/audit-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>90</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{ISO8601} traceId=%X{traceId} user=%X{userId} %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="AUDIT_LOG" level="INFO" additivity="false">
+        <appender-ref ref="AUDIT_FILE"/>
+    </logger>
+
     <root level="INFO">
-        <appender-ref ref="CONSOLE_JSON"/>
+        <appender-ref ref="CONSOLE"/>
     </root>
 </configuration>

@@ -1,0 +1,28 @@
+server:
+  port: 8080
+  shutdown: graceful
+  forward-headers-strategy: FRAMEWORK
+  netty:
+    connection-timeout: 5s
+
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+logging:
+  level:
+    root: WARN
+    com.cloudpool: INFO
+    org.springframework.cloud.gateway: WARN
+
+cors:
+  allowed-origins: ${CLOUDPOOL_CORS_ALLOWED_ORIGINS:https://cloudpool.app}
+
+management:
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true

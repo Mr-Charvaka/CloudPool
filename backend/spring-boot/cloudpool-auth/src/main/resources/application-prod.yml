@@ -1,0 +1,46 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/cloudpool}?sslmode=require
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 10
+      idle-timeout: 300000
+      connection-timeout: 5000
+      max-lifetime: 1200000
+      leak-detection-threshold: 60000
+      pool-name: CloudPoolAuthPool
+      data-source-properties:
+        loggerLevel: debug
+        slowQueryLoggingThresholdMs: 2000
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        generate_statistics: false
+        jdbc:
+          batch_size: 50
+          timezone: UTC
+        order_inserts: true
+        order_updates: true
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+logging:
+  level:
+    root: WARN
+    com.cloudpool: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql: WARN
+
+server:
+  port: 8082
+  shutdown: graceful
+  forward-headers-strategy: FRAMEWORK
+  servlet:
+    session:
+      timeout: 30m
+
+cloudpool:
+  rate-limit:
+    requests-per-minute: ${CLOUDPOOL_RATE_LIMIT_RPM:600}
