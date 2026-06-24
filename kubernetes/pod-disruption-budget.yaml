@@ -1,0 +1,32 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cloudpool-api-pdb
+  namespace: cloudpool
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: cloudpool-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cloudpool-auth-pdb
+  namespace: cloudpool
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: cloudpool-auth
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cloudpool-data-pdb
+  namespace: cloudpool
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: cloudpool-data

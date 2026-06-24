@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: db-backup
+  namespace: cloudpool
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: backup-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: amazon/aws-cli:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  apk add --no-cache postgresql-client gnupg
+                  /scripts/backup-postgres.sh
+              env:
+                - name: POSTGRES_HOST
+                  value: postgres
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudpool-secrets
+                      key: postgres-user
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudpool-secrets
+                      key: postgres-password
+                - name: S3_BACKUP_BUCKET
+                  value: cloudpool-backups
+                - name: GPG_RECIPIENT
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudpool-secrets
+                      key: gpg-recipient
+                    optional: true
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudpool-secrets
+                      key: aws-access-key-id
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudpool-secrets
+                      key: aws-secret-access-key
+                - name: AWS_DEFAULT_REGION
+                  value: us-east-1
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+          volumes:
+            - name: scripts
+              configMap:
+                name: backup-scripts
+                defaultMode: 0755
