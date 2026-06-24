@@ -7,7 +7,7 @@ COPY backend/rust/src ./src
 RUN cargo build --release
 
 # Stage 2: Build Spring Boot application (multi-module reactor)
-FROM maven:3.9.9-eclipse-temurin-17 AS java-builder
+FROM maven:3.9.15-eclipse-temurin-26 AS java-builder
 WORKDIR /app
 # Copy the entire multi-module project (parent pom + all child modules)
 COPY backend/spring-boot/pom.xml ./pom.xml
