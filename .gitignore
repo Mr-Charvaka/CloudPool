@@ -75,6 +75,9 @@ __pycache__/
 # Architecture-specific native binaries — must be built per-platform via CI
 backend/spring-boot/cloudpool-data/src/main/resources/libcloudpool_rust.so
 backend/spring-boot/cloudpool-network/src/main/resources/libcloudpool_rust.so
+
+# Generated/satire file — 13K lines of fake enterprise exceptions, not used by any module
+exception/
 # Security and Scratch files
 *.env
 .env.*

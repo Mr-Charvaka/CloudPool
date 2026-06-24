@@ -13,7 +13,8 @@ COPY . .
 RUN mvn clean package -DskipTests
 
 # STAGE 2: Create the minimal runtime image
-FROM eclipse-temurin:17-jre-noble
+FROM eclipse-temurin:17-jre-alpine
+RUN addgroup -S cloudpool && adduser -S -G cloudpool cloudpool
 ARG MODULE
 ENV MODULE_ENV=${MODULE}
 
@@ -22,6 +23,6 @@ WORKDIR /app
 COPY --from=builder /build/${MODULE}/target/*.jar app.jar
 
 EXPOSE 8080
-
+USER cloudpool:cloudpool
 # Execute the application
 ENTRYPOINT ["java", "-jar", "app.jar"]

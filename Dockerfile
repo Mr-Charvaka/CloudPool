@@ -20,12 +20,14 @@ COPY backend/spring-boot/cloudpool-network ./cloudpool-network
 RUN mvn package -DskipTests
 
 # Stage 3: Runtime image
-FROM eclipse-temurin:17-jre-noble
+FROM eclipse-temurin:17-jre-alpine
+RUN addgroup -S cloudpool && adduser -S -G cloudpool cloudpool
 WORKDIR /app
 COPY --from=rust-builder /usr/src/cloudpool-rust/target/release/libcloudpool_rust.so /usr/local/lib/libcloudpool_rust.so
-RUN ldconfig
+RUN ldconfig /usr/local/lib
 # Copy the gateway jar (the deployable service)
 COPY --from=java-builder /app/cloudpool-gateway/target/cloudpool-*.jar app.jar
 ENV LD_LIBRARY_PATH=/usr/local/lib
 EXPOSE 8080
+USER cloudpool:cloudpool
 ENTRYPOINT ["java", "-Djava.library.path=/usr/local/lib", "-jar", "app.jar"]
