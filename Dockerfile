@@ -1,5 +1,5 @@
 # Stage 1: Build Rust native library
-FROM rust:1.88-slim AS rust-builder
+FROM rust:1.96-slim AS rust-builder
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 WORKDIR /usr/src/cloudpool-rust
 COPY backend/rust/Cargo.toml backend/rust/Cargo.lock ./
