@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "lint": "tsc --noEmit",
-    "test": "echo 'No tests configured'",
+    "test": "npm run build && node --test tests/",
     "prepublishOnly": "npm run build"
   },
   "engines": {

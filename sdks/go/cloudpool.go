@@ -117,67 +117,7 @@ func (c *CloudPoolClient) UseMiddleware(mw ...Middleware) {
 }
 
 func (c *CloudPoolClient) Request(method, path string, body interface{}, headers map[string]string) ([]byte, error) {
-	return c.request(context.Background(), method, path, body, headers)
-}
-
-func (c *CloudPoolClient) request(ctx context.Context, method, reqPath string, body interface{}, headers map[string]string) ([]byte, error) {
-	u, err := url.Parse(c.baseURL + "/" + strings.TrimPrefix(reqPath, "/"))
-	if err != nil {
-		return nil, fmt.Errorf("invalid url: %w", err)
-	}
-
-	var bodyReader io.Reader
-	if body != nil {
-		jsonBytes, err := json.Marshal(body)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request body: %w", err)
-		}
-		bodyReader = bytes.NewReader(jsonBytes)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, u.String(), bodyReader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	if body != nil && bodyReader != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	c.setHeaders(req)
-
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
-
-	for _, mw := range c.middleware {
-		mw(req)
-	}
-
-	doFn := func() (*http.Response, error) { return c.httpClient.Do(req) }
-
-	resp, err := retry(c.retryMax, doFn)
-	if err != nil {
-		return nil, fmt.Errorf("http request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		apiErr := &APIError{StatusCode: resp.StatusCode}
-		if err := json.Unmarshal(respBytes, apiErr); err == nil && apiErr.Message != "" {
-			return nil, apiErr
-		}
-		return nil, &APIError{
-			StatusCode: resp.StatusCode,
-			Message:    sanitizeErrorBody(string(respBytes)),
-		}
-	}
-
-	return respBytes, nil
+	return c.call(context.Background(), &requestParams{Method: method, Path: path, Body: body, Headers: headers})
 }
 
 func (c *CloudPoolClient) setHeaders(req *http.Request) {

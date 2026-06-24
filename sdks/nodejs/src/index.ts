@@ -83,9 +83,14 @@ export class GraphQLError extends CloudPoolError {
       extensions?: unknown;
     }>
   ) {
-    super(errors[0]?.message || 'GraphQL Error', 400, 'GRAPHQL_ERROR', errors);
+    if (!errors || errors.length === 0) {
+      super('GraphQL returned an empty errors array', 400, 'GRAPHQL_EMPTY_ERRORS', errors);
+      this.graphqlErrors = errors || [];
+    } else {
+      super(errors[0].message || 'GraphQL Error', 400, 'GRAPHQL_ERROR', errors);
+      this.graphqlErrors = errors;
+    }
     this.name = 'GraphQLError';
-    this.graphqlErrors = errors;
   }
 }
 
@@ -243,13 +248,20 @@ export class CloudPoolClient {
       body: JSON.stringify({ query, variables }),
     });
 
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      throw new CloudPoolError(
+        `GraphQL returned non-JSON response: ${text.slice(0, 200)}`,
+        502,
+        'INVALID_RESPONSE'
+      );
+    }
+
     const json = (await response.json()) as GraphQLResponse<T>;
 
-    if (json.errors && json.errors.length > 0) {
+    if (json.errors) {
       throw new GraphQLError(json.errors);
-    } else if (json.errors) {
-      // Empty errors array, but still present
-      throw new CloudPoolError('GraphQL returned an empty errors array', 400, 'GRAPHQL_EMPTY_ERRORS');
     }
 
     return json;
@@ -320,16 +332,20 @@ export class CloudPoolClient {
     return Math.min(seconds * 1000, MAX_RETRY_DELAY_MS);
   }
 
-  private isNetworkOrTimeoutError(err: any): boolean {
-    return (
-      err instanceof TypeError ||
-      err.name === 'AbortError' ||
-      err.name === 'TimeoutError' ||
-      err.name === 'FetchError' ||
-      err.code === 'ECONNREFUSED' ||
-      err.code === 'ECONNRESET' ||
-      err.code === 'ENOTFOUND'
-    );
+  private isNetworkOrTimeoutError(err: unknown): boolean {
+    if (err instanceof TypeError) return true;
+    if (err instanceof Error) {
+      const e = err as Error & { code?: string };
+      return (
+        e.name === 'AbortError' ||
+        e.name === 'TimeoutError' ||
+        e.name === 'FetchError' ||
+        e.code === 'ECONNREFUSED' ||
+        e.code === 'ECONNRESET' ||
+        e.code === 'ENOTFOUND'
+      );
+    }
+    return false;
   }
 
   private async sleep(

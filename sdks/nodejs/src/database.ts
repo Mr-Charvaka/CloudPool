@@ -19,7 +19,7 @@ export class DatabaseClient {
     fields: FieldDefinition[],
     projectId?: string
   ): Promise<T> {
-    const body: Record<string, any> = {
+    const body: Record<string, unknown> = {
       name,
       displayName,
       description,
@@ -64,7 +64,7 @@ export class DatabaseClient {
   /**
    * Insert record row into a dynamic custom database table.
    */
-  public async insertRecord<T = unknown>(tableId: string, record: Record<string, any>): Promise<T> {
+  public async insertRecord<T = unknown>(tableId: string, record: Record<string, unknown>): Promise<T> {
     const response = await this.client.request('POST', `/api/v1/db/tables/${tableId}/records`, {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(record),

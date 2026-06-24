@@ -41,7 +41,7 @@ export class FilesClient {
     sharedWithEmail?: string,
     expiryHours?: number
   ): Promise<T> {
-    const body: Record<string, any> = {};
+    const body: Record<string, unknown> = {};
     if (sharedWithEmail) body.sharedWithEmail = sharedWithEmail;
     if (expiryHours !== undefined) body.expiryHours = expiryHours;
 

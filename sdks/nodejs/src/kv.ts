@@ -1,8 +1,8 @@
 import { CloudPoolClient } from './index';
 
-export interface KvEntry {
+export interface KvEntry<T = unknown> {
   key: string;
-  value: any;
+  value: T;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -21,10 +21,10 @@ export class KvClient {
 
   public async set<T = unknown>(
     key: string,
-    value: any,
+    value: T,
     ttlSeconds?: number
   ): Promise<void> {
-    const body: Record<string, any> = { value };
+    const body: Record<string, unknown> = { value };
     if (ttlSeconds !== undefined) body.ttlSeconds = ttlSeconds;
     await this.client.request(
       'PUT',

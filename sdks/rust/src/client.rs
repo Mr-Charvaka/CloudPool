@@ -149,7 +149,10 @@ impl CloudPoolClient {
             return Ok(resp);
         }
         let retry_after = parse_retry_after(&resp);
-        let body = resp.text().await.unwrap_or_default();
+        let body = match resp.text().await {
+            Ok(text) => text,
+            Err(e) => return Err(CloudPoolError::Network(e.to_string())),
+        };
         Err(parse_error_response(status.as_u16(), &body, retry_after))
     }
 }
