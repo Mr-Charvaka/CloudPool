@@ -79,26 +79,47 @@ public class StorageService {
         String name = null;
         String checksum = null;
 
-        try (InputStream inputStream = file.getInputStream()) {
+        try {
             java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
             
-            if (user.getGoogleRefreshToken() != null) {
-                driveFileId = googleDriveService.uploadFile(file, user);
-                driveLocation = "Google Drive";
-                name = driveFileId;
-                try (InputStream is = file.getInputStream();
-                     java.security.DigestInputStream dis = new java.security.DigestInputStream(is, digest)) {
-                    byte[] buffer = new byte[8192];
-                    while (dis.read(buffer) != -1) {}
-                }
-            } else if (isS3Enabled && s3Service.isPresent()) {
-                driveFileId = s3Service.get().uploadFile(file, user);
-                driveLocation = "AWS S3";
-                name = driveFileId;
-                try (InputStream is = file.getInputStream();
-                     java.security.DigestInputStream dis = new java.security.DigestInputStream(is, digest)) {
-                    byte[] buffer = new byte[8192];
-                    while (dis.read(buffer) != -1) {}
+            if (user.getGoogleRefreshToken() != null || (isS3Enabled && s3Service.isPresent())) {
+                // Single-pass: write to temp file while computing checksum
+                Path tempFile = Files.createTempFile("cloudpool-upload-", ".tmp");
+                try {
+                    try (InputStream is = file.getInputStream();
+                         java.security.DigestInputStream dis = new java.security.DigestInputStream(is, digest);
+                         java.io.OutputStream os = Files.newOutputStream(tempFile)) {
+                        dis.transferTo(os);
+                    }
+                    checksum = java.util.HexFormat.of().formatHex(digest.digest());
+                    digest = java.security.MessageDigest.getInstance("SHA-256");
+
+                    MultipartFile tempMultipart = new MultipartFile() {
+                        @Override public String getName() { return file.getName(); }
+                        @Override public String getOriginalFilename() { return file.getOriginalFilename(); }
+                        @Override public String getContentType() { return file.getContentType(); }
+                        @Override public boolean isEmpty() { return false; }
+                        @Override public long getSize() {
+                            try { return Files.size(tempFile); } catch (IOException e) { return 0; }
+                        }
+                        @Override public byte[] getBytes() throws IOException { return Files.readAllBytes(tempFile); }
+                        @Override public InputStream getInputStream() throws IOException { return Files.newInputStream(tempFile); }
+                        @Override public void transferTo(File dest) throws IOException, IllegalStateException {
+                            Files.copy(tempFile, dest.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        }
+                    };
+
+                    if (user.getGoogleRefreshToken() != null) {
+                        driveFileId = googleDriveService.uploadFile(tempMultipart, user);
+                        driveLocation = "Google Drive";
+                        name = driveFileId;
+                    } else {
+                        driveFileId = s3Service.get().uploadFile(tempMultipart, user);
+                        driveLocation = "AWS S3";
+                        name = driveFileId;
+                    }
+                } finally {
+                    Files.deleteIfExists(tempFile);
                 }
             } else {
                 Path uploadPath = Paths.get(localDir).toAbsolutePath().normalize();
