@@ -2,50 +2,183 @@ name: CloudPool CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+
 jobs:
-  build-backend:
-    name: Backend Tests & Build
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      python-sdk: ${{ steps.filter.outputs.python-sdk }}
+      go-sdk: ${{ steps.filter.outputs.go-sdk }}
+      go-cli: ${{ steps.filter.outputs.go-cli }}
+      node-sdk: ${{ steps.filter.outputs.node-sdk }}
+      rust-sdk: ${{ steps.filter.outputs.rust-sdk }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            python-sdk:
+              - 'sdks/python/**'
+            go-sdk:
+              - 'sdks/go/**'
+            go-cli:
+              - 'cli/go/**'
+            node-sdk:
+              - 'sdks/nodejs/**'
+            rust-sdk:
+              - 'sdks/rust/**'
+
+  backend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: cloudpool_test
+          POSTGRES_USER: cloudpool
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cloudpool -d cloudpool_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - name: Run backend tests
+        working-directory: backend/spring-boot
+        run: mvn clean test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/cloudpool_test
+          SPRING_DATASOURCE_USERNAME: cloudpool
+          SPRING_DATASOURCE_PASSWORD: password
+          CLOUDPOOL_JWT_SECRET: ci-test-secret-key-minimum-32-chars-long
+          CLOUDPOOL_GOOGLE_DRIVE_CLIENT_ID: dummy-client-id
+          CLOUDPOOL_GOOGLE_DRIVE_CLIENT_SECRET: dummy-client-secret
+
+  python-sdk:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.python-sdk == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: sdks/python/pyproject.toml
+      - name: Install Python SDK
+        working-directory: sdks/python
+        run: pip install -e ".[all,dev]"
+      - name: Run Python SDK tests
+        working-directory: sdks/python
+        run: pytest -v --cov=cloudpool
+
+  go-sdk:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.go-sdk == 'true'
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: sdks/go/go.sum
+      - name: Build Go SDK
+        working-directory: sdks/go
+        run: go build ./...
+      - name: Run Go SDK tests
+        working-directory: sdks/go
+        run: go test ./...
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: maven
-
-    - name: Run Maven Tests
-      run: |
-        cd backend/spring-boot
-        mvn clean test
-
-  build-frontend:
-    name: Frontend Build Check
+  go-cli:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.go-cli == 'true'
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: cli/go/go.sum
+      - name: Build Go CLI
+        working-directory: cli/go
+        run: go build ./...
+      - name: Run Go CLI tests
+        working-directory: cli/go
+        run: go test ./...
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: 'frontend/package-lock.json'
+  node-sdk:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.node-sdk == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ['18', '20', '22']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: sdks/nodejs/package-lock.json
+      - name: Build Node.js SDK
+        working-directory: sdks/nodejs
+        run: npm ci && npm run build
+      - name: Run Node.js SDK tests
+        working-directory: sdks/nodejs
+        run: npm test
 
-    - name: Install Dependencies
-      run: |
-        cd frontend
-        npm ci
-
-    - name: Build React App
-      run: |
-        cd frontend
-        npm run build
+  rust-sdk:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.rust-sdk == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust-version: ['1.70', 'stable']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust-version }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: sdks/rust
+      - name: Check Rust SDK
+        working-directory: sdks/rust
+        run: cargo clippy -D warnings
+      - name: Run Rust SDK tests
+        working-directory: sdks/rust
+        run: cargo test

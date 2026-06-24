@@ -39,16 +39,50 @@ jobs:
         echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
         chmod 600 $HOME/.kube/config
 
+    - name: Record previous revision for rollback
+      id: pre-deploy
+      run: |
+        REV=$(kubectl rollout history deployment/cloudpool-api -n cloudpool | tail -2 | head -1 | awk '{print $1}')
+        echo "previous_revision=$REV" >> $GITHUB_OUTPUT
+        kubectl rollout history deployment/cloudpool-api -n cloudpool
+
+    - name: Generate SBOM with Syft
+      uses: anchore/sbom-action@v0
+      with:
+        path: .
+        format: spdx-json
+        output-file: sbom.spdx.json
+
+    - name: Attach SBOM to release
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom
+        path: sbom.spdx.json
+
     - name: Deploy to Kubernetes
+      id: deploy
       run: |
         kubectl set image deployment/cloudpool-api \
           cloudpool-api=${{ secrets.DOCKER_USERNAME }}/cloudpool:${{ github.sha }} \
           -n cloudpool
-        kubectl rollout status deployment/cloudpool-api -n cloudpool --timeout=120s
+        kubectl rollout status deployment/cloudpool-api -n cloudpool --timeout=180s
 
     - name: Run smoke tests
+      id: smoke-test
       run: |
         kubectl run smoke-test \
           --image=curlimages/curl:latest \
           --rm -i --restart=Never \
-          -- curl -f http://cloudpool-api:80/actuator/health || exit 1
+          -- curl -sf --max-time 10 http://cloudpool-api:80/actuator/health
+        kubectl run smoke-test-db \
+          --image=curlimages/curl:latest \
+          --rm -i --restart=Never \
+          -- curl -sf --max-time 10 http://cloudpool-api:80/actuator/health/db
+
+    - name: Rollback on failure
+      if: failure() && steps.deploy.outcome == 'success'
+      run: |
+        echo "Smoke tests failed. Rolling back to previous revision..."
+        kubectl rollout undo deployment/cloudpool-api -n cloudpool
+        kubectl rollout status deployment/cloudpool-api -n cloudpool --timeout=120s
+        echo "Rollback complete. Please investigate the failed deployment SHA: ${{ github.sha }}"

@@ -1,0 +1,33 @@
+# CloudPool CODEOWNERS
+# Each owner line is a glob pattern followed by one or more @users or @teams
+
+# Backend (Spring Boot / Java)
+/backend/spring-boot/ @cloudpool/backend-maintainers
+
+# Python SDK
+/sdks/python/ @cloudpool/python-sdk-maintainers
+
+# Go SDK
+/sdks/go/ @cloudpool/go-sdk-maintainers
+
+# Go CLI
+/cli/go/ @cloudpool/cli-maintainers
+
+# Node.js SDK
+/sdks/nodejs/ @cloudpool/node-sdk-maintainers
+
+# Rust SDK
+/sdks/rust/ @cloudpool/rust-sdk-maintainers
+
+# Infrastructure (Kubernetes, Docker, CI/CD)
+/kubernetes/ @cloudpool/infra-maintainers
+/docker/ @cloudpool/infra-maintainers
+/.github/workflows/ @cloudpool/infra-maintainers
+/Dockerfile @cloudpool/infra-maintainers
+
+# Documentation
+/docs/ @cloudpool/docs-maintainers
+
+# Root-level files
+/*.md @cloudpool/backend-maintainers
+/README.md @cloudpool/backend-maintainers
