@@ -60,7 +60,10 @@ Examples:
 				GetContext(cmd).Printer.Detail("Expires", resp.ExpiresAt)
 			}
 		case "stop":
-			GetContext(cmd).Client.Post(cmd.Context(), "/api/network/tunnel/stop", nil, nil)
+			_, err := GetContext(cmd).Client.Post(cmd.Context(), "/api/network/tunnel/stop", nil, nil)
+			if err != nil {
+				return fmt.Errorf("tunnel stop failed: %w", err)
+			}
 			GetContext(cmd).Printer.Success("Tunnel stopped")
 		case "status":
 			data, err := GetContext(cmd).Client.Get(cmd.Context(), "/api/network/tunnel/status", nil)
