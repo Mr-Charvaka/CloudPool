@@ -17,7 +17,7 @@
     <description>Shared security utilities, exception classes, and common models for CloudPool</description>
 
     <properties>
-        <jjwt.version>0.12.3</jjwt.version>
+        <jjwt.version>0.13.0</jjwt.version>
     </properties>
 
     <dependencies>
