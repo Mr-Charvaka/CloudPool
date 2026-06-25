@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { fetchFiles, fetchBuckets, fetchQuota, uploadFile, downloadFile, shareFile, fetchLogs, type FileMetadata, type Bucket, type Quota } from '../lib/api';
+import { fetchFiles, fetchBuckets, fetchQuota, uploadFile, downloadFile, fetchLogs, type FileMetadata, type Bucket, type Quota } from '../lib/api';
 
 export default function DashboardPage() {
   const [files, setFiles] = useState<FileMetadata[]>([]);
@@ -8,8 +8,6 @@ export default function DashboardPage() {
   const [logs, setLogs] = useState<Array<{ id: string; action: string; details: string; timestamp: string }>>([]);
   const [selectedBucket, setSelectedBucket] = useState('default-pool');
   const [uploading, setUploading] = useState(false);
-  const [statusMsg, setStatusMsg] = useState('Idle');
-  const [shareEmail, setShareEmail] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -31,26 +29,21 @@ export default function DashboardPage() {
       if (bucketsData.length > 0 && !bucketsData.find(b => b.name === selectedBucket)) {
         setSelectedBucket(bucketsData[0].name);
       }
-    } catch (e) {
-      setStatusMsg(`Failed to load data: ${e}`);
+    } catch {
     }
   }
 
   async function handleUpload() {
     const input = fileInputRef.current;
     if (!input || !input.files || input.files.length === 0) {
-      setStatusMsg('No file selected');
       return;
     }
     setUploading(true);
-    setStatusMsg('Uploading...');
     try {
-      const result = await uploadFile(input.files[0], selectedBucket);
-      setStatusMsg(`Uploaded: ${result.originalName}`);
+      await uploadFile(input.files[0], selectedBucket);
       input.value = '';
       loadData();
-    } catch (e) {
-      setStatusMsg(`Upload failed: ${e}`);
+    } catch {
     } finally {
       setUploading(false);
     }
