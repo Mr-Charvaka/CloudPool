@@ -6,6 +6,13 @@ import DashboardPage from './pages/DashboardPage';
 import FilePoolPage from './pages/FilePoolPage';
 import DatabasePage from './pages/DatabasePage';
 import ProvisionerPage from './pages/ProvisionerPage';
+import TopologyPage from './pages/TopologyPage';
+import VectorPage from './pages/VectorPage';
+import ComputePage from './pages/ComputePage';
+import ApiKeysPage from './pages/ApiKeysPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import EmailsPage from './pages/EmailsPage';
+import SettingsPage from './pages/SettingsPage';
 
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
@@ -20,13 +27,13 @@ function App() {
           {activePage === 'filepool' && <FilePoolPage />}
           {activePage === 'database' && <DatabasePage />}
           {activePage === 'provisioner' && <ProvisionerPage />}
-          {/* Add other pages here as needed */}
-          {['topology', 'vector', 'compute', 'apikeys', 'analytics', 'emails', 'settings'].includes(activePage) && (
-            <div className="page active">
-              <div className="page-title">{activePage.toUpperCase()} - UNDER CONSTRUCTION</div>
-              <div className="page-sub">This page is being migrated to React.</div>
-            </div>
-          )}
+          {activePage === 'topology' && <TopologyPage />}
+          {activePage === 'vector' && <VectorPage />}
+          {activePage === 'compute' && <ComputePage />}
+          {activePage === 'apikeys' && <ApiKeysPage />}
+          {activePage === 'analytics' && <AnalyticsPage />}
+          {activePage === 'emails' && <EmailsPage />}
+          {activePage === 'settings' && <SettingsPage />}
         </div>
       </div>
     </>
