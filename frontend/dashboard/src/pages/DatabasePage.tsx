@@ -7,12 +7,6 @@ interface DevTable {
   description?: string;
 }
 
-interface TableField {
-  id: string;
-  name: string;
-  fieldType: string;
-}
-
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const token = localStorage.getItem('cp_token');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -27,7 +21,6 @@ export default function DatabasePage() {
   const [selectedDB, setSelectedDB] = useState<string | null>(null);
   const [tables, setTables] = useState<DevTable[]>([]);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [fields, setFields] = useState<TableField[]>([]);
   const [records, setRecords] = useState<Record<string, unknown>[]>([]);
   const [log, setLog] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -46,17 +39,6 @@ export default function DatabasePage() {
     setLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
   }
 
-  async function loadFields(tableId: string) {
-    try {
-      const data = await api<TableField[]>(`/api/v1/db/tables/${tableId}/fields`);
-      setFields(data);
-      setSelectedTable(tableId);
-      addLog(`Loaded ${data.length} fields`);
-    } catch (e) {
-      addLog(`Failed to load fields: ${e}`);
-    }
-  }
-
   async function loadRecords(tableId: string) {
     setLoading(true);
     try {
@@ -71,7 +53,7 @@ export default function DatabasePage() {
   }
 
   async function handleQuery(tableId: string) {
-    await loadFields(tableId);
+    setSelectedTable(tableId);
     await loadRecords(tableId);
   }
 
