@@ -17,8 +17,12 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
-@Testcontainers
+import com.cloudpool.CloudpoolDataApplication;
+
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+@SpringBootTest(classes = CloudpoolDataApplication.class)
+@Testcontainers(disabledWithoutDocker = true)
 class DatabaseServiceIntegrationTest {
 
     @Container
