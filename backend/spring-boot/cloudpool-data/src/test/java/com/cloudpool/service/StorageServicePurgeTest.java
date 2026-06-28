@@ -24,8 +24,9 @@ class StorageServicePurgeTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        storageService = new StorageService(null, null, null, null, fileShareRepository, null, null, null);
-    }
+        storageService = new StorageService(
+            null, null, null, null, fileShareRepository, null, null, null, null, java.util.Optional.empty()
+        );}
 
     @Test
     void purgeExpiredShares_deletesExpiredTokens() {
