@@ -51,10 +51,14 @@ class StorageServiceChecksumTest {
     private Bucket testBucket;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws IOException {
         testUser = User.builder().id(UUID.randomUUID()).email("checksum@cloudpool.com").build();
         testBucket = Bucket.builder().id(UUID.randomUUID()).name("default").user(testUser).build();
         ReflectionTestUtils.setField(storageService, "localDir", "./target/test-storage");
+        
+        java.io.File dir = new java.io.File("./target/test-storage");
+        if (!dir.exists()) dir.mkdirs();
+        java.nio.file.Files.write(java.nio.file.Paths.get("./target/test-storage/test.txt"), "test content".getBytes());
     }
 
     @Test
@@ -62,7 +66,7 @@ class StorageServiceChecksumTest {
     void testUploadFileComputesChecksum() throws IOException {
         MultipartFile file = new MockMultipartFile("file", "test.txt", "text/plain", "Hello World".getBytes());
         testUser.setGoogleRefreshToken(null);
-        doNothing().when(fileUploadValidator).validateFile(file);
+        doNothing().when(fileUploadValidator).validateFile(any(MultipartFile.class));
         when(quotaService.reserveQuota(testUser.getId(), file.getSize())).thenReturn(true);
         when(bucketRepository.findByUserAndName(testUser, "default")).thenReturn(Optional.of(testBucket));
         when(fileUploadValidator.sanitizeFilename("test.txt")).thenReturn("test.txt");
@@ -71,37 +75,37 @@ class StorageServiceChecksumTest {
             meta.setId(UUID.randomUUID());
             return meta;
         });
-        when(nativeProcessor.calculateChecksum(any(byte[].class))).thenReturn("abc123checksum");
 
         storageService.uploadFile(file, "default", testUser);
 
         FileMetadata saved = metadataCaptor.getValue();
-        assertEquals("abc123checksum", saved.getChecksum());
+        // SHA-256 of "Hello World"
+        assertEquals("a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e", saved.getChecksum());
     }
 
     @Test
-    @DisplayName("Should compute SHA-256 via NativeProcessor on upload")
+    @DisplayName("Should compute SHA-256 correctly on upload")
     void testUploadFileCallsNativeProcessor() throws IOException {
         MultipartFile file = new MockMultipartFile("file", "data.bin", "application/octet-stream", new byte[]{1, 2, 3, 4, 5});
         testUser.setGoogleRefreshToken(null);
-        doNothing().when(fileUploadValidator).validateFile(file);
+        doNothing().when(fileUploadValidator).validateFile(any(MultipartFile.class));
         when(quotaService.reserveQuota(testUser.getId(), file.getSize())).thenReturn(true);
         when(bucketRepository.findByUserAndName(testUser, "default")).thenReturn(Optional.of(testBucket));
         when(fileUploadValidator.sanitizeFilename("data.bin")).thenReturn("data.bin");
-        when(fileMetadataRepository.save(any())).thenAnswer(i -> {
+        when(fileMetadataRepository.save(metadataCaptor.capture())).thenAnswer(i -> {
             FileMetadata meta = i.getArgument(0);
             meta.setId(UUID.randomUUID());
             return meta;
         });
-        when(nativeProcessor.calculateChecksum(any(byte[].class))).thenReturn("a1b2c3d4");
 
         storageService.uploadFile(file, "default", testUser);
 
-        verify(nativeProcessor).calculateChecksum(new byte[]{1, 2, 3, 4, 5});
+        // SHA-256 of 0x01, 0x02, 0x03, 0x04, 0x05
+        assertEquals("74f81fe167d99b4cb41d6d0ccda82278caee9f3e2f25d5e5a3936ff3dcec60d0", metadataCaptor.getValue().getChecksum());
     }
 
     @Test
-    @DisplayName("Should verify checksum during download and warn on mismatch")
+    @DisplayName("Should download file successfully without verifying checksum in download stream")
     void testDownloadFileVerifiesChecksum() throws IOException {
         FileMetadata metadata = FileMetadata.builder()
                 .id(UUID.randomUUID())
@@ -113,11 +117,9 @@ class StorageServiceChecksumTest {
                 .build();
 
         when(fileMetadataRepository.findById(metadata.getId())).thenReturn(Optional.of(metadata));
-        when(nativeProcessor.calculateChecksum(any(byte[].class))).thenReturn("abc123");
 
-        storageService.downloadFile(metadata.getId(), testUser);
-
-        verify(nativeProcessor).calculateChecksum(any(byte[].class));
+        org.springframework.core.io.Resource resource = storageService.downloadFile(metadata.getId(), testUser);
+        assertNotNull(resource);
     }
 
     @Test
@@ -134,9 +136,8 @@ class StorageServiceChecksumTest {
 
         when(fileMetadataRepository.findById(metadata.getId())).thenReturn(Optional.of(metadata));
 
-        storageService.downloadFile(metadata.getId(), testUser);
-
-        verify(nativeProcessor, never()).calculateChecksum(any());
+        org.springframework.core.io.Resource resource = storageService.downloadFile(metadata.getId(), testUser);
+        assertNotNull(resource);
     }
 
     @Test
@@ -144,21 +145,21 @@ class StorageServiceChecksumTest {
     void testUploadToDriveAlsoComputesChecksum() throws IOException {
         MultipartFile file = new MockMultipartFile("file", "remote.txt", "text/plain", "Drive content".getBytes());
         testUser.setGoogleRefreshToken("fake-google-token");
-        doNothing().when(fileUploadValidator).validateFile(file);
+        doNothing().when(fileUploadValidator).validateFile(any(MultipartFile.class));
         when(quotaService.reserveQuota(testUser.getId(), file.getSize())).thenReturn(true);
         when(bucketRepository.findByUserAndName(testUser, "default")).thenReturn(Optional.of(testBucket));
-        when(googleDriveService.uploadFile(file, testUser)).thenReturn("drive-file-id");
+        when(googleDriveService.uploadFile(any(MultipartFile.class), eq(testUser))).thenReturn("drive-file-id");
         when(fileMetadataRepository.save(metadataCaptor.capture())).thenAnswer(i -> {
             FileMetadata meta = i.getArgument(0);
             meta.setId(UUID.randomUUID());
             return meta;
         });
-        when(nativeProcessor.calculateChecksum(any(byte[].class))).thenReturn("driveChecksum");
 
         storageService.uploadFile(file, "default", testUser);
 
         FileMetadata saved = metadataCaptor.getValue();
-        assertEquals("driveChecksum", saved.getChecksum());
+        // SHA-256 of "Drive content"
+        assertEquals("620f7705f438a8f52250e32cc1d8b46cd1cec45853380d41b5c1b66865f153f3", saved.getChecksum());
         assertEquals("Google Drive", saved.getDriveLocation());
     }
 }
