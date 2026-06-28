@@ -6,7 +6,6 @@ import com.cloudpool.event.DeploymentFailedEvent;
 import com.cloudpool.event.InboxEvent;
 import com.cloudpool.repository.InboxEventRepository;
 import com.cloudpool.service.ComputeService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.Queue;
 import org.springframework.amqp.rabbit.annotation.Argument;
@@ -18,14 +17,22 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
+import java.util.Optional;
+
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class DeploymentEventListener {
 
     private final ComputeService computeService;
     private final InboxEventRepository inboxRepo;
     private final RabbitTemplate rabbitTemplate;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public DeploymentEventListener(ComputeService computeService, InboxEventRepository inboxRepo, Optional<RabbitTemplate> rabbitTemplate) {
+        this.computeService = computeService;
+        this.inboxRepo = inboxRepo;
+        this.rabbitTemplate = rabbitTemplate.orElse(null);
+    }
 
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(value = "deployment.queue", durable = "true", arguments = {
@@ -63,7 +70,9 @@ public class DeploymentEventListener {
                     .deploymentId(deployment.getId().toString())
                     .timestamp(Instant.now())
                     .build();
-            rabbitTemplate.convertAndSend("deployment.success.queue", successEvent);
+            if (rabbitTemplate != null) {
+                rabbitTemplate.convertAndSend("deployment.success.queue", successEvent);
+            }
 
             // 3. Mark processed
             inboxRepo.save(InboxEvent.builder()
@@ -83,7 +92,9 @@ public class DeploymentEventListener {
                     .reason(e.getMessage())
                     .timestamp(Instant.now())
                     .build();
-            rabbitTemplate.convertAndSend("deployment.failed.queue", failedEvent);
+            if (rabbitTemplate != null) {
+                rabbitTemplate.convertAndSend("deployment.failed.queue", failedEvent);
+            }
             
             // We do NOT save to inbox repo here, so RabbitMQ will retry if it was a transient network error.
             // Or we could save it to prevent retries for fatal business logic errors.
