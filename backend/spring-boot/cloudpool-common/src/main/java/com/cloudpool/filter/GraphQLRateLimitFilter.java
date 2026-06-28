@@ -5,8 +5,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -19,15 +19,20 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class GraphQLRateLimitFilter extends OncePerRequestFilter {
 
-    private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
+    @Autowired(required = false)
+    private StringRedisTemplate redisTemplate;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private static final int MAX_REQUESTS_PER_SECOND = 10;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        if (redisTemplate == null) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         String path = request.getRequestURI();
         
         if (!"/graphql".equals(path)) {
