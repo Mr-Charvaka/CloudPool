@@ -32,11 +32,10 @@ class ComputeServiceTest {
     @Mock private ContainerDeploymentRepository containerDeploymentRepository;
     @Mock private BucketRepository bucketRepository;
     @Mock private BackgroundJobRepository backgroundJobRepository;
-    @Mock private GraphQLSubscriptionService subscriptionService;
-    @Mock private QuotaPolicy quotaPolicy;
-    @Mock private ObjectMapper objectMapper;
 
-    @InjectMocks
+    private KubernetesDeploymentService kubernetesDeploymentService;
+    private QuotaPolicy quotaPolicy;
+    private ObjectMapper objectMapper;
     private ComputeService computeService;
 
     private User testUser;
@@ -44,6 +43,13 @@ class ComputeServiceTest {
 
     @BeforeEach
     void setUp() {
+        objectMapper = new ObjectMapper();
+        quotaPolicy = new QuotaPolicy(containerDeploymentRepository);
+        kubernetesDeploymentService = new KubernetesDeploymentService(containerDeploymentRepository);
+        computeService = new ComputeService(staticSiteRepository, serverlessFunctionRepository,
+                containerDeploymentRepository, bucketRepository, backgroundJobRepository,
+                new GraphQLSubscriptionService(), quotaPolicy, objectMapper, kubernetesDeploymentService);
+
         userId = UUID.randomUUID();
         testUser = User.builder()
                 .id(userId)
@@ -158,7 +164,6 @@ class ComputeServiceTest {
     void testDeployContainer() {
         UUID userUUID = UUID.randomUUID();
 
-        doNothing().when(quotaPolicy).enforceContainerQuota(any(User.class));
         when(containerDeploymentRepository.save(any(ContainerDeployment.class)))
                 .thenAnswer(invocation -> {
                     ContainerDeployment dep = invocation.getArgument(0);
@@ -183,7 +188,7 @@ class ComputeServiceTest {
         ContainerDeployment dep1 = ContainerDeployment.builder().name("dep1").build();
         ContainerDeployment dep2 = ContainerDeployment.builder().name("dep2").build();
 
-        when(containerDeploymentRepository.findByUser(testUser)).thenReturn(List.of(dep1, dep2));
+        when(containerDeploymentRepository.findByUserId(testUser.getId())).thenReturn(List.of(dep1, dep2));
 
         List<ContainerDeployment> result = computeService.listContainers(testUser);
 
@@ -195,7 +200,7 @@ class ComputeServiceTest {
         ServerlessFunction fn1 = ServerlessFunction.builder().name("fn1").build();
         ServerlessFunction fn2 = ServerlessFunction.builder().name("fn2").build();
 
-        when(serverlessFunctionRepository.findByUser(testUser)).thenReturn(List.of(fn1, fn2));
+        when(serverlessFunctionRepository.findByUserId(testUser.getId())).thenReturn(List.of(fn1, fn2));
 
         List<ServerlessFunction> result = computeService.listServerlessFunctions(testUser);
 
