@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -48,19 +49,26 @@ class StorageServiceIntegrationTest extends IntegrationTestBase {
         testUser = User.builder()
                 .email("integration_test@cloudpool.com")
                 .name("Integration User")
-                .storageQuotaBytes(104857600L) // 100MB
-                .usedStorageBytes(0L)
+                .storageQuota(1024L * 1024L) // 1MB
+                .currentUsage(0L)
                 .build();
         
         testUser = userRepository.saveAndFlush(testUser);
+        UUID userId = testUser.getId();
 
         Bucket defaultBucket = Bucket.builder()
                 .name("default")
                 .user(testUser)
-                .region("us-east-1")
                 .build();
                 
         bucketRepository.saveAndFlush(defaultBucket);
+        
+        UUID bucketId = java.util.UUID.randomUUID();
+        bucketRepository.save(Bucket.builder()
+                .id(bucketId)
+                .user(testUser)
+                .name("test-bucket")
+                .build());
     }
 
     @Test
