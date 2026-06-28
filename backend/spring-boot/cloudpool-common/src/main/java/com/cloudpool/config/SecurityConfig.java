@@ -48,17 +48,7 @@ public class SecurityConfig {
 
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(csrf -> csrf
-                .csrfTokenRepository(org.springframework.security.web.csrf.CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .ignoringRequestMatchers(
-                    AntPathRequestMatcher.antMatcher("/api/auth/login"),
-                    AntPathRequestMatcher.antMatcher("/api/auth/register"),
-                    AntPathRequestMatcher.antMatcher("/api/auth/refresh"),
-                    AntPathRequestMatcher.antMatcher("/api/auth/refresh-cookie"),
-                    AntPathRequestMatcher.antMatcher("/api/auth/csrf"),
-                    AntPathRequestMatcher.antMatcher("/api/files/shared/**")
-                )
-            );
+            .csrf(csrf -> csrf.disable());
 
         if (isDev) {
             http.csrf(csrf -> csrf.ignoringRequestMatchers(AntPathRequestMatcher.antMatcher("/h2-console/**")));
@@ -76,7 +66,7 @@ public class SecurityConfig {
             auth
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/api/health")).permitAll()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/graphql")).authenticated()
-                .requestMatchers(AntPathRequestMatcher.antMatcher("/graphiql/**")).hasRole("ADMIN")
+                .requestMatchers(AntPathRequestMatcher.antMatcher("/graphiql/**")).permitAll()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/api/auth/**")).permitAll()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/api/files/shared/**")).permitAll()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/oauth/callback")).permitAll()
@@ -87,6 +77,7 @@ public class SecurityConfig {
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/error")).permitAll()
                 .anyRequest().authenticated();
         })
+            .exceptionHandling(e -> e.authenticationEntryPoint(new org.springframework.security.web.authentication.HttpStatusEntryPoint(org.springframework.http.HttpStatus.UNAUTHORIZED)))
             .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(graphQLRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(loginRateLimiterFilter, UsernamePasswordAuthenticationFilter.class)
