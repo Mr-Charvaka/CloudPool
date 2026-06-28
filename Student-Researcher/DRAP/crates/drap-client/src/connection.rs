@@ -230,7 +230,9 @@ impl ControlConnection {
                                 let local_addr = format!("127.0.0.1:{}", local_port);
                                 let request = frame.payload.clone();
                                 tokio::spawn(async move {
-                                    let _ = Self::execute_replay(&local_addr, request).await;
+                                    if let Ok(mut stream) = TcpStream::connect(&local_addr).await {
+                                        let _ = stream.write_all(&request).await;
+                                    }
                                 });
                             }
                             FrameType::UdpData => {
@@ -309,11 +311,7 @@ impl ControlConnection {
         tx
     }
 
-    async fn execute_replay(local_addr: &str, raw_request: Bytes) -> Result<()> {
-        let mut stream = TcpStream::connect(local_addr).await?;
-        stream.write_all(&raw_request).await?;
-        Ok(())
-    }
+
 }
 
 fn build_tls_connector(addr: &str, _danger_accept_invalid_certs: bool) -> Result<TlsConnector> {
