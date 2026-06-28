@@ -14,15 +14,15 @@ import java.util.UUID;
 
 @Repository
 public interface ContainerDeploymentRepository extends TenantAwareRepository<ContainerDeployment, UUID> {
-    List<ContainerDeployment> findByUser(User user);
-    Optional<ContainerDeployment> findByUserAndName(User user, String name);
-    long countByUser(User user);
+    List<ContainerDeployment> findByUserId(UUID userId);
+    Optional<ContainerDeployment> findByUserIdAndName(UUID userId, String name);
+    long countByUserId(UUID userId);
 
     @Override
-    @Query("select c from ContainerDeployment c where c.id = :id and c.user.id = :#{T(java.util.UUID).fromString(T(com.cloudpool.context.TenantContextHolder).getTenantId())}")
+    @Query("select c from ContainerDeployment c where c.id = :id and c.userId = :#{T(java.util.UUID).fromString(T(com.cloudpool.context.TenantContextHolder).getTenantId())}")
     Optional<ContainerDeployment> findByIdForTenant(@Param("id") UUID id);
 
     @Override
-    @Query("select c from ContainerDeployment c where c.user.id = :#{T(java.util.UUID).fromString(T(com.cloudpool.context.TenantContextHolder).getTenantId())}")
+    @Query("select c from ContainerDeployment c where c.userId = :#{T(java.util.UUID).fromString(T(com.cloudpool.context.TenantContextHolder).getTenantId())}")
     Page<ContainerDeployment> findAllForTenant(Pageable pageable);
 }
