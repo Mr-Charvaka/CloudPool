@@ -31,6 +31,7 @@ public class ServerlessFunction {
     @Builder.Default
     private boolean wasmCompiled = false;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private com.cloudpool.model.enums.ServerlessStatus status; // e.g. com.cloudpool.model.enums.BackgroundJobStatus.PENDING, com.cloudpool.model.enums.ServerlessStatus.ACTIVE, "FAILED"
 
