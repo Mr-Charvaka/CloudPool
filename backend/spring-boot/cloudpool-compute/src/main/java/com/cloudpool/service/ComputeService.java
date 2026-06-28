@@ -82,7 +82,7 @@ public class ComputeService {
     }
 
     public List<ServerlessFunction> listServerlessFunctions(User user) {
-        return serverlessFunctionRepository.findByUser(user);
+        return serverlessFunctionRepository.findByUserId(user.getId());
     }
 
     public java.util.concurrent.CompletableFuture<String> executeServerlessFunctionAsync(UUID userId, UUID id, String paramsJson) {
@@ -123,7 +123,7 @@ public class ComputeService {
     }
 
     public List<ContainerDeployment> listContainers(User user) {
-        return containerDeploymentRepository.findByUser(user);
+        return containerDeploymentRepository.findByUserId(user.getId());
     }
 
     @Transactional
