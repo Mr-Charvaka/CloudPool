@@ -28,10 +28,10 @@ public class StaticSite {
     @Column(nullable = false)
     private String domain;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private com.cloudpool.model.enums.StaticSiteStatus status; // e.g. com.cloudpool.model.enums.StaticSiteStatus.DEPLOYED, "SUSPENDED"
 
-    @org.hibernate.annotations.TenantId
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
