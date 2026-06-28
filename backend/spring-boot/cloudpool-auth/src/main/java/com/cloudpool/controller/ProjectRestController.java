@@ -34,6 +34,19 @@ public class ProjectRestController {
         return ResponseEntity.ok(projects);
     }
 
+    @GetMapping("/{projectId}")
+    public ResponseEntity<?> getProject(@PathVariable UUID projectId) {
+        try {
+            User user = getAuthenticatedUser();
+            Project project = projectService.getProject(projectId, user.getId());
+            return ResponseEntity.ok(project);
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(404).body(Map.of("error", "Project not found"));
+        }
+    }
+
     @PostMapping
     public ResponseEntity<?> createProject(@Valid @RequestBody CreateProjectRequest request) {
         if (request.getName() == null || request.getName().trim().isEmpty()) {
