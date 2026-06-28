@@ -9,6 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -31,8 +32,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class RateLimitFilterTest {
 
-    @Mock private RedisTemplate<String, Object> redisTemplate;
-    @Mock private ValueOperations<String, Object> valueOperations;
+    @Mock private StringRedisTemplate redisTemplate;
+    @Mock private ValueOperations<String, String> valueOperations;
 
     @InjectMocks
     private RateLimitFilter rateLimitFilter;
@@ -49,7 +50,7 @@ class RateLimitFilterTest {
         SecurityContextHolder.clearContext();
         
         // Setup default config via reflection
-        ReflectionTestUtils.setField(rateLimitFilter, "requestsPerMinute", 120);
+        ReflectionTestUtils.setField(rateLimitFilter, "defaultRequestsPerMinute", 10.0);
         ReflectionTestUtils.setField(rateLimitFilter, "enabled", true);
         
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -104,7 +105,7 @@ class RateLimitFilterTest {
         request.setUserPrincipal(mockPrincipal);
         
         String expectedRedisKey = "ratelimit:user:test-user-uuid";
-        when(valueOperations.increment(expectedRedisKey)).thenReturn(50L);
+        when(valueOperations.increment(expectedRedisKey)).thenReturn(5L);
 
         // Act
         rateLimitFilter.doFilterInternal(request, response, filterChain);
