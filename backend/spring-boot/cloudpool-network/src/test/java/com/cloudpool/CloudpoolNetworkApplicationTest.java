@@ -8,9 +8,9 @@ import org.springframework.test.context.TestPropertySource;
 @SpringBootTest
 @ActiveProfiles("local")
 @TestPropertySource(properties = {
-    "JWT_SECRET=test-jwt-secret-key-for-testing-purposes-only",
-    "CLOUDPOOL_ENCRYPTION_MASTER_KEY=test-master-key-32bytes-test-master-key!!",
-    "CLOUDPOOL_ENCRYPTION_SALT=test-salt-value-for-encryption",
+    "JWT_SECRET=this-is-a-very-long-test-jwt-secret-key-that-is-at-least-64-characters-long-for-testing",
+    "CLOUDPOOL_ENCRYPTION_MASTER_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    "CLOUDPOOL_ENCRYPTION_SALT=dGVzdC1vbmx5LXNhbHQtdmFsdWUtMzItYnl0ZXMtbG9uZyEh",
 })
 class CloudpoolNetworkApplicationTest {
 
