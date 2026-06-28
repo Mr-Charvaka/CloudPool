@@ -22,9 +22,9 @@ class PubSubWebSocketHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new PubSubWebSocketHandler();
-        when(session.getId()).thenReturn("session-main");
-        when(subscriberSession.getId()).thenReturn("session-sub");
-        when(subscriberSession.isOpen()).thenReturn(true);
+        lenient().when(session.getId()).thenReturn("session-main");
+        lenient().when(subscriberSession.getId()).thenReturn("session-sub");
+        lenient().when(subscriberSession.isOpen()).thenReturn(true);
     }
 
     @Test
