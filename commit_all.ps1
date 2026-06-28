@@ -1,29 +1,26 @@
-$statusOutput = git status --porcelain
-
-foreach ($line in $statusOutput) {
-    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+$files = git status -s | ForEach-Object { $_.Substring(3) }
+foreach ($f in $files) {
+    if ([string]::IsNullOrWhiteSpace($f)) { continue }
+    $fname = Split-Path $f -Leaf
+    $dname = Split-Path $f -Parent
+    $msg = "Update $fname in $dname"
     
-    # Git porcelain status has 2 chars for status, a space, then the file path.
-    $status = $line.Substring(0, 2)
-    $file = $line.Substring(3)
+    if ($fname.EndsWith(".yml") -or $fname.EndsWith(".properties") -or $fname.EndsWith(".rs") -or $fname.EndsWith(".xml") -or $fname.EndsWith(".yaml") -or $fname -eq ".env.example") {
+        $msg = "Configure $fname for $dname"
+    } elseif ($fname.EndsWith("Test.java")) {
+        $msg = "Add or update test $fname"
+    } elseif ($fname.EndsWith(".java")) {
+        $msg = "Implement feature or fix in $fname"
+    } elseif ($fname.EndsWith(".sql")) {
+        $msg = "Update database schema/migrations $fname"
+    } elseif ($fname.EndsWith(".ps1")) {
+        $msg = "Update script $fname"
+    } elseif ($fname.EndsWith(".err") -or $fname.EndsWith(".txt") -or $fname -eq "Hash.java" -or $fname -eq "MockMaker") {
+        $msg = "Update build output/temp file $fname"
+    }
     
-    # Extract filename for commit message
-    $filename = Split-Path $file -Leaf
-    
-    $action = "Update"
-    if ($status -match "A" -or $status -match "\?\?") { $action = "Add" }
-    elseif ($status -match "D") { $action = "Remove" }
-    
-    # Trim quotes if any
-    $file = $file -replace '^"|"$',''
-    
-    # Add the specific file
-    git add $file
-    
-    # Commit with message
-    $commitMsg = "$action $filename"
-    git commit -m "$commitMsg"
+    Write-Host "Committing $f -> $msg"
+    git add "$f"
+    git commit -m "$msg"
 }
-
-# Push to origin main
-git push origin main
+git push
