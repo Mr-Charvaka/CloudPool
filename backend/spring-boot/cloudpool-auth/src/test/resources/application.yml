@@ -30,3 +30,5 @@ cloudpool:
     # that encrypt/decrypt round-trips correctly via EncryptionUtil.
     master-key: "test-only-master-key-not-for-production-use"
     salt: "dGVzdC1vbmx5LXNhbHQtdmFsdWUtMzItYnl0ZXMtbG9uZyEh"
+  rate-limit:
+    enabled: false
