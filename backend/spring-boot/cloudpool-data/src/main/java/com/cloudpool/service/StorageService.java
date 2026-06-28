@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.cloudpool.util.FileUploadValidator;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -153,7 +154,9 @@ public class StorageService {
                 }
             }
 
-            checksum = java.util.HexFormat.of().formatHex(digest.digest());
+            if (checksum == null) {
+                checksum = java.util.HexFormat.of().formatHex(digest.digest());
+            }
         } catch (Exception e) {
             quotaService.releaseQuota(user.getId(), file.getSize());
             if (e instanceof IOException) {
