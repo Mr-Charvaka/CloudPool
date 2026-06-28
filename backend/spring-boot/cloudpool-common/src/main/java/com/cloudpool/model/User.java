@@ -29,6 +29,7 @@ public class User {
     @Column(nullable = false)
     private String name;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private com.cloudpool.model.enums.Role role; // e.g. "USER", "ADMIN"
 
