@@ -5,16 +5,16 @@ import com.cloudpool.event.DeploymentRequestedEvent;
 import com.cloudpool.event.OutboxEvent;
 import com.cloudpool.repository.OutboxEventRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class OutboxEventProcessor {
 
     private static final String EXCHANGE = "cloudpool.exchange";
@@ -23,6 +23,13 @@ public class OutboxEventProcessor {
     private final OutboxEventRepository outboxRepo;
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OutboxEventProcessor(OutboxEventRepository outboxRepo, ObjectMapper objectMapper, Optional<RabbitTemplate> rabbitTemplate) {
+        this.outboxRepo = outboxRepo;
+        this.objectMapper = objectMapper;
+        this.rabbitTemplate = rabbitTemplate.orElse(null);
+    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processEvent(OutboxEvent event) {
@@ -33,7 +40,11 @@ public class OutboxEventProcessor {
             String routingKey = resolveRoutingKey(event.getEventType());
             Object payload = deserializePayload(event.getEventType(), event.getPayload());
 
-            rabbitTemplate.convertAndSend(EXCHANGE, routingKey, payload);
+            if (rabbitTemplate != null) {
+                rabbitTemplate.convertAndSend(EXCHANGE, routingKey, payload);
+            } else {
+                log.warn("RabbitMQ is not configured. Event {} will not be sent to exchange {}.", event.getEventId(), EXCHANGE);
+            }
 
             event.setStatus(OutboxEvent.OutboxStatus.PUBLISHED);
             log.info("Relay [{}]: Published event {} to exchange {} routing {}",
