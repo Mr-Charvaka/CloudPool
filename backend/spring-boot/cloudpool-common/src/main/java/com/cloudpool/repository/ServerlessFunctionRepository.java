@@ -14,15 +14,15 @@ import java.util.UUID;
 
 @Repository
 public interface ServerlessFunctionRepository extends TenantAwareRepository<ServerlessFunction, UUID> {
-    List<ServerlessFunction> findByUser(User user);
-    Optional<ServerlessFunction> findByUserAndName(User user, String name);
-    Optional<ServerlessFunction> findByUserAndTriggerRoute(User user, String triggerRoute);
+    List<ServerlessFunction> findByUserId(UUID userId);
+    Optional<ServerlessFunction> findByUserIdAndName(UUID userId, String name);
+    Optional<ServerlessFunction> findByUserIdAndTriggerRoute(UUID userId, String triggerRoute);
 
     @Override
-    @Query("select f from ServerlessFunction f where f.id = :id and f.user.id = :#{T(java.util.UUID).fromString(T(com.cloudpool.context.TenantContextHolder).getTenantId())}")
+    @Query("select f from ServerlessFunction f where f.id = :id and f.userId = :#{T(java.util.UUID).fromString(T(com.cloudpool.context.TenantContextHolder).getTenantId())}")
     Optional<ServerlessFunction> findByIdForTenant(@Param("id") UUID id);
 
     @Override
-    @Query("select f from ServerlessFunction f where f.user.id = :#{T(java.util.UUID).fromString(T(com.cloudpool.context.TenantContextHolder).getTenantId())}")
+    @Query("select f from ServerlessFunction f where f.userId = :#{T(java.util.UUID).fromString(T(com.cloudpool.context.TenantContextHolder).getTenantId())}")
     Page<ServerlessFunction> findAllForTenant(Pageable pageable);
 }
