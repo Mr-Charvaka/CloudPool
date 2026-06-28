@@ -20,7 +20,6 @@ public class Bucket {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
-    @org.hibernate.annotations.TenantId
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
