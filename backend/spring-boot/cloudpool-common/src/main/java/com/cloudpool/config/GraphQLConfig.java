@@ -31,8 +31,8 @@ public class GraphQLConfig {
             private final ConcurrentHashMap<String, PreparsedDocumentEntry> cache = new ConcurrentHashMap<>();
 
             @Override
-            public PreparsedDocumentEntry getDocument(Function<String, PreparsedDocumentEntry> computeFunction, String query) {
-                return cache.computeIfAbsent(query, computeFunction);
+            public PreparsedDocumentEntry getDocument(graphql.ExecutionInput executionInput, Function<graphql.ExecutionInput, PreparsedDocumentEntry> computeFunction) {
+                return cache.computeIfAbsent(executionInput.getQuery(), key -> computeFunction.apply(executionInput));
             }
         };
     }
