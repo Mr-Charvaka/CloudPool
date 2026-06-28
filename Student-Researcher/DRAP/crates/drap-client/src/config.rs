@@ -86,7 +86,4 @@ impl DrapConfig {
         }
     }
 
-    pub fn get_token(&self) -> Option<String> {
-        self.authtoken.clone()
-    }
 }
