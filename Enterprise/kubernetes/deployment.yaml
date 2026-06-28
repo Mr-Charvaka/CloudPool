@@ -36,72 +36,11 @@ spec:
         env:
         - name: SPRING_PROFILES_ACTIVE
           value: "prod"
-        
-        - name: DATABASE_HOST
-          valueFrom:
-            configMapKeyRef:
-              name: cloudpool-config
-              key: database-host
-        
-        - name: DATABASE_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: cloudpool-config
-              key: database-name
-        
-        - name: DATABASE_USER
-          valueFrom:
-            secretKeyRef:
-              name: cloudpool-secrets
-              key: database-user
-        
-        - name: DATABASE_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: cloudpool-secrets
-              key: database-password
-        
-        - name: REDIS_HOST
-          valueFrom:
-            configMapKeyRef:
-              name: cloudpool-config
-              key: redis-host
-        
-        - name: WEAVIATE_URL
-          valueFrom:
-            configMapKeyRef:
-              name: cloudpool-config
-              key: weaviate-url
-        
-        - name: RABBITMQ_HOST
-          valueFrom:
-            configMapKeyRef:
-              name: cloudpool-config
-              key: rabbitmq-host
-        
-        - name: JWT_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: cloudpool-secrets
-              key: jwt-secret
-        
-        - name: GOOGLE_DRIVE_CLIENT_ID
-          valueFrom:
-            secretKeyRef:
-              name: cloudpool-secrets
-              key: google-drive-client-id
-        
-        - name: GOOGLE_DRIVE_CLIENT_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: cloudpool-secrets
-              key: google-drive-client-secret
-        
-        - name: OPENAI_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: cloudpool-secrets
-              key: openai-api-key
+        envFrom:
+        - configMapRef:
+            name: cloudpool-config
+        - secretRef:
+            name: cloudpool-secrets
 
         livenessProbe:
           httpGet:
