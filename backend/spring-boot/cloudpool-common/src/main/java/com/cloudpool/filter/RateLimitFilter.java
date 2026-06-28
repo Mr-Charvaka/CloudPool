@@ -6,7 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -19,14 +19,18 @@ import java.security.Principal;
  
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class RateLimitFilter extends OncePerRequestFilter {
  
+    @Value("${cloudpool.rate-limit.enabled:true}")
+    private boolean enabled;
+
     @Value("${cloudpool.rate-limit.requests-per-minute:120}")
     private double defaultRequestsPerMinute;
  
-    private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
+    @Autowired(required = false)
+    private StringRedisTemplate redisTemplate;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final Semaphore globalConcurrencyLimit = new Semaphore(1000);
  
     @Override
@@ -34,10 +38,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
                                     HttpServletResponse response, 
                                     FilterChain filterChain) 
             throws ServletException, IOException {
-        
 
+        if (!enabled || redisTemplate == null) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         
-        // /api/auth/ bypass removed for Issue 19
         if (isPublicEndpoint(request)) {
             filterChain.doFilter(request, response);
             return;
