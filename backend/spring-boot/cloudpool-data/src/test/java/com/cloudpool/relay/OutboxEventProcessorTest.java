@@ -28,7 +28,6 @@ class OutboxEventProcessorTest {
     @Mock private RabbitTemplate rabbitTemplate;
     @Mock private ObjectMapper objectMapper;
 
-    @InjectMocks
     private OutboxEventProcessor processor;
 
     private OutboxEvent pendingEvent;
@@ -36,6 +35,8 @@ class OutboxEventProcessorTest {
 
     @BeforeEach
     void setUp() {
+        processor = new OutboxEventProcessor(outboxRepo, objectMapper, java.util.Optional.of(rabbitTemplate));
+        
         pendingEvent = OutboxEvent.builder()
                 .eventId(UUID.randomUUID())
                 .aggregateType("deployment")
@@ -76,7 +77,7 @@ class OutboxEventProcessorTest {
 
     @Test
     @DisplayName("Should increment attempt count on failure and set status to FAILED")
-    void testProcessEventFailureIncrementsAttempt() {
+    void testProcessEventFailureIncrementsAttempt() throws Exception {
         when(outboxRepo.save(any(OutboxEvent.class))).thenAnswer(i -> i.getArgument(0));
         when(objectMapper.readValue(anyString(), eq(DeploymentRequestedEvent.class)))
                 .thenThrow(new RuntimeException("Deserialization failed"));
@@ -89,7 +90,7 @@ class OutboxEventProcessorTest {
 
     @Test
     @DisplayName("Should dead-letter event after max attempts")
-    void testProcessEventDeadLetterAfterMaxAttempts() {
+    void testProcessEventDeadLetterAfterMaxAttempts() throws Exception {
         pendingEvent.setAttemptCount(4);
         when(outboxRepo.save(any(OutboxEvent.class))).thenAnswer(i -> i.getArgument(0));
         when(objectMapper.readValue(anyString(), eq(DeploymentRequestedEvent.class)))
@@ -109,7 +110,7 @@ class OutboxEventProcessorTest {
         when(objectMapper.readValue(pendingEvent.getPayload(), DeploymentRequestedEvent.class))
                 .thenReturn(deserialized);
         doThrow(new RuntimeException("RabbitMQ connection lost"))
-                .when(rabbitTemplate).convertAndSend(anyString(), anyString(), any());
+                .when(rabbitTemplate).convertAndSend(anyString(), anyString(), (Object) any());
 
         processor.processEvent(pendingEvent);
 
@@ -121,7 +122,7 @@ class OutboxEventProcessorTest {
     @Test
     @DisplayName("Should route DeploymentSuccessEvent to deployment.success routing key")
     void testResolveRoutingKeySuccess() throws Exception {
-        Object deserialized = new Object();
+        DeploymentRequestedEvent deserialized = new DeploymentRequestedEvent();
         when(outboxRepo.save(any(OutboxEvent.class))).thenAnswer(i -> i.getArgument(0));
         when(objectMapper.readValue(deploymentEvent.getPayload(), BaseEvent.class)).thenReturn(deserialized);
 
@@ -142,7 +143,7 @@ class OutboxEventProcessorTest {
                 .status(OutboxEvent.OutboxStatus.PENDING)
                 .attemptCount(0)
                 .build();
-        Object deserialized = new Object();
+        DeploymentRequestedEvent deserialized = new DeploymentRequestedEvent();
         when(outboxRepo.save(any(OutboxEvent.class))).thenAnswer(i -> i.getArgument(0));
         when(objectMapper.readValue("{}", BaseEvent.class)).thenReturn(deserialized);
 
