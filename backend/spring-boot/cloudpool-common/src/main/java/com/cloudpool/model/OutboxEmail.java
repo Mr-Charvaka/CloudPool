@@ -29,6 +29,7 @@ public class OutboxEmail {
     @Builder.Default
     private LocalDateTime sentAt = LocalDateTime.now();
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private com.cloudpool.model.enums.EmailStatus status; // SENT, FAILED, QUEUED
 
