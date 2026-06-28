@@ -2,11 +2,6 @@ package com.cloudpool.config;
 
 import com.cloudpool.context.TenantContextHolder;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.context.annotation.Primary;
-import org.springframework.stereotype.Component;
-
 import javax.sql.DataSource;
 import java.io.PrintWriter;
 import java.sql.Connection;
@@ -15,16 +10,11 @@ import java.sql.Statement;
 import java.util.logging.Logger;
 
 @Slf4j
-@Component
-@Primary
 public class TenantAwareDataSourceWrapper implements DataSource {
 
     private final DataSource delegate;
 
-    @Value("${spring.datasource.url:}")
-    private String datasourceUrl;
-
-    public TenantAwareDataSourceWrapper(@Lazy DataSource delegate) {
+    public TenantAwareDataSourceWrapper(DataSource delegate) {
         this.delegate = delegate;
         log.info("TenantAwareDataSourceWrapper initialized. RLS session variables will be set on every connection.");
     }
@@ -60,11 +50,17 @@ public class TenantAwareDataSourceWrapper implements DataSource {
 
     @Override
     public <T> T unwrap(Class<T> iface) throws SQLException {
+        if (iface.isInstance(this)) {
+            return iface.cast(this);
+        }
         return delegate.unwrap(iface);
     }
 
     @Override
     public boolean isWrapperFor(Class<?> iface) throws SQLException {
+        if (iface.isInstance(this)) {
+            return true;
+        }
         return delegate.isWrapperFor(iface);
     }
 
