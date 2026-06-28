@@ -77,22 +77,15 @@ management:
 # Custom Application Properties
 cloudpool:
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET:dev-jwt-secret-cloudpool-hs512-key-min-64-chars-must-be-long-enough!!}
     expiration-ms: ${JWT_EXPIRATION_MS:3600000}
-  
+
   cors:
     allowed-origins: ${CLOUDPOOL_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8080,https://cloudpool.empirebot.in,https://*.empirebot.in}
- 
+
   encryption:
-    master-key: ${CLOUDPOOL_ENCRYPTION_MASTER_KEY}
-    # Required by EncryptionUtil's HKDF key derivation. Must be the SAME
-    # value across all four services (auth/network/data/compute) — they
-    # share a database, and a value encrypted by one service must be
-    # decryptable by any other that reads the same column. Generate once
-    # with: openssl rand -base64 32  — then set identically everywhere
-    # this app is deployed. Do not regenerate per-service or per-environment
-    # without a coordinated re-encryption of existing data.
-    salt: ${CLOUDPOOL_ENCRYPTION_SALT}
+    master-key: ${CLOUDPOOL_ENCRYPTION_MASTER_KEY:dev-master-key-not-for-production-32bytes!}
+    salt: ${CLOUDPOOL_ENCRYPTION_SALT:dGVzdC1vbmx5LXNhbHQtdmFsdWUtMzItYnl0ZXMtbG9uZyEh}
  
   rate-limit:
     requests-per-minute: ${CLOUDPOOL_RATE_LIMIT_RPM:120}
