@@ -74,7 +74,7 @@ class AuthControllerRateLimitTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.error").value("Too many refresh attempts. Try again later."));
 
-        verify(refreshRateLimiter).checkRateLimit("192.168.1.100", "cp_refresh_abcdef");
+        verify(refreshRateLimiter).checkRateLimit("192.168.1.100", "cp_refresh_abcde");
     }
 
     @Test
