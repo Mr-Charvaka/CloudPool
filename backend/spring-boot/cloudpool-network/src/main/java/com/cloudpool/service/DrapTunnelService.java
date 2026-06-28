@@ -14,10 +14,10 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class DrapTunnelService {
 
-    @Value("${cloudpool.drap.executable-path}")
+    @Value("${cloudpool.drap.executable-path:}")
     private String drapExecutablePath;
 
-    @Value("${cloudpool.drap.enabled}")
+    @Value("${cloudpool.drap.enabled:false}")
     private boolean drapEnabled;
 
     // Track active processes by subdomain mapping
