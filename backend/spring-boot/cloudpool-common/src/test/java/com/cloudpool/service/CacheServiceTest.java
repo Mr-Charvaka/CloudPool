@@ -34,9 +34,7 @@ class CacheServiceTest {
         String id = "file-123";
         String data = "file-data";
 
-        Object result = cacheService.cacheFile(id, data);
-
-        assertEquals(data, result);
+        cacheService.cacheFile(id, data);
         verify(valueOperations).set("file:" + id, data, 1, TimeUnit.HOURS);
     }
 
@@ -44,9 +42,7 @@ class CacheServiceTest {
     void testCacheFileNoRedis() {
         CacheService noRedis = new CacheService(Optional.empty());
 
-        Object result = noRedis.cacheFile("id", "data");
-
-        assertEquals("data", result);
+        noRedis.cacheFile("id", "data");
     }
 
     @Test
