@@ -248,9 +248,10 @@ class ProjectServiceTest {
                 .thenReturn(Optional.empty());
         when(databaseConnectionRepository.save(any(DatabaseConnection.class)))
                 .thenAnswer(i -> i.getArgument(0));
+        when(encryptionUtil.encrypt(any(byte[].class))).thenReturn("encrypted".getBytes());
 
         DatabaseConnection result = projectService.saveConnection(
-                projectId, "POSTGRESQL", "db.example.com", 5432,
+                projectId, "POSTGRESQL", "8.8.8.8", 5432,
                 "mydb", "admin", "pass", true, userId);
 
         assertNotNull(result);
