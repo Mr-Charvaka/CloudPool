@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -19,15 +20,16 @@ public class IdempotencyFilter implements Filter {
     private static final Logger log = LoggerFactory.getLogger(IdempotencyFilter.class);
     private static final Duration TTL = Duration.ofHours(24);
 
-    private final StringRedisTemplate redis;
-
-    public IdempotencyFilter(StringRedisTemplate redis) {
-        this.redis = redis;
-    }
+    @Autowired(required = false)
+    private StringRedisTemplate redis;
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
+        if (redis == null) {
+            chain.doFilter(request, response);
+            return;
+        }
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse res = (HttpServletResponse) response;
 
@@ -47,7 +49,6 @@ public class IdempotencyFilter implements Filter {
         Boolean alreadySeen = redis.hasKey(cacheKey);
 
         if (Boolean.TRUE.equals(alreadySeen)) {
-            String previousResponse = redis.opsForValue().get(cacheKey);
             log.debug("Idempotency hit for key={}", idempotencyKey);
             res.setStatus(409);
             res.setContentType("application/problem+json");
