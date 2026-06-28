@@ -34,6 +34,7 @@ public class ContainerDeployment {
     @Column(nullable = false)
     private int replicas;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private com.cloudpool.model.enums.ContainerStatus status; // e.g. com.cloudpool.model.enums.ContainerStatus.BUILDING, com.cloudpool.model.enums.ContainerStatus.DEPLOYING, com.cloudpool.model.enums.ContainerStatus.LIVE, "FAILED"
 
