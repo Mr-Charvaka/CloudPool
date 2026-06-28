@@ -47,6 +47,7 @@ class AuthControllerTest {
     @Mock private MetricsService metricsService;
     @Mock private RefreshTokenService refreshTokenService;
 
+    @org.mockito.Spy
     private PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @InjectMocks
