@@ -1,6 +1,5 @@
 package com.cloudpool.gateway.controller;
 
-import com.cloudpool.exception.GlobalExceptionHandler;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ControllerAdvice;
