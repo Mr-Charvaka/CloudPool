@@ -65,7 +65,7 @@ async fn main() -> Result<()> {
                 return Err(anyhow::anyhow!("Either --config or a local port must be specified"));
             };
 
-            let auth_token = config.get_token()
+            let auth_token = config.authtoken.clone()
                 .or_else(|| std::env::var("DRAP_AUTH_TOKEN").ok())
                 .unwrap_or_else(|| {
                     warn!("No auth token configured; set DRAP_AUTH_TOKEN or authtoken in config");
