@@ -25,7 +25,7 @@ class CloudTunnelHandlerTest {
     @BeforeEach
     void setUp() {
         handler = new CloudTunnelHandler();
-        when(session.getId()).thenReturn("tunnel-session");
+        lenient().when(session.getId()).thenReturn("tunnel-session");
     }
 
     @Test
