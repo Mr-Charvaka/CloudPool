@@ -19,7 +19,7 @@ import java.util.UUID;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 public class EndToEndFlowTest {
 
     // Set to true to enable this test. Disabled by default because it spins up the entire docker-compose
