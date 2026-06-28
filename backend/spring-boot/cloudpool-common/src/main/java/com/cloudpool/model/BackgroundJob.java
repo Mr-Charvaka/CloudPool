@@ -20,6 +20,7 @@ public class BackgroundJob {
     @Column(nullable = false)
     private String jobType;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private com.cloudpool.model.enums.BackgroundJobStatus status; // PENDING, RUNNING, COMPLETED, FAILED
 
