@@ -102,16 +102,17 @@ public class AuthController {
         return ResponseEntity.ok(responseBody);
     }
 
+    private static final String DUMMY_HASH = new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode("dummy");
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest, HttpServletResponse response) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElse(null);
 
         // Dummy hash for bcrypt to prevent timing attacks
-        String dummyHash = "$2a$10$xyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyzxyz";
         boolean passwordMatches = passwordEncoder.matches(
                 request.getPassword(), 
-                user != null ? user.getPasswordHash() : dummyHash
+                user != null ? user.getPasswordHash() : DUMMY_HASH
         );
 
         if (user == null || !passwordMatches) {
