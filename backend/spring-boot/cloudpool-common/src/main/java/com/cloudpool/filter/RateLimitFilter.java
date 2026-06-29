@@ -94,7 +94,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         // Try API key first
         String apiKey = request.getHeader("X-API-KEY");
         if (apiKey != null && !apiKey.isBlank()) {
-            return "api-key:" + apiKey;
+            // NEVER store raw API keys in Redis or logs. Hash them first!
+            return "api-key:" + com.cloudpool.common.util.ApiKeyUtils.hashApiKey(apiKey);
         }
  
         // Prevent manual X-Forwarded-For spoofing. Rely on Spring Boot's 
