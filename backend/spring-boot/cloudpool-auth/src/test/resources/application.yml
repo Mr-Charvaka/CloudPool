@@ -12,6 +12,9 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
   flyway:
     enabled: false
+  sql:
+    init:
+      mode: always
   autoconfigure:
     # No message broker is available in the test environment, and this
     # test slice only exercises auth + project CRUD, neither of which
