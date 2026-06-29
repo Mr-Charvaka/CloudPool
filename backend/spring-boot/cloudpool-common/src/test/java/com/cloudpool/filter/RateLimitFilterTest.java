@@ -83,7 +83,7 @@ class RateLimitFilterTest {
     void shouldBlockRequestExceedingLimit() throws ServletException, IOException {
         // Arrange
         request.addHeader("X-API-KEY", "test-api-key");
-        String expectedRedisKey = "ratelimit:api-key:test-api-key";
+        String expectedRedisKey = "ratelimit:api-key:" + com.cloudpool.common.util.ApiKeyUtils.hashApiKey("test-api-key");
         
         when(valueOperations.increment(expectedRedisKey)).thenReturn(121L);
 
