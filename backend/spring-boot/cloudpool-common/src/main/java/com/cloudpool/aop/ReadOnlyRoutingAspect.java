@@ -10,17 +10,21 @@ import org.springframework.stereotype.Component;
 @Component
 public class ReadOnlyRoutingAspect {
 
-    @Before("@annotation(tx)")
-    public void beforeReadOnly(org.springframework.transaction.annotation.Transactional tx) {
-        if (tx.readOnly()) {
-            ReadReplicaContext.setReadOnly(true);
-        }
-    }
-
-    @After("@annotation(tx)")
-    public void afterReadOnly(org.springframework.transaction.annotation.Transactional tx) {
-        if (tx.readOnly()) {
-            ReadReplicaContext.clear();
+    @org.aspectj.lang.annotation.Around("@annotation(tx)")
+    public Object aroundReadOnly(org.aspectj.lang.ProceedingJoinPoint pjp, org.springframework.transaction.annotation.Transactional tx) throws Throwable {
+        boolean previousState = ReadReplicaContext.isReadOnly();
+        try {
+            if (tx.readOnly()) {
+                ReadReplicaContext.setReadOnly(true);
+            }
+            return pjp.proceed();
+        } finally {
+            // Restore previous state (handles nested transactions)
+            if (previousState) {
+                ReadReplicaContext.setReadOnly(true);
+            } else {
+                ReadReplicaContext.clear();
+            }
         }
     }
 }
