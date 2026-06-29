@@ -48,9 +48,19 @@ public class RateLimitByUserFilter implements Filter {
 
     private String resolveUserId(HttpServletRequest req) {
         String apiKey = req.getHeader("X-API-KEY");
-        if (apiKey != null) return apiKey;
+        if (apiKey != null) return com.cloudpool.common.util.ApiKeyUtils.hashApiKey(apiKey);
         String auth = req.getHeader("Authorization");
-        if (auth != null && auth.startsWith("Bearer ")) return auth.substring(7);
+        if (auth != null && auth.startsWith("Bearer ")) {
+            String token = auth.substring(7);
+            // Hash the token to prevent storing massive JWTs in memory and leaking secrets in heap dumps
+            try {
+                java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+                byte[] hash = md.digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                return java.util.Base64.getEncoder().encodeToString(hash);
+            } catch (java.security.NoSuchAlgorithmException e) {
+                return String.valueOf(token.hashCode());
+            }
+        }
         return req.getRemoteAddr();
     }
 
