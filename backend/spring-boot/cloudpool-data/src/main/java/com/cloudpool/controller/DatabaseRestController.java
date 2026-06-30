@@ -45,7 +45,11 @@ public class DatabaseRestController {
                 }
             }
             if (projectId == null) {
-                projectId = projectService.listProjects(user.getId()).get(0).getId();
+                List<com.cloudpool.model.Project> projects = projectService.listProjects(user.getId());
+                if (projects.isEmpty()) {
+                    throw new IllegalArgumentException("No projects found for the user. Please create a project first.");
+                }
+                projectId = projects.get(0).getId();
             }
             DevTable table = databaseService.createTable(
                     user.getId(),
@@ -76,7 +80,11 @@ public class DatabaseRestController {
             }
         }
         if (projectId == null) {
-            projectId = projectService.listProjects(user.getId()).get(0).getId();
+            List<com.cloudpool.model.Project> projects = projectService.listProjects(user.getId());
+            if (projects.isEmpty()) {
+                return ResponseEntity.ok(java.util.Collections.emptyList());
+            }
+            projectId = projects.get(0).getId();
         }
         List<DevTable> tables = databaseService.listTables(user.getId(), projectId);
         return ResponseEntity.ok(tables);
