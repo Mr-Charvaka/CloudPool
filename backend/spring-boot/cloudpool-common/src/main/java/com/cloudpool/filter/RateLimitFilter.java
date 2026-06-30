@@ -104,7 +104,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
  
     /**
-     * Check if endpoint should be rate limited
+     * Check if endpoint should be rate limited by the global rate limiter
      */
     private boolean isPublicEndpoint(HttpServletRequest request) {
         String path = request.getRequestURI();
@@ -112,6 +112,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
                path.equals("/") || 
                path.equals("/index.html") || 
                path.startsWith("/static/") || 
-               path.equals("/favicon.ico");
+               path.equals("/favicon.ico") ||
+               path.equals("/graphql") ||
+               path.startsWith("/api/auth/login");
     }
 }
