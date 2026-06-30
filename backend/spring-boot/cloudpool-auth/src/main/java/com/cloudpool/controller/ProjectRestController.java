@@ -161,6 +161,9 @@ public class ProjectRestController {
     @PostMapping("/{projectId}/connections/test")
     public ResponseEntity<?> testConnection(@PathVariable UUID projectId, @Valid @RequestBody SaveConnectionRequest request) {
         try {
+            User user = getAuthenticatedUser();
+            projectService.getProject(projectId, user.getId()); // Enforce access control
+            
             boolean success = projectService.testConnection(
                     request.getDbType(),
                     request.getHost(),
@@ -170,6 +173,8 @@ public class ProjectRestController {
                     request.getPassword()
             );
             return ResponseEntity.ok(Map.of("success", success));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(403).body(Map.of("success", false, "error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage()));
         }
