@@ -41,8 +41,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         try {
+            String gatewayEmail = request.getHeader("X-User-Email");
             String jwt = parseJwt(request);
-            if (jwt != null && !cacheService.isTokenBlacklisted(jwt) && jwtUtils.validateToken(jwt)) {
+            
+            if (StringUtils.hasText(gatewayEmail)) {
+                // Request has been authenticated by the Gateway
+                Optional<User> userOpt = userRepository.findByEmail(gatewayEmail);
+
+                if (userOpt.isPresent() && userOpt.get().isActive()) {
+                    User user = userOpt.get();
+                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                            user, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole())));
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
+            } else if (jwt != null && !cacheService.isTokenBlacklisted(jwt) && jwtUtils.validateToken(jwt)) {
+                // Fallback for direct internal calls missing the gateway header
                 String email = jwtUtils.getEmailFromToken(jwt);
                 Optional<User> userOpt = userRepository.findByEmail(email);
 
