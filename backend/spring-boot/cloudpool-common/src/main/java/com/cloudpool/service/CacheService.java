@@ -16,7 +16,8 @@ public class CacheService {
     private static final String FILE_CACHE_PREFIX = "file:";
     private static final String TABLE_CACHE_PREFIX = "table:";
     private static final String COLLECTION_CACHE_PREFIX = "collection:";
-    private static final long DEFAULT_TTL = 1;
+    @org.springframework.beans.factory.annotation.Value("${cloudpool.cache.ttl:1}")
+    private long defaultTtl;
 
     public CacheService(Optional<RedisTemplate<String, Object>> redisTemplate) {
         this.redisTemplate = redisTemplate.orElse(null);
@@ -25,7 +26,7 @@ public class CacheService {
     public void cacheFile(Object id, Object data) {
         if (redisTemplate != null) {
             String key = FILE_CACHE_PREFIX + id;
-            redisTemplate.opsForValue().set(key, data, DEFAULT_TTL, TimeUnit.HOURS);
+            redisTemplate.opsForValue().set(key, data, defaultTtl, TimeUnit.HOURS);
             log.debug("Cached file: {}", id);
         }
     }
@@ -49,21 +50,27 @@ public class CacheService {
     public void cacheTable(Object id, Object data) {
         if (redisTemplate != null) {
             String key = TABLE_CACHE_PREFIX + id;
-            redisTemplate.opsForValue().set(key, data, DEFAULT_TTL, TimeUnit.HOURS);
+            redisTemplate.opsForValue().set(key, data, defaultTtl, TimeUnit.HOURS);
         }
     }
 
     public void cacheCollection(Object id, Object data) {
         if (redisTemplate != null) {
             String key = COLLECTION_CACHE_PREFIX + id;
-            redisTemplate.opsForValue().set(key, data, DEFAULT_TTL, TimeUnit.HOURS);
+            redisTemplate.opsForValue().set(key, data, defaultTtl, TimeUnit.HOURS);
         }
     }
 
     public void clearAll() {
         if (redisTemplate != null) {
-            redisTemplate.getConnectionFactory().getConnection().flushAll();
-            log.info("All caches cleared");
+            java.util.Set<String> keys = new java.util.HashSet<>();
+            Optional.ofNullable(redisTemplate.keys(FILE_CACHE_PREFIX + "*")).ifPresent(keys::addAll);
+            Optional.ofNullable(redisTemplate.keys(TABLE_CACHE_PREFIX + "*")).ifPresent(keys::addAll);
+            Optional.ofNullable(redisTemplate.keys(COLLECTION_CACHE_PREFIX + "*")).ifPresent(keys::addAll);
+            if (!keys.isEmpty()) {
+                redisTemplate.delete(keys);
+            }
+            log.info("Application specific caches cleared safely");
         }
     }
 
