@@ -1307,7 +1307,11 @@
       const data = await res.json();
       if (!res.ok) {
         errorDiv.style.display = "block";
-        errorDiv.textContent = data.error || "Authentication failed";
+        let errMsg = data.error || data.detail || "Authentication failed";
+        if (data.errors) {
+            errMsg += ": " + Object.entries(data.errors).map(([k, v]) => `${k} ${v}`).join(', ');
+        }
+        errorDiv.textContent = errMsg;
         return;
       }
       localStorage.setItem("cp_token", data.token);

@@ -290,13 +290,13 @@ public class AuthController {
     @Data
     public static class RegisterRequest {
         @jakarta.validation.constraints.NotBlank
-
-        @jakarta.validation.constraints.Email
-
+        @jakarta.validation.constraints.Pattern(regexp = "^[^\\s@]+@[^\\s@]+$", message = "must be a valid email format")
         private String email;
+        
         @jakarta.validation.constraints.NotBlank
         @jakarta.validation.constraints.Size(min=8)
         private String password;
+        
         @jakarta.validation.constraints.NotBlank
         private String name;
     }
@@ -304,10 +304,9 @@ public class AuthController {
     @Data
     public static class LoginRequest {
         @jakarta.validation.constraints.NotBlank
-
-        @jakarta.validation.constraints.Email
-
+        @jakarta.validation.constraints.Pattern(regexp = "^[^\\s@]+@[^\\s@]+$", message = "must be a valid email format")
         private String email;
+        
         @jakarta.validation.constraints.NotBlank
         @jakarta.validation.constraints.Size(min=8)
         private String password;

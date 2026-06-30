@@ -68,6 +68,11 @@ public class ComputeService {
         staticSiteRepository.delete(site);
     }
 
+    public StaticSite getStaticSiteByDomain(String domain) {
+        return staticSiteRepository.findByDomain(domain)
+                .orElseThrow(() -> new ResourceNotFoundException("Static site not found for domain: " + domain));
+    }
+
     @Transactional
     public ServerlessFunction deployServerlessFunction(UUID userId, String name, String triggerRoute, String code) {
         ServerlessFunction function = ServerlessFunction.builder()

@@ -13,6 +13,8 @@ import java.util.UUID;
 public interface FileMetadataRepository extends JpaRepository<FileMetadata, UUID> {
     List<FileMetadata> findByBucket(Bucket bucket);
     
+    java.util.Optional<FileMetadata> findByBucketAndOriginalName(Bucket bucket, String originalName);
+    
     @Query("SELECT f FROM FileMetadata f WHERE f.bucket.user.id = :userId")
     List<FileMetadata> findByUserId(@Param("userId") UUID userId);
 

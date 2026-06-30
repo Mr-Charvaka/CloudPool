@@ -187,6 +187,13 @@ public class StorageService {
         return saved;
     }
 
+    public FileMetadata getFileMetadata(User user, String bucketName, String originalName) {
+        Bucket bucket = bucketRepository.findByUserAndName(user, bucketName)
+                .orElseThrow(() -> new IllegalArgumentException("Bucket not found"));
+        return fileMetadataRepository.findByBucketAndOriginalName(bucket, originalName)
+                .orElseThrow(() -> new IllegalArgumentException("File not found in bucket"));
+    }
+
     public FileShare shareFile(UUID fileId, String sharedWithEmail, Integer expiryHours, User user) {
         FileMetadata metadata = fileMetadataRepository.findById(fileId)
                 .orElseThrow(() -> new IllegalArgumentException("File not found"));

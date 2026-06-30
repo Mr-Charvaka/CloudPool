@@ -58,17 +58,47 @@ public class ComputeController {
     @GetMapping("/static/serve/{domain}/**")
     public ResponseEntity<?> serveStaticFile(
             @PathVariable("domain") String domain,
-            @RequestParam(value = "path", defaultValue = "index.html") String requestPath) {
-        // Implementation remains in StorageService later, or keeping it thin here:
-        // TODO: Move file serving payload to StorageService or CDN integration
-        return ResponseEntity.status(501).body("Not Implemented in Refactor");
+            @RequestParam(value = "path", required = false) String requestPath,
+            jakarta.servlet.http.HttpServletRequest request) { 
+        
+        try {
+            StaticSite site = computeService.getStaticSiteByDomain(domain);
+            
+            String filePath = requestPath;
+            if (filePath == null || filePath.isEmpty()) {
+                String path = (String) request.getAttribute(org.springframework.web.servlet.HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE);
+                String bestMatchPattern = (String) request.getAttribute(org.springframework.web.servlet.HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+                filePath = new org.springframework.util.AntPathMatcher().extractPathWithinPattern(bestMatchPattern, path);
+            }
+            
+            if (filePath == null || filePath.isEmpty() || filePath.equals("/")) {
+                filePath = "index.html";
+            }
+            
+            FileMetadata metadata = storageService.getFileMetadata(site.getUser(), site.getBucketName(), filePath);
+            org.springframework.core.io.Resource resource = storageService.downloadFileDirectly(metadata);
+            
+            String contentType = metadata.getMimeType();
+            if (contentType == null) {
+                contentType = "application/octet-stream";
+            }
+            
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .body(resource);
+                    
+        } catch (Exception e) {
+            log.error("Failed to serve static file for domain: " + domain, e);
+            return ResponseEntity.status(404).body("File not found");
+        }
     }
 
     @GetMapping("/dns/gateway/{domain}/**")
     public ResponseEntity<?> web3Gateway(
             @PathVariable("domain") String domain,
-            @RequestParam(value = "path", defaultValue = "index.html") String requestPath) {
-        return ResponseEntity.status(501).body("Not Implemented in Refactor");
+            @RequestParam(value = "path", required = false) String requestPath,
+            jakarta.servlet.http.HttpServletRequest request) {
+        return serveStaticFile(domain, requestPath, request);
     }
 
     /* ── SERVERLESS FUNCTIONS ── */

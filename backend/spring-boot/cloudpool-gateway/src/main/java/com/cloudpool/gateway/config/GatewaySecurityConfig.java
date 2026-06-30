@@ -30,11 +30,17 @@ public class GatewaySecurityConfig {
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+        ServerWebExchangeMatcher apiKeyMatcher = exchange -> 
+            exchange.getRequest().getHeaders().containsKey("X-API-KEY") ? 
+            ServerWebExchangeMatcher.MatchResult.match() : 
+            ServerWebExchangeMatcher.MatchResult.notMatch();
+
         http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeExchange(exchanges -> exchanges
                 .pathMatchers("/api/auth/**", "/public/**", "/", "/index.html", "/favicon.ico", "/static/**", "/error", "/graphiql/**").permitAll()
+                .matchers(apiKeyMatcher).permitAll()
                 .anyExchange().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
