@@ -101,7 +101,7 @@
         <dependency>
             <groupId>com.stripe</groupId>
             <artifactId>stripe-java</artifactId>
-            <version>24.3.0</version>
+            <version>33.0.0</version>
         </dependency>
 
         <!-- Weaviate Vector DB -->
