@@ -18,7 +18,7 @@
 
     <properties>
         <google-drive-api.version>v3-rev197-1.25.0</google-drive-api.version>
-        <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
     </properties>
 
     <dependencies>
