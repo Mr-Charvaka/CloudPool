@@ -20,7 +20,7 @@ COPY backend/spring-boot/cloudpool-network ./cloudpool-network
 RUN mvn package -DskipTests
 
 # Stage 3: Runtime image
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 RUN addgroup -S cloudpool && adduser -S -G cloudpool cloudpool
 WORKDIR /app
 COPY --from=rust-builder /usr/src/cloudpool-rust/target/release/libcloudpool_rust.so /usr/local/lib/libcloudpool_rust.so
