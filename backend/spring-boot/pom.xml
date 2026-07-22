@@ -59,7 +59,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-cloud.version>2022.0.4</spring-cloud.version>
+        <spring-cloud.version>2025.1.2</spring-cloud.version>
         <lombok.version>1.18.38</lombok.version>
         <opentelemetry.version>1.31.0</opentelemetry.version>
     </properties>
