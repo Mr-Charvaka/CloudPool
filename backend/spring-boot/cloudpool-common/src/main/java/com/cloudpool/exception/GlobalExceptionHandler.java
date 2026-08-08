@@ -1,64 +1,123 @@
 package com.cloudpool.exception;
 
+import com.cloudpool.dto.ErrorResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
-import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-import java.net.URI;
-import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 
-@ControllerAdvice
+@RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ProblemDetail handleNotFound(ResourceNotFoundException ex) {
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
-        problemDetail.setTitle("Resource Not Found");
-        problemDetail.setProperty("timestamp", Instant.now());
-        return problemDetail;
+    public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex, WebRequest request) {
+        HttpStatus status = HttpStatus.NOT_FOUND;
+        ErrorResponse errorResponse = new ErrorResponse(
+                status.value(),
+                status.getReasonPhrase(),
+                ex.getMessage(),
+                getPath(request)
+        );
+        return ResponseEntity.status(status).body(errorResponse);
     }
 
     @ExceptionHandler(UnauthorizedException.class)
-    public ProblemDetail handleUnauthorized(UnauthorizedException ex) {
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
-        problemDetail.setTitle("Unauthorized Access");
-        problemDetail.setProperty("timestamp", Instant.now());
-        return problemDetail;
+    public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException ex, WebRequest request) {
+        HttpStatus status = HttpStatus.UNAUTHORIZED;
+        ErrorResponse errorResponse = new ErrorResponse(
+                status.value(),
+                status.getReasonPhrase(),
+                ex.getMessage(),
+                getPath(request)
+        );
+        return ResponseEntity.status(status).body(errorResponse);
     }
 
     @ExceptionHandler(CloudPoolException.class)
-    public ProblemDetail handleCloudPoolException(CloudPoolException ex) {
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
-        problemDetail.setTitle("Application Error");
-        problemDetail.setProperty("timestamp", Instant.now());
-        return problemDetail;
+    public ResponseEntity<ErrorResponse> handleCloudPoolException(CloudPoolException ex, WebRequest request) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        ErrorResponse errorResponse = new ErrorResponse(
+                status.value(),
+                status.getReasonPhrase(),
+                ex.getMessage(),
+                getPath(request)
+        );
+        return ResponseEntity.status(status).body(errorResponse);
     }
 
-    @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
-    public ProblemDetail handleValidationExceptions(org.springframework.web.bind.MethodArgumentNotValidException ex) {
-        java.util.Map<String, String> errors = new java.util.HashMap<>();
-        ex.getBindingResult().getAllErrors().forEach((error) -> {
-            String fieldName = ((org.springframework.validation.FieldError) error).getField();
-            String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
-        });
-        
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed for one or more fields.");
-        problemDetail.setTitle("Validation Error");
-        problemDetail.setProperty("timestamp", Instant.now());
-        problemDetail.setProperty("errors", errors);
-        return problemDetail;
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex, WebRequest request) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        Map<String, String> fieldErrors = new HashMap<>();
+        for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
+            fieldErrors.put(fieldError.getField(), fieldError.getDefaultMessage());
+        }
+        ErrorResponse errorResponse = new ErrorResponse(
+                status.value(),
+                status.getReasonPhrase(),
+                "Validation failed for one or more fields",
+                getPath(request)
+        );
+        errorResponse.setValidationErrors(fieldErrors);
+        return ResponseEntity.status(status).body(errorResponse);
     }
 
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadable(HttpMessageNotReadableException ex, WebRequest request) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        ErrorResponse errorResponse = new ErrorResponse(
+                status.value(),
+                status.getReasonPhrase(),
+                "Malformed JSON request body",
+                getPath(request)
+        );
+        return ResponseEntity.status(status).body(errorResponse);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex, WebRequest request) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+        String parameterName = ex.getName();
+        String expectedType = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
+        ErrorResponse errorResponse = new ErrorResponse(
+                status.value(),
+                status.getReasonPhrase(),
+                String.format("Parameter '%s' must be of type '%s'", parameterName, expectedType),
+                getPath(request)
+        );
+        return ResponseEntity.status(status).body(errorResponse);
+    }
 
     @ExceptionHandler(Exception.class)
-    public ProblemDetail handleGeneralException(Exception ex) {
-        log.error("Unhandled internal server error", ex);
-        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "An internal server error occurred. Please contact support.");
-        problemDetail.setTitle("Internal Server Error");
-        problemDetail.setProperty("timestamp", Instant.now());
-        return problemDetail;
+    public ResponseEntity<ErrorResponse> handleGeneralException(Exception ex, WebRequest request) {
+        log.error("Unhandled exception at path {}", getPath(request), ex);
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+        ErrorResponse errorResponse = new ErrorResponse(
+                status.value(),
+                status.getReasonPhrase(),
+                "An internal server error occurred. Please contact support.",
+                getPath(request)
+        );
+        return ResponseEntity.status(status).body(errorResponse);
+    }
+
+    private String getPath(WebRequest request) {
+        if (request instanceof ServletWebRequest servletWebRequest) {
+            return servletWebRequest.getRequest().getRequestURI();
+        }
+        return request.getDescription(false);
     }
 }
