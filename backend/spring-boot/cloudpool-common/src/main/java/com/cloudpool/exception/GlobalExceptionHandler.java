@@ -15,8 +15,9 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -62,10 +63,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex, WebRequest request) {
         HttpStatus status = HttpStatus.BAD_REQUEST;
-        Map<String, String> fieldErrors = new HashMap<>();
-        for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
-            fieldErrors.put(fieldError.getField(), fieldError.getDefaultMessage());
-        }
+        // Collected rather than accumulated into a mutable map so the map is never
+        // exposed as shared state. getDefaultMessage() is nullable and Collectors.toMap
+        // rejects null values, so it is defaulted; a field carrying more than one
+        // violation keeps the last message, as the previous Map.put did.
+        Map<String, String> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
+                .collect(Collectors.toMap(
+                        FieldError::getField,
+                        fieldError -> fieldError.getDefaultMessage() == null
+                                ? "Invalid value"
+                                : fieldError.getDefaultMessage(),
+                        (first, second) -> second,
+                        LinkedHashMap::new));
         ErrorResponse errorResponse = new ErrorResponse(
                 status.value(),
                 status.getReasonPhrase(),
@@ -116,13 +125,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneralException(Exception ex, WebRequest request) {
-        log.error("Unhandled exception at path {}", getPath(request), ex);
+        String path = getPath(request);
+        if (log.isErrorEnabled()) {
+            log.error("Unhandled exception at path {}", path, ex);
+        }
         HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
         ErrorResponse errorResponse = new ErrorResponse(
                 status.value(),
                 status.getReasonPhrase(),
                 "An internal server error occurred. Please contact support.",
-                getPath(request)
+                path
         );
         return ResponseEntity.status(status).body(errorResponse);
     }
