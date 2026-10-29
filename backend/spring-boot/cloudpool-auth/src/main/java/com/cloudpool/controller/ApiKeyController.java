@@ -15,6 +15,7 @@ import com.cloudpool.common.util.ApiKeyUtils;
 import com.cloudpool.service.AuditLogService;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @RestController
@@ -86,6 +87,48 @@ public class ApiKeyController {
         response.put("createdAt", saved.getCreatedAt());
         response.put("expiresAt", saved.getExpiresAt());
 
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Replaces the secret of an existing key. The old secret stops working immediately because
+     * only the hash is stored, and the key keeps its id so usage analytics stay linked to it.
+     */
+    @PostMapping("/{id}/rotate")
+    public ResponseEntity<?> rotateKey(@PathVariable UUID id) {
+        User user = getAuthenticatedUser();
+        Optional<ApiKey> keyOpt = apiKeyRepository.findById(id);
+        if (keyOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        ApiKey key = keyOpt.get();
+        if (!key.getUser().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+        }
+        if (!key.isActive()) {
+            return ResponseEntity.status(409).body(Map.of("error", "Revoked API keys cannot be rotated"));
+        }
+
+        long lifetimeDays = 90;
+        if (key.getCreatedAt() != null && key.getExpiresAt() != null) {
+            lifetimeDays = Math.max(1, Math.min(90, ChronoUnit.DAYS.between(key.getCreatedAt(), key.getExpiresAt())));
+        }
+
+        String plainKey = "cp_live_" + ApiKeyUtils.generateRandomString(32);
+        LocalDateTime now = LocalDateTime.now();
+        key.setKeyHash(ApiKeyUtils.hashApiKey(plainKey));
+        key.setCreatedAt(now);
+        key.setExpiresAt(now.plusDays(lifetimeDays));
+        ApiKey saved = apiKeyRepository.save(key);
+
+        auditLogService.log(user, AuditLogService.ACTION_API_KEY_ROTATE, "API_KEY", saved.getId().toString(), "Rotated API key: " + saved.getName());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", saved.getId());
+        response.put("name", saved.getName());
+        response.put("apiKey", plainKey); // Plaintext key shown only once!
+        response.put("createdAt", saved.getCreatedAt());
+        response.put("expiresAt", saved.getExpiresAt());
         return ResponseEntity.ok(response);
     }
 

@@ -44,6 +44,7 @@ public class AuditLogService {
     public static final String ACTION_BUCKET_DELETE  = "BUCKET_DELETE";
     public static final String ACTION_API_KEY_CREATE = "API_KEY_CREATE";
     public static final String ACTION_API_KEY_DELETE = "API_KEY_DELETE";
+    public static final String ACTION_API_KEY_ROTATE = "API_KEY_ROTATE";
     public static final String ACTION_TABLE_CREATE   = "TABLE_CREATE";
     public static final String ACTION_TABLE_DROP     = "TABLE_DROP";
     public static final String ACTION_VECTOR_INDEX   = "VECTOR_INDEX";
