@@ -116,7 +116,7 @@ public class ProjectRestController {
     public ResponseEntity<?> listConnections(@PathVariable UUID projectId) {
         try {
             User user = getAuthenticatedUser();
-            List<DatabaseConnection> connections = projectService.listConnections(projectId, user.getId());
+            List<?> connections = projectService.listConnections(projectId, user.getId());
             return ResponseEntity.ok(connections);
         } catch (Exception e) {
             return ResponseEntity.status(403).body(Map.of("error", e.getMessage()));

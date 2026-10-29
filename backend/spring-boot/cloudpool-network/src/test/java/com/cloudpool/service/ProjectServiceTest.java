@@ -29,6 +29,7 @@ class ProjectServiceTest {
     @Mock private DevTableFieldRepository devTableFieldRepository;
     @Mock private JdbcTemplate jdbcTemplate;
     @Mock private EncryptionUtil encryptionUtil;
+    @Mock private DatabaseConnectionProfileService connectionProfileService;
 
     private ProjectService projectService;
     private UUID userId;
@@ -40,7 +41,7 @@ class ProjectServiceTest {
         projectService = new ProjectService(projectRepository, projectSecretRepository,
                 databaseConnectionRepository, projectSnapshotRepository,
                 devTableRepository, devTableFieldRepository, jdbcTemplate,
-                new ObjectMapper(), encryptionUtil);
+                new ObjectMapper(), encryptionUtil, connectionProfileService);
 
         userId = UUID.randomUUID();
         projectId = UUID.randomUUID();
@@ -132,6 +133,7 @@ class ProjectServiceTest {
 
         projectService.deleteProject(projectId, userId);
 
+        verify(connectionProfileService).evictAfterCommit(projectId);
         verify(projectSecretRepository).deleteByProjectId(projectId);
         verify(databaseConnectionRepository).deleteByProjectId(projectId);
         verify(projectSnapshotRepository).deleteByProjectId(projectId);
@@ -231,14 +233,26 @@ class ProjectServiceTest {
     }
 
     @Test
-    void listConnections_shouldReturnList() {
+    void listConnections_shouldReadProfilesFromTheCacheLayer() {
+        var profile = new com.cloudpool.dto.DatabaseConnectionProfile(
+                UUID.randomUUID(), projectId, "POSTGRESQL", "db.internal", 5432, "app", "admin", true, LocalDateTime.now());
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(testProject));
-        when(databaseConnectionRepository.findByProjectId(projectId)).thenReturn(List.of());
+        when(connectionProfileService.getProfiles(projectId)).thenReturn(List.of(profile));
 
         var result = projectService.listConnections(projectId, userId);
 
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
+        assertEquals(List.of(profile), result);
+        verifyNoInteractions(databaseConnectionRepository);
+    }
+
+    @Test
+    void listConnections_shouldCheckOwnershipBeforeReadingTheCache() {
+        UUID intruder = UUID.randomUUID();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(testProject));
+
+        assertThrows(SecurityException.class, () -> projectService.listConnections(projectId, intruder));
+
+        verifyNoInteractions(connectionProfileService);
     }
 
     @Test
@@ -256,6 +270,7 @@ class ProjectServiceTest {
 
         assertNotNull(result);
         assertEquals("POSTGRESQL", result.getDbType());
+        verify(connectionProfileService).evictAfterCommit(projectId);
     }
 
     @Test
@@ -278,6 +293,7 @@ class ProjectServiceTest {
         projectService.deleteConnection(connId, userId);
 
         verify(databaseConnectionRepository).delete(conn);
+        verify(connectionProfileService).evictAfterCommit(projectId);
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.cloudpool.service;
 
+import com.cloudpool.dto.DatabaseConnectionProfile;
 import com.cloudpool.model.*;
 import com.cloudpool.repository.*;
 import com.cloudpool.util.EncryptionUtil;
@@ -28,6 +29,7 @@ public class ProjectService {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
     private final EncryptionUtil encryptionUtil;
+    private final DatabaseConnectionProfileService connectionProfileService;
 
     @org.springframework.beans.factory.annotation.Value("${spring.datasource.url:jdbc:h2:file:./data/cloudpooldb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}")
     private String datasourceUrl;
@@ -93,6 +95,7 @@ public class ProjectService {
 
         projectSecretRepository.deleteByProjectId(projectId);
         databaseConnectionRepository.deleteByProjectId(projectId);
+        connectionProfileService.evictAfterCommit(projectId);
         projectSnapshotRepository.deleteByProjectId(projectId);
         projectRepository.delete(project);
     }
@@ -146,9 +149,9 @@ public class ProjectService {
 
     // ── DATABASE CONNECTIONS ──
 
-    public List<DatabaseConnection> listConnections(UUID projectId, UUID userId) {
-        getProject(projectId, userId); // check auth
-        return databaseConnectionRepository.findByProjectId(projectId);
+    public List<DatabaseConnectionProfile> listConnections(UUID projectId, UUID userId) {
+        getProject(projectId, userId); // check auth before touching the cache
+        return connectionProfileService.getProfiles(projectId);
     }
 
     private void validateHost(String host) {
@@ -231,7 +234,9 @@ public class ProjectService {
                     .active(active)
                     .build();
         }
-        return databaseConnectionRepository.save(conn);
+        DatabaseConnection saved = databaseConnectionRepository.save(conn);
+        connectionProfileService.evictAfterCommit(projectId);
+        return saved;
     }
 
     @Transactional
@@ -243,8 +248,10 @@ public class ProjectService {
     public void deleteConnection(UUID connectionId, UUID userId) {
         DatabaseConnection conn = databaseConnectionRepository.findById(connectionId)
                 .orElseThrow(() -> new NoSuchElementException("Connection not found"));
-        getProject(conn.getProject().getId(), userId); // check auth
+        UUID projectId = conn.getProject().getId();
+        getProject(projectId, userId); // check auth
         databaseConnectionRepository.delete(conn);
+        connectionProfileService.evictAfterCommit(projectId);
     }
 
     public boolean testConnection(String dbType, String host, int port, String databaseName, String username, String password) {
@@ -351,6 +358,7 @@ public class ProjectService {
 
             // 2. Restore Connections
             databaseConnectionRepository.deleteByProjectId(projectId);
+            connectionProfileService.evictAfterCommit(projectId);
             if (topology.getConnections() != null) {
                 for (ConnectionState c : topology.getConnections()) {
                     DatabaseConnection conn = DatabaseConnection.builder()
