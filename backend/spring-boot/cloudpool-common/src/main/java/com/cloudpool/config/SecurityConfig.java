@@ -67,6 +67,8 @@ public class SecurityConfig {
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/api/health")).permitAll()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/graphql")).authenticated()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/graphiql/**")).permitAll()
+                // Handshake only: browsers cannot authenticate it, so STOMP sessions are authenticated in the CONNECT frame
+                .requestMatchers(AntPathRequestMatcher.antMatcher("/ws/console/**")).permitAll()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/api/auth/**")).permitAll()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/api/files/shared/**")).permitAll()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/oauth/callback")).permitAll()

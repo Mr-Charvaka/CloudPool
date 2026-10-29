@@ -39,7 +39,7 @@ public class GatewaySecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeExchange(exchanges -> exchanges
-                .pathMatchers("/api/auth/**", "/public/**", "/", "/index.html", "/favicon.ico", "/static/**", "/error", "/graphiql/**").permitAll()
+                .pathMatchers("/api/auth/**", "/public/**", "/", "/index.html", "/favicon.ico", "/static/**", "/error", "/graphiql/**", "/ws/console/**").permitAll()
                 .matchers(apiKeyMatcher).permitAll()
                 .anyExchange().authenticated()
             )
