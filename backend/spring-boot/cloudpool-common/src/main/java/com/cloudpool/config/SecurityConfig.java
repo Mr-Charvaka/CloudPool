@@ -67,6 +67,7 @@ public class SecurityConfig {
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/api/health")).permitAll()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/graphql")).authenticated()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/graphiql/**")).permitAll()
+                .requestMatchers(AntPathRequestMatcher.antMatcher("/api/admin/**")).hasRole("ADMIN")
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/api/auth/**")).permitAll()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/api/files/shared/**")).permitAll()
                 .requestMatchers(AntPathRequestMatcher.antMatcher("/oauth/callback")).permitAll()
